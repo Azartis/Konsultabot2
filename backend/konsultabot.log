@@ -752,3 +752,14 @@ C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\technical_kno
 Watching for file changes with StatReloader
 C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\technical_knowledge.py changed, reloading.
 Watching for file changes with StatReloader
+"POST /api/chat/send/ HTTP/1.1" 200 302
+"POST /api/chat/send/ HTTP/1.1" 200 1292
+"POST /api/chat/send/ HTTP/1.1" 200 304
+"OPTIONS /api/users/login/ HTTP/1.1" 200 0
+"POST /api/users/login/ HTTP/1.1" 200 393
+"OPTIONS /api/chat/send/ HTTP/1.1" 200 0
+"POST /api/chat/send/ HTTP/1.1" 200 304
+"POST /api/chat/send/ HTTP/1.1" 200 1292
+"POST /api/chat/send/ HTTP/1.1" 200 304
+"POST /api/chat/send/ HTTP/1.1" 200 304
+"POST /api/chat/send/ HTTP/1.1" 200 1292
