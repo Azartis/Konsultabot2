@@ -763,3 +763,309 @@ Watching for file changes with StatReloader
 "POST /api/chat/send/ HTTP/1.1" 200 304
 "POST /api/chat/send/ HTTP/1.1" 200 304
 "POST /api/chat/send/ HTTP/1.1" 200 1292
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+"OPTIONS /api/users/login/ HTTP/1.1" 200 0
+"POST /api/users/login/ HTTP/1.1" 200 393
+"OPTIONS /api/chat/send/ HTTP/1.1" 200 0
+"POST /api/chat/send/ HTTP/1.1" 200 384
+"POST /api/chat/send/ HTTP/1.1" 200 792
+"POST /api/chat/send/ HTTP/1.1" 200 1383
+"POST /api/chat/send/ HTTP/1.1" 200 302
+"POST /api/chat/send/ HTTP/1.1" 200 220
+"POST /api/chat/send/ HTTP/1.1" 200 257
+"POST /api/chat/send/ HTTP/1.1" 200 302
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+"OPTIONS /api/users/login/ HTTP/1.1" 200 0
+- Broken pipe from ('127.0.0.1', 58913)
+"POST /api/users/login/ HTTP/1.1" 200 393
+"OPTIONS /api/chat/send/ HTTP/1.1" 200 0
+"POST /api/chat/send/ HTTP/1.1" 200 384
+"POST /api/chat/send/ HTTP/1.1" 200 301
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+"GET /?vscodeBrowserReqId=1759154648479 HTTP/1.1" 200 196
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\konsultabot_backend\settings.py changed, reloading.
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\konsultabot_backend\settings.py changed, reloading.
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\konsultabot_backend\settings.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+"GET /api/ HTTP/1.1" 200 196
+- Broken pipe from ('192.168.1.17', 61526)
+Not Found: /api/health/
+"GET /api/health/ HTTP/1.1" 404 2838
+- Broken pipe from ('192.168.1.17', 61547)
+Not Found: /api/users/
+"GET /api/users/ HTTP/1.1" 404 3640
+- Broken pipe from ('192.168.1.17', 63542)
+Unauthorized: /api/users/profile/
+"GET /api/users/profile/ HTTP/1.1" 401 58
+- Broken pipe from ('192.168.1.17', 53097)
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+Unauthorized: /api/users/profile/
+"GET /api/users/profile/ HTTP/1.1" 401 58
+Unauthorized: /api/chat/send/
+"POST /api/chat/send/ HTTP/1.1" 401 58
+"OPTIONS /api/users/login/ HTTP/1.1" 200 0
+"POST /api/users/login/ HTTP/1.1" 200 393
+"OPTIONS /api/chat/send/ HTTP/1.1" 200 0
+"POST /api/chat/send/ HTTP/1.1" 200 384
+"POST /api/chat/send/ HTTP/1.1" 200 304
+"POST /api/chat/send/ HTTP/1.1" 200 304
+"POST /api/chat/send/ HTTP/1.1" 200 1909
+"POST /api/chat/send/ HTTP/1.1" 200 304
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+Watching for file changes with StatReloader
+"OPTIONS /api/users/login/ HTTP/1.1" 200 0
+"POST /api/users/login/ HTTP/1.1" 200 393
+"OPTIONS /api/chat/send/ HTTP/1.1" 200 0
+"POST /api/chat/send/ HTTP/1.1" 200 384
+"POST /api/chat/send/ HTTP/1.1" 200 304
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+Watching for file changes with StatReloader
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+Watching for file changes with StatReloader
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\urls.py changed, reloading.
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\urls.py changed, reloading.
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\urls.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Unauthorized: /api/chat/test-gemini/
+"POST /api/chat/test-gemini/ HTTP/1.1" 401 58
+Unauthorized: /api/chat/send/
+"POST /api/chat/send/ HTTP/1.1" 401 58
+"OPTIONS /api/users/login/ HTTP/1.1" 200 0
+"POST /api/users/login/ HTTP/1.1" 200 393
+"OPTIONS /api/chat/send/ HTTP/1.1" 200 0
+"POST /api/chat/send/ HTTP/1.1" 200 304
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+Watching for file changes with StatReloader
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+Watching for file changes with StatReloader
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\urls.py changed, reloading.
+Watching for file changes with StatReloader
+Service Unavailable: /api/chat/test-chat-gemini/
+"POST /api/chat/test-chat-gemini/ HTTP/1.1" 503 102
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+Watching for file changes with StatReloader
+"GET /api/ HTTP/1.1" 200 196
+Service Unavailable: /api/chat/test-chat-gemini/
+"POST /api/chat/test-chat-gemini/ HTTP/1.1" 503 75
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+Watching for file changes with StatReloader
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+Watching for file changes with StatReloader
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+Watching for file changes with StatReloader
+Internal Server Error: /api/chat/test-chat-gemini/
+"POST /api/chat/test-chat-gemini/ HTTP/1.1" 500 104
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+Watching for file changes with StatReloader
+Internal Server Error: /api/chat/test-chat-gemini/
+"POST /api/chat/test-chat-gemini/ HTTP/1.1" 500 83
+"GET /api/ HTTP/1.1" 200 196
+Internal Server Error: /api/chat/test-chat-gemini/
+"POST /api/chat/test-chat-gemini/ HTTP/1.1" 500 83
+Internal Server Error: /api/chat/test-chat-gemini/
+"POST /api/chat/test-chat-gemini/ HTTP/1.1" 500 104
+Internal Server Error: /api/chat/test-chat-gemini/
+"POST /api/chat/test-chat-gemini/ HTTP/1.1" 500 101
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+Watching for file changes with StatReloader
+"GET /api/ HTTP/1.1" 200 196
+Internal Server Error: /api/chat/test-chat-gemini/
+"POST /api/chat/test-chat-gemini/ HTTP/1.1" 500 83
+Internal Server Error: /api/chat/test-chat-gemini/
+"POST /api/chat/test-chat-gemini/ HTTP/1.1" 500 104
+Internal Server Error: /api/chat/test-chat-gemini/
+"POST /api/chat/test-chat-gemini/ HTTP/1.1" 500 101
+"GET /api/ HTTP/1.1" 200 196
+Internal Server Error: /api/chat/test-chat-gemini/
+"POST /api/chat/test-chat-gemini/ HTTP/1.1" 500 83
+Internal Server Error: /api/chat/test-chat-gemini/
+"POST /api/chat/test-chat-gemini/ HTTP/1.1" 500 104
+Internal Server Error: /api/chat/test-chat-gemini/
+"POST /api/chat/test-chat-gemini/ HTTP/1.1" 500 101
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+Watching for file changes with StatReloader
+"GET /api/ HTTP/1.1" 200 196
+Internal Server Error: /api/chat/test-chat-gemini/
+"POST /api/chat/test-chat-gemini/ HTTP/1.1" 500 83
+Internal Server Error: /api/chat/test-chat-gemini/
+"POST /api/chat/test-chat-gemini/ HTTP/1.1" 500 104
+Internal Server Error: /api/chat/test-chat-gemini/
+"POST /api/chat/test-chat-gemini/ HTTP/1.1" 500 101
+Internal Server Error: /api/chat/test-chat-gemini/
+"POST /api/chat/test-chat-gemini/ HTTP/1.1" 500 97
+Watching for file changes with StatReloader
+Internal Server Error: /api/chat/test-chat-gemini/
+"POST /api/chat/test-chat-gemini/ HTTP/1.1" 500 97
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Internal Server Error: /api/chat/test-chat-gemini/
+"POST /api/chat/test-chat-gemini/ HTTP/1.1" 500 97
+Internal Server Error: /api/chat/test-chat-gemini/
+"POST /api/chat/test-chat-gemini/ HTTP/1.1" 500 97
+Internal Server Error: /api/chat/test-chat-gemini/
+"POST /api/chat/test-chat-gemini/ HTTP/1.1" 500 77
+Internal Server Error: /api/chat/test-chat-gemini/
+"POST /api/chat/test-chat-gemini/ HTTP/1.1" 500 82
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Internal Server Error: /api/chat/test-chat-gemini/
+Internal Server Error: /api/chat/test-chat-gemini/
+"POST /api/chat/test-chat-gemini/ HTTP/1.1" 500 97
+"POST /api/chat/test-chat-gemini/ HTTP/1.1" 500 97
+Internal Server Error: /api/chat/test-chat-gemini/
+"POST /api/chat/test-chat-gemini/ HTTP/1.1" 500 97
+"GET /api/ HTTP/1.1" 200 196
+Method Not Allowed: /api/chat/test-chat-gemini/
+"GET /api/chat/test-chat-gemini/ HTTP/1.1" 405 40
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Internal Server Error: /api/chat/test-chat-gemini/
+"POST /api/chat/test-chat-gemini/ HTTP/1.1" 500 195
+Internal Server Error: /api/chat/test-chat-gemini/
+"POST /api/chat/test-chat-gemini/ HTTP/1.1" 500 193
+Internal Server Error: /api/chat/test-chat-gemini/
+"POST /api/chat/test-chat-gemini/ HTTP/1.1" 500 237
+Internal Server Error: /api/chat/test-chat-gemini/
+"POST /api/chat/test-chat-gemini/ HTTP/1.1" 500 235
+Internal Server Error: /api/chat/test-chat-gemini/
+"POST /api/chat/test-chat-gemini/ HTTP/1.1" 500 223
+Internal Server Error: /api/chat/test-chat-gemini/
+"POST /api/chat/test-chat-gemini/ HTTP/1.1" 500 233
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\urls.py changed, reloading.
+Watching for file changes with StatReloader
+"POST /api/chat/simple-gemini/ HTTP/1.1" 200 307
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+Watching for file changes with StatReloader
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Internal Server Error: /api/chat/test-chat-gemini/
+"POST /api/chat/test-chat-gemini/ HTTP/1.1" 500 223
+"OPTIONS /api/users/login/ HTTP/1.1" 200 0
+"POST /api/users/login/ HTTP/1.1" 200 393
+"OPTIONS /api/chat/send/ HTTP/1.1" 200 0
+Gemini fallback failed: 400 API key not valid. Please pass a valid API key. [reason: "API_KEY_INVALID"
+domain: "googleapis.com"
+metadata {
+  key: "service"
+  value: "generativelanguage.googleapis.com"
+}
+, locale: "en-US"
+message: "API key not valid. Please pass a valid API key."
+]
+"POST /api/chat/send/ HTTP/1.1" 200 303
+"POST /api/chat/simple-gemini/ HTTP/1.1" 200 307
+"POST /api/chat/simple-gemini/ HTTP/1.1" 200 307
+"POST /api/chat/simple-gemini/ HTTP/1.1" 200 307
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+"POST /api/chat/simple-gemini/ HTTP/1.1" 200 307
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+"POST /api/chat/simple-gemini/ HTTP/1.1" 200 307
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+"POST /api/chat/simple-gemini/ HTTP/1.1" 200 995
+"POST /api/chat/simple-gemini/ HTTP/1.1" 200 1311
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\urls.py changed, reloading.
+Watching for file changes with StatReloader
+"GET /api/chat/server-info/ HTTP/1.1" 200 318
+"OPTIONS /api/users/login/ HTTP/1.1" 200 0
+"POST /api/users/login/ HTTP/1.1" 200 393
+"OPTIONS /api/chat/send/ HTTP/1.1" 200 0
+Gemini fallback failed: 400 API key not valid. Please pass a valid API key. [reason: "API_KEY_INVALID"
+domain: "googleapis.com"
+metadata {
+  key: "service"
+  value: "generativelanguage.googleapis.com"
+}
+, locale: "en-US"
+message: "API key not valid. Please pass a valid API key."
+]
+"POST /api/chat/send/ HTTP/1.1" 200 304
+"OPTIONS /api/users/login/ HTTP/1.1" 200 0
+"POST /api/users/login/ HTTP/1.1" 200 393
+"OPTIONS /api/chat/send/ HTTP/1.1" 200 0
+Gemini fallback failed: 400 API key not valid. Please pass a valid API key. [reason: "API_KEY_INVALID"
+domain: "googleapis.com"
+metadata {
+  key: "service"
+  value: "generativelanguage.googleapis.com"
+}
+, locale: "en-US"
+message: "API key not valid. Please pass a valid API key."
+]
+"POST /api/chat/send/ HTTP/1.1" 200 304
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
+Watching for file changes with StatReloader

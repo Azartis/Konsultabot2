@@ -1,0 +1,16 @@
+{
+  "primary_ip": "192.168.1.17",
+  "all_ips": [
+    "192.168.1.17"
+  ],
+  "port": 8000,
+  "endpoints": {
+    "api_root": "http://192.168.1.17:8000/api/",
+    "gemini": "http://192.168.1.17:8000/api/chat/simple-gemini/",
+    "chat": "http://192.168.1.17:8000/api/chat/send/",
+    "auth": "http://192.168.1.17:8000/api/users/"
+  },
+  "fallback_urls": [
+    "http://192.168.1.17:8000/api/"
+  ]
+}

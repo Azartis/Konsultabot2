@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.eggs/
+.build/
+dist/
+build/
+.cache/
+.venv/
+venv/
+.env
+.env.*
+
+# Logs and databases
+*.log
+*.sqlite3
+*.db
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Node/React Native (mobile project)
+node_modules/
+KonsultabotMobileNew/**/node_modules/
+KonsultabotMobileNew/**/.expo/
+KonsultabotMobileNew/**/.expo-shared/
+KonsultabotMobileNew/**/dist/
+KonsultabotMobileNew/**/build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Django
+staticfiles/
+media/
+
+# Others
+*.bak
+*.tmp

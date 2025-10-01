@@ -1,6 +1,6 @@
 @echo off
 echo Starting Konsultabot Django Backend...
-cd /d "c:\Users\Ace Ziegfred Culapas\CascadeProjects\Project"
+cd /d "c:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj"
 call ".venv\Scripts\activate.bat"
 echo Installing dependencies...
 pip install -r requirements.txt

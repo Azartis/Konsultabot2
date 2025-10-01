@@ -8,8 +8,19 @@ const getApiUrl = () => {
     return 'http://localhost:8000/api';
   }
   
-  // For mobile, use the configured URL or fallback
-  return Constants.expoConfig?.extra?.apiUrl || 'http://localhost:8000/api';
+  // For mobile, try to get server info dynamically
+  // Fallback to common IP addresses if needed
+  const possibleIPs = [
+    '192.168.1.17',
+    '192.168.1.10', 
+    '192.168.1.11',
+    '192.168.0.100',
+    '10.0.0.100'
+  ];
+  
+  // Use the first IP as default, but this will be updated dynamically
+  const defaultIP = possibleIPs[0];
+  return `http://${defaultIP}:8000/api`;
 };
 
 const API_BASE_URL = getApiUrl();
@@ -138,6 +149,84 @@ class ApiService {
 
   async getApiStatus() {
     return this.api.get('/status/');
+  }
+
+  // Gemini testing endpoint
+  async testGemini(message = 'What is artificial intelligence?') {
+    return this.api.post('/chat/test-gemini/', { 
+      message, 
+      language: 'english' 
+    });
+  }
+
+  // Direct Gemini chat test (no auth required)
+  async testChatGemini(message = 'What is artificial intelligence?') {
+    return this.api.post('/chat/test-chat-gemini/', { 
+      message, 
+      language: 'english' 
+    });
+  }
+
+  // Working Gemini endpoint (no auth required)
+  async askGemini(message = 'What is artificial intelligence?') {
+    return this.api.post('/chat/simple-gemini/', { 
+      message 
+    });
+  }
+
+  // Dynamic server discovery
+  async discoverServer() {
+    const possibleIPs = [
+      '192.168.1.17',
+      '192.168.1.10', 
+      '192.168.1.11',
+      '192.168.0.100',
+      '10.0.0.100',
+      '192.168.1.1',
+      '192.168.0.1'
+    ];
+
+    for (const ip of possibleIPs) {
+      try {
+        const testUrl = `http://${ip}:8000/api/chat/server-info/`;
+        const response = await axios.get(testUrl, { timeout: 3000 });
+        
+        if (response.status === 200 && response.data.status === 'success') {
+          console.log(`✅ Found server at ${ip}:8000`);
+          
+          // Update the base URL
+          this.api.defaults.baseURL = `http://${ip}:8000/api`;
+          
+          return {
+            success: true,
+            serverIP: ip,
+            serverInfo: response.data
+          };
+        }
+      } catch (error) {
+        console.log(`❌ Server not found at ${ip}:8000`);
+        continue;
+      }
+    }
+
+    return {
+      success: false,
+      error: 'No server found on common IP addresses'
+    };
+  }
+
+  // Auto-configure API service
+  async autoConfig() {
+    console.log('🔍 Auto-discovering server...');
+    const result = await this.discoverServer();
+    
+    if (result.success) {
+      console.log('✅ Server auto-configured:', result.serverInfo);
+      return result;
+    } else {
+      console.log('❌ Auto-config failed, using default IP');
+      return result;
+    }
   }
 }
 
