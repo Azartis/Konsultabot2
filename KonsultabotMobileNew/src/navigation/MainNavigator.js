@@ -3,11 +3,11 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 
-import ChatScreen from '../screens/main/ChatScreen';
-import HistoryScreen from '../screens/main/HistoryScreen';
-import ProfileScreen from '../screens/main/ProfileScreen';
-import SettingsScreen from '../screens/main/SettingsScreen';
-import { theme } from '../theme/theme';
+import GeminiKonsultaBot from '../screens/main/GeminiKonsultaBot';
+import SimpleHistoryScreen from '../screens/main/SimpleHistoryScreen';
+import SimpleProfileScreen from '../screens/main/SimpleProfileScreen';
+import SimpleSettingsScreen from '../screens/main/SimpleSettingsScreen';
+import { theme } from '../theme/cleanTheme';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -27,8 +27,8 @@ function ChatStack() {
     >
       <Stack.Screen 
         name="ChatMain" 
-        component={ChatScreen}
-        options={{ title: 'Konsultabot' }}
+        component={GeminiKonsultaBot}
+        options={{ headerShown: false }}
       />
     </Stack.Navigator>
   );
@@ -49,8 +49,8 @@ function HistoryStack() {
     >
       <Stack.Screen 
         name="HistoryMain" 
-        component={HistoryScreen}
-        options={{ title: 'Chat History' }}
+        component={SimpleHistoryScreen}
+        options={{ headerShown: false }}
       />
     </Stack.Navigator>
   );
@@ -71,13 +71,13 @@ function ProfileStack() {
     >
       <Stack.Screen 
         name="ProfileMain" 
-        component={ProfileScreen}
-        options={{ title: 'Profile' }}
+        component={SimpleProfileScreen}
+        options={{ headerShown: false }}
       />
       <Stack.Screen 
         name="Settings" 
-        component={SettingsScreen}
-        options={{ title: 'Settings' }}
+        component={SimpleSettingsScreen}
+        options={{ headerShown: false }}
       />
     </Stack.Navigator>
   );

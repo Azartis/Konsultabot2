@@ -1,0 +1,22 @@
+# Working requirements for Konsultabot - tested and functional
+# Essential packages that install without compiler issues
+
+# Core functionality
+google-generativeai>=0.3.0
+requests>=2.25.0
+python-dotenv>=0.19.0
+bcrypt>=3.2.0
+pillow>=8.0.0
+
+# Pre-installed scientific packages (use system versions)
+# numpy - already installed globally
+# scipy - already installed globally  
+# scikit-learn - already installed globally
+
+# Optional packages (install separately if needed)
+# speechrecognition>=3.8.0  # For voice features
+# pyttsx3>=2.90  # For text-to-speech
+# nltk>=3.8  # For NLP features
+
+# Note: Some packages require C++ compiler and may fail
+# The app works with basic functionality using the packages above

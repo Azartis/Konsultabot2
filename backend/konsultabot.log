@@ -1069,3 +1069,469 @@ Watching for file changes with StatReloader
 Watching for file changes with StatReloader
 C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\chat\views.py changed, reloading.
 Watching for file changes with StatReloader
+"POST /api/chat/simple-gemini/ HTTP/1.1" 200 2060
+"OPTIONS /api/users/profile/ HTTP/1.1" 200 0
+"GET /api/users/profile/ HTTP/1.1" 200 304
+"POST /api/chat/send/ HTTP/1.1" 200 2074
+"POST /api/chat/send/ HTTP/1.1" 200 3259
+"POST /api/chat/send/ HTTP/1.1" 200 441
+"POST /api/chat/send/ HTTP/1.1" 200 770
+"POST /api/chat/send/ HTTP/1.1" 200 672
+"GET /api/users/profile/ HTTP/1.1" 200 304
+Watching for file changes with StatReloader
+"OPTIONS /api/users/login/ HTTP/1.1" 200 0
+"POST /api/users/login/ HTTP/1.1" 200 393
+"OPTIONS /api/chat/send/ HTTP/1.1" 200 0
+"POST /api/chat/send/ HTTP/1.1" 200 516
+- Broken pipe from ('127.0.0.1', 55551)
+- Broken pipe from ('127.0.0.1', 55554)
+"POST /api/chat/send/ HTTP/1.1" 200 1909
+- Broken pipe from ('127.0.0.1', 55619)
+"POST /api/chat/send/ HTTP/1.1" 200 2647
+- Broken pipe from ('127.0.0.1', 56030)
+- Broken pipe from ('127.0.0.1', 56510)
+- Broken pipe from ('127.0.0.1', 56262)
+"OPTIONS /api/users/login/ HTTP/1.1" 200 0
+"POST /api/users/login/ HTTP/1.1" 200 393
+"OPTIONS /api/chat/send/ HTTP/1.1" 200 0
+- Broken pipe from ('127.0.0.1', 53758)
+"OPTIONS /api/users/login/ HTTP/1.1" 200 0
+"POST /api/users/login/ HTTP/1.1" 200 393
+"OPTIONS /api/chat/send/ HTTP/1.1" 200 0
+- Broken pipe from ('127.0.0.1', 51755)
+"POST /api/chat/send/ HTTP/1.1" 200 1424
+"OPTIONS /api/users/login/ HTTP/1.1" 200 0
+"POST /api/users/login/ HTTP/1.1" 200 393
+"OPTIONS /api/chat/send/ HTTP/1.1" 200 0
+- Broken pipe from ('127.0.0.1', 63397)
+Watching for file changes with StatReloader
+"POST /api/chat/send/ HTTP/1.1" 200 3122
+"POST /api/chat/send/ HTTP/1.1" 200 451
+- Broken pipe from ('127.0.0.1', 50179)
+"GET /api/chat/server-info/ HTTP/1.1" 200 333
+"GET /api/chat/server-info/ HTTP/1.1" 200 333
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+"OPTIONS /api/users/profile/ HTTP/1.1" 200 0
+"GET /api/users/profile/ HTTP/1.1" 200 304
+- Broken pipe from ('127.0.0.1', 54238)
+"GET /api/chat/server-info/ HTTP/1.1" 200 333
+"OPTIONS /api/users/login/ HTTP/1.1" 200 0
+"POST /api/users/login/ HTTP/1.1" 200 393
+"OPTIONS /api/chat/send/ HTTP/1.1" 200 0
+"POST /api/chat/send/ HTTP/1.1" 200 516
+- Broken pipe from ('127.0.0.1', 58101)
+"POST /api/chat/send/ HTTP/1.1" 200 1909
+"OPTIONS /api/users/login/ HTTP/1.1" 200 0
+- Broken pipe from ('127.0.0.1', 56550)
+"POST /api/users/login/ HTTP/1.1" 200 393
+"OPTIONS /api/users/login/ HTTP/1.1" 200 0
+- Broken pipe from ('127.0.0.1', 64202)
+Watching for file changes with StatReloader
+"POST /api/users/login/ HTTP/1.1" 200 393
+"OPTIONS /api/chat/send/ HTTP/1.1" 200 0
+"POST /api/chat/send/ HTTP/1.1" 200 255
+"POST /api/chat/send/ HTTP/1.1" 200 576
+"POST /api/chat/send/ HTTP/1.1" 200 755
+"OPTIONS /api/users/profile/update/ HTTP/1.1" 200 0
+"PUT /api/users/profile/update/ HTTP/1.1" 200 353
+"POST /api/chat/send/ HTTP/1.1" 200 442
+"POST /api/chat/send/ HTTP/1.1" 200 1292
+"OPTIONS /api/users/profile/ HTTP/1.1" 200 0
+"GET /api/users/profile/ HTTP/1.1" 200 303
+"GET /api/users/profile/ HTTP/1.1" 200 303
+"GET /api/users/profile/ HTTP/1.1" 200 303
+Watching for file changes with StatReloader
+"GET /api/users/profile/ HTTP/1.1" 200 303
+"POST /api/chat/send/ HTTP/1.1" 200 418
+"GET /api/users/profile/ HTTP/1.1" 200 303
+"POST /api/chat/send/ HTTP/1.1" 200 500
+"GET /api/users/profile/ HTTP/1.1" 200 303
+- Broken pipe from ('127.0.0.1', 60424)
+Watching for file changes with StatReloader
+"POST /api/users/login/ HTTP/1.1" 200 392
+"OPTIONS /api/chat/history/ HTTP/1.1" 200 0
+"GET /api/chat/history/ HTTP/1.1" 200 79081
+Watching for file changes with StatReloader
+"GET /api/users/profile/ HTTP/1.1" 200 303
+- Broken pipe from ('127.0.0.1', 49815)
+"GET /api/users/profile/ HTTP/1.1" 200 303
+Watching for file changes with StatReloader
+Unauthorized: /api/users/profile/
+"GET /api/users/profile/ HTTP/1.1" 401 58
+"OPTIONS /api/users/login/ HTTP/1.1" 200 0
+"POST /api/users/login/ HTTP/1.1" 200 392
+"OPTIONS /api/chat/send/ HTTP/1.1" 200 0
+Invalid HTTP_HOST header: '192.168.1.5:8000'. You may need to add '192.168.1.5' to ALLOWED_HOSTS.
+Traceback (most recent call last):
+  File "C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\.venv\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\.venv\Lib\site-packages\django\utils\deprecation.py", line 133, in __call__
+    response = self.process_request(request)
+  File "C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\.venv\Lib\site-packages\django\middleware\common.py", line 48, in process_request
+    host = request.get_host()
+  File "C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\.venv\Lib\site-packages\django\http\request.py", line 150, in get_host
+    raise DisallowedHost(msg)
+django.core.exceptions.DisallowedHost: Invalid HTTP_HOST header: '192.168.1.5:8000'. You may need to add '192.168.1.5' to ALLOWED_HOSTS.
+Bad Request: /api/chat/send/
+"POST /api/chat/send/ HTTP/1.1" 400 79404
+Invalid HTTP_HOST header: '192.168.1.5:8000'. You may need to add '192.168.1.5' to ALLOWED_HOSTS.
+Traceback (most recent call last):
+  File "C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\.venv\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\.venv\Lib\site-packages\django\utils\deprecation.py", line 133, in __call__
+    response = self.process_request(request)
+  File "C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\.venv\Lib\site-packages\django\middleware\common.py", line 48, in process_request
+    host = request.get_host()
+  File "C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\.venv\Lib\site-packages\django\http\request.py", line 150, in get_host
+    raise DisallowedHost(msg)
+django.core.exceptions.DisallowedHost: Invalid HTTP_HOST header: '192.168.1.5:8000'. You may need to add '192.168.1.5' to ALLOWED_HOSTS.
+Bad Request: /api/chat/send/
+"POST /api/chat/send/ HTTP/1.1" 400 79404
+Invalid HTTP_HOST header: '192.168.1.5:8000'. You may need to add '192.168.1.5' to ALLOWED_HOSTS.
+Traceback (most recent call last):
+  File "C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\.venv\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\.venv\Lib\site-packages\django\utils\deprecation.py", line 133, in __call__
+    response = self.process_request(request)
+  File "C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\.venv\Lib\site-packages\django\middleware\common.py", line 48, in process_request
+    host = request.get_host()
+  File "C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\.venv\Lib\site-packages\django\http\request.py", line 150, in get_host
+    raise DisallowedHost(msg)
+django.core.exceptions.DisallowedHost: Invalid HTTP_HOST header: '192.168.1.5:8000'. You may need to add '192.168.1.5' to ALLOWED_HOSTS.
+Bad Request: /api/chat/send/
+"POST /api/chat/send/ HTTP/1.1" 400 79404
+Invalid HTTP_HOST header: '192.168.1.5:8000'. You may need to add '192.168.1.5' to ALLOWED_HOSTS.
+Traceback (most recent call last):
+  File "C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\.venv\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\.venv\Lib\site-packages\django\utils\deprecation.py", line 133, in __call__
+    response = self.process_request(request)
+  File "C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\.venv\Lib\site-packages\django\middleware\common.py", line 48, in process_request
+    host = request.get_host()
+  File "C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\.venv\Lib\site-packages\django\http\request.py", line 150, in get_host
+    raise DisallowedHost(msg)
+django.core.exceptions.DisallowedHost: Invalid HTTP_HOST header: '192.168.1.5:8000'. You may need to add '192.168.1.5' to ALLOWED_HOSTS.
+Bad Request: /api/chat/send/
+"POST /api/chat/send/ HTTP/1.1" 400 79404
+Invalid HTTP_HOST header: '192.168.1.5:8000'. You may need to add '192.168.1.5' to ALLOWED_HOSTS.
+Traceback (most recent call last):
+  File "C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\.venv\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\.venv\Lib\site-packages\django\utils\deprecation.py", line 133, in __call__
+    response = self.process_request(request)
+  File "C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\.venv\Lib\site-packages\django\middleware\common.py", line 48, in process_request
+    host = request.get_host()
+  File "C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\.venv\Lib\site-packages\django\http\request.py", line 150, in get_host
+    raise DisallowedHost(msg)
+django.core.exceptions.DisallowedHost: Invalid HTTP_HOST header: '192.168.1.5:8000'. You may need to add '192.168.1.5' to ALLOWED_HOSTS.
+Bad Request: /api/chat/send/
+"POST /api/chat/send/ HTTP/1.1" 400 79404
+Invalid HTTP_HOST header: '192.168.1.5:8000'. You may need to add '192.168.1.5' to ALLOWED_HOSTS.
+Traceback (most recent call last):
+  File "C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\.venv\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\.venv\Lib\site-packages\django\utils\deprecation.py", line 133, in __call__
+    response = self.process_request(request)
+  File "C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\.venv\Lib\site-packages\django\middleware\common.py", line 48, in process_request
+    host = request.get_host()
+  File "C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\.venv\Lib\site-packages\django\http\request.py", line 150, in get_host
+    raise DisallowedHost(msg)
+django.core.exceptions.DisallowedHost: Invalid HTTP_HOST header: '192.168.1.5:8000'. You may need to add '192.168.1.5' to ALLOWED_HOSTS.
+Bad Request: /api/
+"GET /api/ HTTP/1.1" 400 79291
+Invalid HTTP_HOST header: '192.168.1.5:8000'. You may need to add '192.168.1.5' to ALLOWED_HOSTS.
+Traceback (most recent call last):
+  File "C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\.venv\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\.venv\Lib\site-packages\django\utils\deprecation.py", line 133, in __call__
+    response = self.process_request(request)
+  File "C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\.venv\Lib\site-packages\django\middleware\common.py", line 48, in process_request
+    host = request.get_host()
+  File "C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\.venv\Lib\site-packages\django\http\request.py", line 150, in get_host
+    raise DisallowedHost(msg)
+django.core.exceptions.DisallowedHost: Invalid HTTP_HOST header: '192.168.1.5:8000'. You may need to add '192.168.1.5' to ALLOWED_HOSTS.
+Bad Request: /api/
+"GET /api/ HTTP/1.1" 400 79291
+Invalid HTTP_HOST header: '192.168.1.5:8000'. You may need to add '192.168.1.5' to ALLOWED_HOSTS.
+Traceback (most recent call last):
+  File "C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\.venv\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\.venv\Lib\site-packages\django\utils\deprecation.py", line 133, in __call__
+    response = self.process_request(request)
+  File "C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\.venv\Lib\site-packages\django\middleware\common.py", line 48, in process_request
+    host = request.get_host()
+  File "C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\.venv\Lib\site-packages\django\http\request.py", line 150, in get_host
+    raise DisallowedHost(msg)
+django.core.exceptions.DisallowedHost: Invalid HTTP_HOST header: '192.168.1.5:8000'. You may need to add '192.168.1.5' to ALLOWED_HOSTS.
+Bad Request: /api/
+"GET /api/ HTTP/1.1" 400 78467
+"GET /api/ HTTP/1.1" 200 196
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\konsultabot_backend\settings.py changed, reloading.
+Watching for file changes with StatReloader
+Unauthorized: /api/chat/send/
+"POST /api/chat/send/ HTTP/1.1" 401 58
+"POST /api/chat/simple-gemini/ HTTP/1.1" 200 301
+Watching for file changes with StatReloader
+"GET /api/ HTTP/1.1" 200 196
+"OPTIONS /api/chat/simple-gemini/ HTTP/1.1" 200 0
+- Broken pipe from ('192.168.1.5', 59463)
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+- Broken pipe from ('192.168.1.5', 59516)
+- Broken pipe from ('192.168.1.5', 59574)
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+- Broken pipe from ('192.168.1.5', 52370)
+- Broken pipe from ('192.168.1.5', 62026)
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+- Broken pipe from ('192.168.1.5', 62044)
+"GET /api/ HTTP/1.1" 200 196
+- Broken pipe from ('192.168.1.5', 52443)
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"POST /api/chat/simple-gemini/ HTTP/1.1" 200 2192
+"POST /api/chat/simple-gemini/ HTTP/1.1" 200 2372
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+- Broken pipe from ('192.168.1.4', 57140)
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+- Broken pipe from ('192.168.1.4', 32824)
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+"GET /api/ HTTP/1.1" 200 196
+Unauthorized: /api/users/profile/
+"GET /api/users/profile/ HTTP/1.1" 401 58
+"GET /api/ HTTP/1.1" 200 196
+Watching for file changes with StatReloader
+"OPTIONS /api/users/login/ HTTP/1.1" 200 0
+"POST /api/users/login/ HTTP/1.1" 200 392
+Not Found: /api/health
+"GET /api/health HTTP/1.1" 404 2832
+Unauthorized: /api/users/profile/
+"GET /api/users/profile/ HTTP/1.1" 401 58
+Unauthorized: /api/users/profile/
+"GET /api/users/profile/ HTTP/1.1" 401 58
+"POST /api/users/login/ HTTP/1.1" 200 392
+Unauthorized: /api/users/profile/
+"GET /api/users/profile/ HTTP/1.1" 401 58
+Unauthorized: /api/users/profile/
+"GET /api/users/profile/ HTTP/1.1" 401 58
+Not Found: /api/health
+"GET /api/health HTTP/1.1" 404 2832
+Not Found: /api/health
+"GET /api/health HTTP/1.1" 404 2832
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+"OPTIONS /api/users/login/ HTTP/1.1" 200 0
+"POST /api/users/login/ HTTP/1.1" 200 392
+Unauthorized: /api/users/profile/
+"GET /api/users/profile/ HTTP/1.1" 401 58
+Unauthorized: /api/users/profile/
+"GET /api/users/profile/ HTTP/1.1" 401 58
+Not Found: /api/health
+"GET /api/health HTTP/1.1" 404 2832
+Not Found: /api/health
+"GET /api/health HTTP/1.1" 404 2832
+Not Found: /api/health
+"GET /api/health HTTP/1.1" 404 2832
+"OPTIONS /api/users/login/ HTTP/1.1" 200 0
+"POST /api/users/login/ HTTP/1.1" 200 392
+Unauthorized: /api/users/profile/
+"GET /api/users/profile/ HTTP/1.1" 401 58
+Unauthorized: /api/users/profile/
+"GET /api/users/profile/ HTTP/1.1" 401 58
+Not Found: /api/health
+"GET /api/health HTTP/1.1" 404 2832
+Not Found: /api/health
+"GET /api/health HTTP/1.1" 404 2832
+Not Found: /api/health
+"GET /api/health HTTP/1.1" 404 2832
+Not Found: /api/health
+"GET /api/health HTTP/1.1" 404 2832
+Watching for file changes with StatReloader

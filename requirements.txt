@@ -3,12 +3,12 @@
 
 
 # AI and NLP
-google-generativeai==0.3.2  # Google AI Studio API
-nltk==3.8.1  # Natural Language Processing
-spacy==3.7.2  # Advanced NLP
-transformers==4.35.2  # Hugging Face transformers
-torch==2.1.1  # PyTorch for ML models
-sentence-transformers==2.2.2  # Sentence embeddings
+google-generativeai>=0.3.0  # Google AI Studio API (flexible version)
+nltk>=3.8  # Natural Language Processing
+spacy>=3.7  # Advanced NLP
+transformers>=4.30  # Hugging Face transformers
+torch>=2.0  # PyTorch for ML models
+sentence-transformers>=2.2  # Sentence embeddings
 
 # Voice Processing
 speechrecognition==3.10.0  # Speech to text

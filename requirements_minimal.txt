@@ -1,0 +1,18 @@
+# Minimal requirements for Konsultabot basic functionality
+# Core GUI and basic features only
+
+# Essential packages
+requests>=2.25.0
+python-dotenv>=0.19.0
+bcrypt>=3.2.0
+
+# GUI enhancements (optional)
+pillow>=8.0.0
+
+# Voice processing (optional - can be skipped)
+# speechrecognition>=3.8.0
+# pyttsx3>=2.90
+
+# AI packages (optional - app works offline without these)
+# google-generativeai>=0.3.0
+# nltk>=3.8

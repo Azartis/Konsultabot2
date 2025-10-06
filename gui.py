@@ -12,7 +12,7 @@ import json
 import os
 import requests
 from database import DatabaseManager
-from config import Config
+import config
 
 # Optional imports with graceful fallbacks
 try:
