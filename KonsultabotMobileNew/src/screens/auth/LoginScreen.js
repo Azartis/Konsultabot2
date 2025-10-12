@@ -18,7 +18,7 @@ import {
 } from 'react-native-paper';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
-import { theme, spacing } from '../../theme/theme';
+import { theme, spacing } from '../../theme/cleanTheme';
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');

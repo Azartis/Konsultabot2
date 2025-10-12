@@ -40,12 +40,30 @@ def _ensure_model():
         )
 
     genai.configure(api_key=GOOGLE_API_KEY)
-    # gemini-2.5-flash is fast and available
-    model = genai.GenerativeModel("gemini-2.5-flash")
-
-    _genai = genai
-    _model = model
-    return _model
+    
+    # Try multiple models in order of preference
+    models_to_try = [
+        "gemini-1.5-flash",
+        "gemini-1.5-pro", 
+        "gemini-pro",
+        "gemini-1.0-pro"
+    ]
+    
+    for model_name in models_to_try:
+        try:
+            model = genai.GenerativeModel(model_name)
+            # Test the model with a simple query
+            test_response = model.generate_content("Hello")
+            if test_response and test_response.text:
+                _genai = genai
+                _model = model
+                print(f"✅ Successfully initialized Gemini model: {model_name}")
+                return _model
+        except Exception as e:
+            print(f"❌ Failed to initialize {model_name}: {e}")
+            continue
+    
+    raise RuntimeError("All Gemini models failed to initialize. Check API key and network connection.")
 
 
 def has_internet(timeout: float = 3.0) -> bool:

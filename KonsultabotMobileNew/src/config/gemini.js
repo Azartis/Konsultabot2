@@ -8,14 +8,18 @@ export const GEMINI_CONFIG = {
   // Replace this with your actual Gemini API key
   API_KEY: 'AIzaSyBRynLqVFbj1jZfAAzqIfLH6xL4rt6483U',
   
-  // Gemini API endpoint (trying multiple model options)
-  API_URL: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',
+  // Try different API endpoints (fallback system)
+  API_URLS: [
+    'https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent',
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent'
+  ],
   
   // Model configuration
   MODEL: 'gemini-pro',
   
   // Request timeout (in milliseconds)
-  TIMEOUT: 10000,
+  TIMEOUT: 15000,
   
   // System prompt for IT support
   SYSTEM_PROMPT: `You are KonsultaBot, an intelligent IT support assistant powered by Google's Gemini AI. 
@@ -40,5 +44,8 @@ export const validateGeminiConfig = () => {
     console.warn('⚠️ Gemini API key not configured. Please update src/config/gemini.js with your actual API key.');
     return false;
   }
+  
+  // Note: API key exists but may return 404 errors - fallback system will handle this
+  console.log('🤖 Gemini API configured - will attempt connection with fallback support');
   return true;
 };

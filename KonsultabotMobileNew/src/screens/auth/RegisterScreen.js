@@ -16,7 +16,7 @@ import {
   ActivityIndicator,
 } from 'react-native-paper';
 import { useAuth } from '../../context/AuthContext';
-import { theme, spacing } from '../../theme/theme';
+import { theme, spacing } from '../../theme/cleanTheme';
 
 export default function RegisterScreen({ navigation }) {
   const [formData, setFormData] = useState({
@@ -70,7 +70,19 @@ export default function RegisterScreen({ navigation }) {
     setLoading(false);
 
     if (result.success) {
-      Alert.alert('Success', 'Registration successful! Welcome to Konsultabot.');
+      Alert.alert(
+        'Success', 
+        'Registration successful! Welcome to KonsultaBot.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              // User is automatically logged in after registration
+              // Navigation will be handled by the AuthContext
+            }
+          }
+        ]
+      );
     } else {
       Alert.alert('Registration Failed', result.error);
     }
@@ -174,6 +186,15 @@ export default function RegisterScreen({ navigation }) {
               >
                 {loading ? 'Creating Account...' : 'Register'}
               </Button>
+
+              <Button
+                mode="text"
+                onPress={() => navigation.navigate('Login')}
+                style={styles.loginButton}
+                textColor={theme.colors.primary}
+              >
+                Already have an account? Login
+              </Button>
             </Card.Content>
           </Card>
         </ScrollView>
@@ -210,5 +231,8 @@ const styles = StyleSheet.create({
   registerButton: {
     marginTop: spacing.lg,
     paddingVertical: spacing.xs,
+  },
+  loginButton: {
+    marginTop: spacing.md,
   },
 });

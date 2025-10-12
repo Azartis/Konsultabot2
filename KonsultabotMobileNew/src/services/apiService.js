@@ -69,49 +69,60 @@ User question: ${message}
 
 Please provide a helpful, detailed response as an IT support expert.`;
 
-    const restEndpoints = [
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent',
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent',
-      'https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent'
-    ];
-
-    for (const endpoint of restEndpoints) {
+    // Try REST API endpoints
+    for (let i = 0; i < GEMINI_CONFIG.API_URLS.length; i++) {
+      const endpoint = GEMINI_CONFIG.API_URLS[i];
+      console.log(`Trying endpoint ${i + 1}/${GEMINI_CONFIG.API_URLS.length}: ${endpoint}`);
+      
       try {
-        console.log(`Trying REST endpoint: ${endpoint}`);
-        const response = await axios.post(
-          `${endpoint}?key=${GEMINI_CONFIG.API_KEY}`,
-          {
-            contents: [{
-              parts: [{
-                text: prompt
-              }]
-            }]
-          },
-          {
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            timeout: GEMINI_CONFIG.TIMEOUT
+        const requestBody = {
+          contents: [{
+            parts: [{ text: `${GEMINI_CONFIG.SYSTEM_PROMPT}\n\nUser: ${message}` }]
+          }],
+          generationConfig: {
+            temperature: 0.7,
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 1024,
           }
-        );
+        };
+
+        const response = await axios.post(`${endpoint}?key=${GEMINI_CONFIG.API_KEY}`, requestBody, {
+          timeout: GEMINI_CONFIG.TIMEOUT,
+          headers: {
+            'Content-Type': 'application/json',
+            'User-Agent': 'KonsultaBot/1.0'
+          }
+        });
 
         if (response.data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-          const geminiResponse = response.data.candidates[0].content.parts[0].text;
-          console.log(`✅ Gemini REST API response received from ${endpoint}`);
+          console.log('✅ Gemini REST API success!');
           return {
             data: {
-              response: geminiResponse,
+              response: response.data.candidates[0].content.parts[0].text,
               mode: 'gemini-rest',
               language: 'english'
             }
           };
+        } else {
+          console.warn('⚠️ Gemini API returned empty response');
         }
-      } catch (restError) {
-        console.log(`REST endpoint ${endpoint} failed:`, restError.response?.status || restError.message);
+      } catch (error) {
+        console.warn(`❌ Gemini endpoint ${i + 1} failed:`, {
+          status: error.response?.status,
+          message: error.message
+        });
+        
+        // If this is a 404 or authentication error, skip to fallback
+        if (error.response?.status === 404 || error.response?.status === 403) {
+          console.log('🔄 Skipping to local AI due to API access issues');
+          break;
+        }
       }
     }
 
-    throw new Error('All Gemini API endpoints failed');
+    throw new Error('All Gemini API endpoints failed - using local AI fallback');
+
   } catch (error) {
     console.error('❌ Gemini API error:', error.message);
     throw error;
@@ -163,20 +174,12 @@ const getApiUrl = async () => {
       console.warn('Failed to read saved server IP:', storageError);
     }
 
-    // Try to discover server
-    const discoveredIP = await discoverServer();
-    if (discoveredIP) {
-      try {
-        await AsyncStorage.setItem(SERVER_IP_KEY, discoveredIP);
-      } catch (e) {
-        console.warn('Failed to save server IP:', e);
-      }
-      return `http://${discoveredIP}:8000/api/chat`;
-    }
+    // Skip server discovery to avoid errors
+    console.log('Skipping server discovery - using fallback');
 
-    // Fallback to default IP
-    const defaultIP = '192.168.1.5';
-    console.warn(`Using default server IP: ${defaultIP}`);
+    // Fallback to appropriate IP based on platform
+    const defaultIP = Platform.OS === 'web' ? 'localhost' : '192.168.1.17';
+    console.warn(`Using default server IP for ${Platform.OS}: ${defaultIP}`);
     return `http://${defaultIP}:8000/api/chat`;
   } catch (error) {
     console.error('Error in getApiUrl:', error);
