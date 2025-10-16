@@ -3,6 +3,7 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import axiosRetry from 'axios-retry';
 import { GEMINI_CONFIG, validateGeminiConfig } from '../config/gemini';
 import { localGeminiAI } from './localGeminiAI';
 
@@ -17,6 +18,27 @@ if (Platform.OS === 'web') {
   }
 }
 
+// Create Axios instance with longer timeout and retries
+const api = axios.create({
+  baseURL: 'http://192.168.1.17:8000/api',
+  timeout: 45000, // 45 seconds
+  headers: {
+    'Content-Type': 'application/json'
+  }
+});
+
+// Add retry mechanism
+axiosRetry(api, { 
+  retries: 2,
+  retryDelay: axiosRetry.exponentialDelay,
+  retryCondition: (error) => {
+    return (
+      axiosRetry.isNetworkOrIdempotentRequestError(error) ||
+      error.code === 'ECONNABORTED'
+    );
+  }
+});
+
 // Gemini API call function using official Google AI SDK
 const callGeminiAPI = async (message) => {
   // Check if API key is configured
@@ -25,6 +47,12 @@ const callGeminiAPI = async (message) => {
   }
 
   try {
+    // Add network check
+    const netInfo = await NetInfo.fetch();
+    if (!netInfo.isConnected) {
+      throw new Error('No internet connection');
+    }
+
     console.log('🤖 Calling Gemini API with official SDK...');
     
     // Try official Google AI SDK first (web only)
@@ -43,7 +71,13 @@ User question: ${message}
 
 Please provide a helpful, detailed response as an IT support expert.`;
 
-          const result = await model.generateContent(prompt);
+          // Use AbortController for timeout
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 45000);
+
+          const result = await model.generateContent(prompt, { signal: controller.signal });
+          clearTimeout(timeout);
+          
           const response = await result.response;
           const text = response.text();
 
@@ -69,33 +103,36 @@ User question: ${message}
 
 Please provide a helpful, detailed response as an IT support expert.`;
 
-    // Try REST API endpoints
-    for (let i = 0; i < GEMINI_CONFIG.API_URLS.length; i++) {
-      const endpoint = GEMINI_CONFIG.API_URLS[i];
-      console.log(`Trying endpoint ${i + 1}/${GEMINI_CONFIG.API_URLS.length}: ${endpoint}`);
-      
-      try {
-        const requestBody = {
-          contents: [{
-            parts: [{ text: `${GEMINI_CONFIG.SYSTEM_PROMPT}\n\nUser: ${message}` }]
-          }],
-          generationConfig: {
-            temperature: 0.7,
-            topK: 40,
-            topP: 0.95,
-            maxOutputTokens: 1024,
-          }
-        };
+    // Try REST API with timeout control
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 45000);
 
-        const response = await axios.post(`${endpoint}?key=${GEMINI_CONFIG.API_KEY}`, requestBody, {
-          timeout: GEMINI_CONFIG.TIMEOUT,
+    try {
+      const requestBody = {
+        contents: [{
+          parts: [{ text: `${GEMINI_CONFIG.SYSTEM_PROMPT}\n\nUser: ${message}` }]
+        }],
+        generationConfig: {
+          temperature: 0.7,
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 1024,
+        }
+      };
+
+      const response = await axios.post(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_CONFIG.API_KEY}`,
+        requestBody,
+        {
           headers: {
             'Content-Type': 'application/json',
             'User-Agent': 'KonsultaBot/1.0'
-          }
+          },
+          signal: controller.signal
         });
 
         if (response.data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+          clearTimeout(timeout);
           console.log('✅ Gemini REST API success!');
           return {
             data: {
@@ -104,29 +141,28 @@ Please provide a helpful, detailed response as an IT support expert.`;
               language: 'english'
             }
           };
-        } else {
-          console.warn('⚠️ Gemini API returned empty response');
         }
-      } catch (error) {
-        console.warn(`❌ Gemini endpoint ${i + 1} failed:`, {
-          status: error.response?.status,
-          message: error.message
-        });
         
-        // If this is a 404 or authentication error, skip to fallback
-        if (error.response?.status === 404 || error.response?.status === 403) {
-          console.log('🔄 Skipping to local AI due to API access issues');
-          break;
-        }
+        console.log('Empty response from Gemini API, trying fallback...');
+        return await localGeminiAI.generateResponse(message);
+        
+    } catch (error) {
+      console.error('Gemini API error:', error.message, error.code, error.config?.url);
+      
+      // Check for specific error types
+      if (error.code === 'ECONNABORTED') {
+        throw new Error('Request timed out. Please try again.');
       }
+      if (error.name === 'AbortError') {
+        throw new Error('Request cancelled due to timeout.');
+      }
+      if (!navigator.onLine) {
+        throw new Error('No internet connection. Please check your network.');
+      }
+      
+      // Attempt local fallback
+      return await localGeminiAI.generateResponse(message);
     }
-
-    throw new Error('All Gemini API endpoints failed - using local AI fallback');
-
-  } catch (error) {
-    console.error('❌ Gemini API error:', error.message);
-    throw error;
-  }
 };
 
 // Cache for server IP to avoid re-discovery
@@ -152,18 +188,12 @@ const checkNetworkStatus = async () => {
 // Get the best available server URL
 const getApiUrl = async () => {
   try {
-    // Web (browser) - Use offline mode for demo
+    // Web (browser) - Use localhost
     if (Platform.OS === 'web') {
-      const hasWindow = typeof window !== 'undefined';
-      const hostname = hasWindow && window.location && window.location.hostname ? 
-        window.location.hostname : 'localhost';
-      
-      // For demo purposes, we'll use offline mode since no backend is running
-      console.log('Web platform detected - using offline mode');
-      return null; // This will trigger offline mode
+      return 'http://localhost:8000/api';
     }
 
-    // Mobile - Check for saved IP first
+    // Mobile - Use network discovery
     try {
       const savedIP = await AsyncStorage.getItem(SERVER_IP_KEY);
       if (savedIP) {
@@ -174,21 +204,27 @@ const getApiUrl = async () => {
       console.warn('Failed to read saved server IP:', storageError);
     }
 
-    // Skip server discovery to avoid errors
-    console.log('Skipping server discovery - using fallback');
+    // Try to discover server automatically
+    console.log('Attempting server discovery...');
+    const discoveredIP = await discoverServer();
 
-    // Fallback to appropriate IP based on platform
-    const defaultIP = Platform.OS === 'web' ? 'localhost' : '192.168.1.17';
-    console.warn(`Using default server IP for ${Platform.OS}: ${defaultIP}`);
-    return `http://${defaultIP}:8000/api/chat`;
+    if (discoveredIP) {
+      console.log(`✅ Server discovered at ${discoveredIP}`);
+      return `http://${discoveredIP}:8000/api`;
+    }
+
+    // Fallback to default IP
+    const defaultIP = '192.168.1.17'; // Your network IP
+    console.warn(`Using default server IP: ${defaultIP}`);
+    return `http://${defaultIP}:8000/api`;
   } catch (error) {
     console.error('Error in getApiUrl:', error);
-    return 'http://192.168.1.5:8000/api/chat';
+    return 'http://192.168.1.17:8000/api'; // Fallback
   }
 };
 
 // Initialize with a default URL, will be updated
-let API_BASE_URL = 'http://192.168.1.5:8000/api/chat';
+let API_BASE_URL = 'http://192.168.1.17:8000/api';
 
 class ApiService {
   constructor() {
@@ -258,23 +294,60 @@ class ApiService {
 
   // Auth endpoints
   async login(email, password) {
-    return this.api.post('/users/login/', { email, password });
+    return this.api.post('/auth/login/', { username: email, password });
   }
 
   async register(userData) {
-    return this.api.post('/users/register/', userData);
+    try {
+      // Check network connectivity first
+      const isConnected = await checkNetworkStatus();
+      if (!isConnected) {
+        throw new Error('No network connection available');
+      }
+
+      // Validate required fields
+      const requiredFields = ['username', 'email', 'password', 'first_name', 'last_name'];
+      for (const field of requiredFields) {
+        if (!userData[field]) {
+          throw new Error(`Missing required field: ${field}`);
+        }
+      }
+
+      // Make the API call with retry logic
+      let retries = 2;
+      while (retries >= 0) {
+        try {
+          const response = await this.api.post('/auth/register/', userData);
+          console.log('Registration successful:', response.status);
+          return response;
+        } catch (error) {
+          if (retries === 0 || error.response?.status === 400) {
+            throw error; // Don't retry client errors or if out of retries
+          }
+          retries--;
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1s before retry
+        }
+      }
+    } catch (error) {
+      console.error('Registration error:', error);
+      throw {
+        message: error.response?.data?.error || error.message || 'Registration failed',
+        status: error.response?.status || 500,
+        details: error.response?.data || {}
+      };
+    }
   }
 
   async logout() {
-    return this.api.post('/users/logout/');
+    return this.api.post('/auth/logout/');
   }
 
   async getProfile() {
-    return this.api.get('/users/profile/');
+    return this.api.get('/auth/profile/');
   }
 
   async updateProfile(profileData) {
-    return this.api.put('/users/profile/update/', profileData);
+    return this.api.put('/auth/profile/', profileData);
   }
 
   // Chat endpoints with offline support
@@ -639,4 +712,10 @@ class ApiService {
   }
 }
 
-export const apiService = new ApiService();
+// Export configured API service
+export const apiService = {
+  api,
+  callGeminiAPI,
+  checkNetworkStatus,
+  getApiUrl
+};

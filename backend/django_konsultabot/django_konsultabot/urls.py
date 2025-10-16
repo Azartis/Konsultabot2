@@ -6,6 +6,7 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from django.views.generic import TemplateView
+from .views import health_redirect
 
 urlpatterns = [
     # Admin interface
@@ -22,8 +23,8 @@ urlpatterns = [
     # Admin dashboard
     path('dashboard/', include('adminpanel.urls')),
     
-    # Health check
-    path('health/', TemplateView.as_view(template_name='health.html'), name='health'),
+    # Health check redirect to API endpoint
+    path('health/', health_redirect, name='health'),
     
     # Root redirect to admin dashboard
     path('', TemplateView.as_view(template_name='index.html'), name='home'),

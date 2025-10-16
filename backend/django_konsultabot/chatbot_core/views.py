@@ -9,6 +9,8 @@ from django.views.decorators.http import require_http_methods
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import authenticate
 from django.utils.decorators import method_decorator
+from django.utils import timezone
+from django.conf import settings
 from django.views import View
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
@@ -37,41 +39,201 @@ class VoiceRateThrottle(UserRateThrottle):
     rate = '50/hour'
 
 
+from rest_framework import serializers
+
+class ChatMessageSerializer(serializers.ModelSerializer):
+    session_id = serializers.CharField(source='session.session_id')
+    
+    class Meta:
+        model = ChatMessage
+        fields = ['id', 'message', 'response', 'timestamp', 'session_id', 
+                 'message_type', 'response_source', 'intent_detected', 'confidence_score']
+
+@api_view(['GET'])
+@permission_classes([])
+def chat_history(request):
+    """
+    Get chat history for the current session or all sessions
+    """
+    try:
+        session_id = request.GET.get('session_id')
+        
+        # Query with error handling
+        if session_id:
+            # Get history for specific session
+            session = ConversationSession.objects.filter(session_id=session_id).first()
+            if not session:
+                return Response({
+                    'status': 'error',
+                    'message': 'Session not found',
+                    'code': 'SESSION_NOT_FOUND'
+                }, status=status.HTTP_404_NOT_FOUND)
+                
+            messages = ChatMessage.objects.filter(session=session).order_by('timestamp')
+        else:
+            messages = ChatMessage.objects.all().order_by('-timestamp')[:50]
+
+        # Get messages with select_related for efficiency
+        messages = messages.select_related('session')
+        
+        # Serialize messages
+        serializer = ChatMessageSerializer(messages, many=True)
+        
+        return Response({
+            'status': 'success',
+            'history': serializer.data,
+            'count': len(serializer.data)
+        })
+
+    except Exception as e:
+        logger.error(f"Error retrieving chat history: {str(e)}")
+        return Response({
+            'status': 'error',
+            'message': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 @api_view(['POST'])
-@permission_classes([IsAuthenticatedOrReadOnly])
-@throttle_classes([ChatRateThrottle])
+@permission_classes([])
+@csrf_exempt
 def chat_endpoint(request):
     """
-    Main chat endpoint supporting text and voice input with multilingual AI
+    Enhanced chat endpoint for KonsultaBot IT Support with improved error handling
     
     POST /api/v1/chat/
     {
-        "query": "My WiFi is not working",
+        "query": "How do I connect to EVSU WiFi?",
         "language": "english",  // optional, auto-detect if not provided
         "session_id": "uuid",   // optional, creates new if not provided
-        "voice_response": true  // optional, returns TTS audio if true
+        "voice_response": false,  // optional, returns TTS audio if true
+        "offline": false  // optional, store query for later if true
     }
     """
+    start_time = timezone.now()
+    
     try:
-        # Parse request data
-        data = json.loads(request.body) if request.body else {}
+        # Validate request data
+        if not request.body:
+            return Response({
+                'status': 'error',
+                'message': 'Request body is required',
+                'code': 'MISSING_BODY'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Parse request data with error handling
+        try:
+            data = json.loads(request.body) if request.body else {}
+        except json.JSONDecodeError:
+            return Response({
+                'status': 'error',
+                'message': 'Invalid JSON in request body',
+                'code': 'INVALID_JSON'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Extract and validate query
         query = data.get('query', '').strip()
-        language = data.get('language', 'auto')
-        session_id = data.get('session_id')
-        voice_response = data.get('voice_response', False)
-        
-        # Validate input
         if not query:
             return Response({
-                'error': 'Query is required',
+                'status': 'error',
+                'message': 'Query is required',
                 'code': 'MISSING_QUERY'
             }, status=status.HTTP_400_BAD_REQUEST)
+        language = data.get('language', 'english').lower()
+        session_id = data.get('session_id')
+        voice_response = data.get('voice_response', False)
+        offline_mode = data.get('offline', False)
         
+        # Validate input with improved feedback
+        if not query:
+            return Response({
+                'status': 'error',
+                'error': 'Query is required',
+                'code': 'MISSING_QUERY',
+                'valid_fields': ['query', 'language', 'session_id', 'voice_response', 'offline'],
+                'example': {
+                    'query': 'How do I connect to EVSU WiFi?',
+                    'language': 'english'
+                }
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
+        # Validate language with detailed feedback
+        supported_languages = ['english', 'tagalog', 'bisaya', 'waray']
+        if language not in supported_languages:
+            return Response({
+                'status': 'error',
+                'error': f'Unsupported language. Supported languages: {", ".join(supported_languages)}',
+                'code': 'INVALID_LANGUAGE',
+                'supported_languages': supported_languages,
+                'provided_language': language,
+                'suggestion': 'Use "english" if unsure'
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Initialize timing and connectivity checks
+        response_start_time = timezone.now()
+        response_timeout = getattr(settings, 'CHAT_RESPONSE_TIMEOUT', 30)  # 30 seconds default
+        
+        # Enhanced error handling for network and system status
+        try:
+            # Check network connectivity
+            from .utils.network_detector import network_detector
+            connection_info = network_detector.get_connection_quality()
+            if not connection_info['connected']:
+                return Response({
+                    'status': 'error',
+                    'error': 'Network connectivity issues detected',
+                    'code': 'NETWORK_ERROR',
+                    'suggestion': 'Please check your internet connection and try again',
+                    'offline_available': True,
+                    'connection_info': connection_info
+                }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+                
+        except Exception as e:
+            logger.error(f"Network detection error: {str(e)}")
+            # Continue processing even if network detection fails
+            connection_info = {
+                'connected': False,
+                'quality': 'unknown',
+                'recommended_mode': 'offline'
+            }
+            
+        # Validate query length
         if len(query) > 1000:
             return Response({
-                'error': 'Query too long (max 1000 characters)',
+                'status': 'error',
+                'message': 'Query too long (max 1000 characters)',
                 'code': 'QUERY_TOO_LONG'
             }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Handle offline mode
+        if offline_mode or getattr(settings, 'KONSULTABOT_SETTINGS', {}).get('OFFLINE_MODE', False):
+            from .utils.offline_handler import offline_handler
+            
+            # Store query for later processing
+            query_stored = offline_handler.store_query(
+                user_id=request.user.id if request.user.is_authenticated else None,
+                query=query,
+                metadata={
+                    'language': language,
+                    'session_id': session_id,
+                    'voice_response': voice_response,
+                }
+            )
+            
+            if query_stored:
+                return Response({
+                    'status': 'pending',
+                    'message': 'Query stored for offline processing',
+                    'offline': True,
+                    'query': query,
+                    'timestamp': timezone.now().isoformat(),
+                    'estimated_processing_time': '5-10 minutes'
+                }, status=status.HTTP_202_ACCEPTED)
+            else:
+                return Response({
+                    'status': 'error',
+                    'error': 'Failed to store offline query',
+                    'code': 'OFFLINE_STORAGE_ERROR',
+                    'retry_after': 60  # Suggest retry after 1 minute
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
         # Get or create session
         session = None
@@ -102,8 +264,8 @@ def chat_endpoint(request):
             context=context
         )
         
-        # Save messages to session
-        ChatMessage.objects.create(
+        # Save user message
+        user_message = ChatMessage.objects.create(
             session=session,
             sender='user',
             message=query,
@@ -111,14 +273,20 @@ def chat_endpoint(request):
             entities_extracted=ai_response.get('entities', {})
         )
         
-        ChatMessage.objects.create(
+        # Save bot's response
+        bot_message = ChatMessage.objects.create(
             session=session,
             sender='bot',
             message=ai_response['message'],
+            response=ai_response['message'],  # Store the response separately
             response_source=ai_response.get('source', 'unknown'),
             response_time=ai_response.get('processing_time', 0),
             confidence_score=ai_response.get('confidence', 0)
         )
+        
+        # Update user message with bot's response
+        user_message.response = ai_response['message']
+        user_message.save()
         
         # Prepare response
         response_data = {
@@ -168,6 +336,132 @@ def chat_endpoint(request):
         return Response({
             'error': 'Internal server error',
             'code': 'INTERNAL_ERROR'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticatedOrReadOnly])
+@throttle_classes([ChatRateThrottle])
+def gemini_chat(request):
+    """
+    Process chat messages through Gemini AI
+    
+    POST /api/v1/chat/gemini/
+    {
+        "query": "What is quantum computing?",
+        "context": null  // optional conversation context
+    }
+    """
+    try:
+        data = json.loads(request.body) if request.body else {}
+        query = data.get('query', '').strip()
+        context = data.get('context')
+
+        if not query:
+            return Response({
+                'error': 'Query is required',
+                'code': 'MISSING_QUERY'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Process with Gemini
+        try:
+            response = multilingual_ai_handler.process_with_gemini(
+                query=query,
+                context=context,
+                user=request.user if request.user.is_authenticated else None
+            )
+        except Exception as e:
+            logger.error(f"Error processing with Gemini: {e}", exc_info=True)
+            return Response({
+                'error': f'Failed to process query: {str(e)}',
+                'code': 'GEMINI_PROCESSING_ERROR'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response(response, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        logger.error(f"Gemini chat error: {e}")
+        return Response({
+            'error': str(e),
+            'code': 'GEMINI_ERROR'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticatedOrReadOnly])
+@throttle_classes([ChatRateThrottle])
+def gemini_translate(request):
+    """
+    Translate text using Gemini AI
+    
+    POST /api/v1/chat/gemini/translate/
+    {
+        "text": "Hello world",
+        "target_lang": "English"  // target language
+    }
+    """
+    try:
+        data = json.loads(request.body) if request.body else {}
+        text = data.get('text', '').strip()
+        target_lang = data.get('target_lang', 'English')
+
+        if not text:
+            return Response({
+                'error': 'Text is required',
+                'code': 'MISSING_TEXT'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Process translation
+        response = multilingual_ai_handler.translate_with_gemini(
+            text=text,
+            target_lang=target_lang
+        )
+
+        return Response(response, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        logger.error(f"Gemini translation error: {e}")
+        return Response({
+            'error': str(e),
+            'code': 'TRANSLATION_ERROR'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticatedOrReadOnly])
+@throttle_classes([ChatRateThrottle])
+def gemini_image_gen(request):
+    """
+    Generate images using Gemini AI
+    
+    POST /api/v1/chat/gemini/image/
+    {
+        "prompt": "A beautiful sunset over mountains"
+    }
+    """
+    try:
+        data = json.loads(request.body) if request.body else {}
+        prompt = data.get('prompt', '').strip()
+
+        if not prompt:
+            return Response({
+                'error': 'Prompt is required',
+                'code': 'MISSING_PROMPT'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Generate image
+        response = multilingual_ai_handler.generate_image_with_gemini(
+            prompt=prompt,
+            user=request.user if request.user.is_authenticated else None
+        )
+
+        return Response(response, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        logger.error(f"Gemini image generation error: {e}")
+        return Response({
+            'error': str(e),
+            'code': 'IMAGE_GEN_ERROR'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -429,40 +723,13 @@ def feedback_endpoint(request):
 
 @api_view(['GET'])
 def health_check(request):
-    """
-    Health check endpoint for monitoring
-    
-    GET /api/v1/chat/health/
-    """
+    """Simple health check endpoint"""
     try:
-        # Check database connectivity
-        session_count = ConversationSession.objects.count()
-        
-        # Check AI services
-        from .utils.network_detector import network_detector
-        from .utils.gemini_helper import gemini_processor
-        
-        connection_status = network_detector.get_connection_quality()
-        gemini_status = gemini_processor.get_model_status()
-        
         return Response({
             'status': 'healthy',
-            'timestamp': timezone.now().isoformat(),
-            'database': {
-                'connected': True,
-                'session_count': session_count
-            },
-            'network': {
-                'connected': connection_status['connected'],
-                'quality': connection_status['quality']
-            },
-            'ai_services': {
-                'gemini_available': gemini_status['available'],
-                'local_ai_available': True
-            },
-            'supported_languages': translation_service.get_supported_languages()
+            'message': 'Server is running',
+            'timestamp': timezone.now().isoformat()
         }, status=status.HTTP_200_OK)
-        
     except Exception as e:
         logger.error(f"Health check error: {e}")
         return Response({

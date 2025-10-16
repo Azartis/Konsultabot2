@@ -13,8 +13,14 @@ export const AuthProvider = ({ children }) => {
       try {
         setIsLoading(true);
         const userData = await AsyncStorage.getItem('user');
+        const accessToken = await AsyncStorage.getItem('accessToken');
         if (userData) {
-          setUser(JSON.parse(userData));
+          const user = JSON.parse(userData);
+          setUser(user);
+          // Restore auth token in API service
+          if (accessToken) {
+            apiService.setAuthToken(accessToken);
+          }
         }
       } catch (error) {
         console.error('Error checking auth:', error);
@@ -25,116 +31,117 @@ export const AuthProvider = ({ children }) => {
     checkAuth();
   }, []);
 
-  const login = async (email, password) => {
+  const login = async (username, password) => {
     try {
-      // Test accounts for demo
-      const testAccounts = {
-        'admin@evsu.edu.ph': {
-          password: 'admin123',
-          user: {
-            id: 1,
-            email: 'admin@evsu.edu.ph',
-            username: 'admin',
-            first_name: 'Admin',
-            last_name: 'User',
-            role: 'admin'
-          }
-        },
-        'student@evsu.edu.ph': {
-          password: 'student123',
-          user: {
-            id: 2,
-            email: 'student@evsu.edu.ph',
-            username: 'student',
-            first_name: 'Student',
-            last_name: 'User',
-            role: 'student'
-          }
-        },
-        'itstaff@evsu.edu.ph': {
-          password: 'staff123',
-          user: {
-            id: 3,
-            email: 'itstaff@evsu.edu.ph',
-            username: 'itstaff',
-            first_name: 'IT Staff',
-            last_name: 'User',
-            role: 'it_staff'
-          }
-        }
-      };
+      setIsLoading(true);
+      const response = await apiService.login(username, password);
+      const { access, refresh, user } = response.data;
 
-      const account = testAccounts[email];
-      if (!account || account.password !== password) {
-        return { success: false, error: 'Invalid email or password' };
-      }
+      // Store tokens
+      await AsyncStorage.setItem('accessToken', access);
+      await AsyncStorage.setItem('refreshToken', refresh);
+      await AsyncStorage.setItem('user', JSON.stringify(user));
 
-      const userData = account.user;
-      await AsyncStorage.setItem('user', JSON.stringify(userData));
-      await AsyncStorage.setItem('user_data', JSON.stringify(userData));
-      setUser(userData);
+      // Set auth token in API service
+      apiService.setAuthToken(access);
+
+      setUser(user);
       return { success: true };
     } catch (error) {
       console.error('Login error:', error);
-      return { success: false, error: 'Failed to login' };
+      const errorMessage = error.response?.data?.error || 'Login failed. Please check your credentials.';
+      return { success: false, error: errorMessage };
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const register = async (formData) => {
     try {
+      setIsLoading(true);
+
+      // Validate required fields
+      const requiredFields = ['student_id', 'email', 'password', 'first_name', 'last_name'];
+      for (const field of requiredFields) {
+        if (!formData[field]?.trim()) {
+          throw new Error(`Missing required field: ${field}`);
+        }
+      }
+
+      // Validate email format
+      if (!formData.email.toLowerCase().includes('@evsu.edu.ph')) {
+        throw new Error('Please use your EVSU email address (@evsu.edu.ph)');
+      }
+
       // Prepare registration data for backend API
       const registrationData = {
-        username: formData.student_id,
-        email: formData.email,
+        username: formData.student_id, // Use student_id as username
+        email: formData.email.toLowerCase().trim(),
         password: formData.password,
-        first_name: formData.first_name,
-        last_name: formData.last_name,
+        first_name: formData.first_name.trim(),
+        last_name: formData.last_name.trim(),
         role: 'student',
-        department: formData.course || 'Computer Science',
-        student_id: formData.student_id,
-        year_level: formData.year_level || '1st Year'
+        department: formData.course?.trim() || 'Computer Science',
+        student_id: formData.student_id.trim(),
+        year_level: formData.year_level?.trim() || '1st Year'
       };
 
       // Make API call to register user in backend database
-      const response = await fetch('http://localhost:5000/api/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(registrationData),
-      });
+      const response = await apiService.register(registrationData);
 
-      const data = await response.json();
-
-      if (response.ok && data.success) {
+      if (response.status === 201) {
         // Registration successful, now login the user
-        const loginResult = await login(formData.email, formData.password);
-        return loginResult;
+        console.log('Registration successful, attempting login...');
+        const loginResult = await login(registrationData.email, registrationData.password);
+        
+        if (loginResult.success) {
+          console.log('Auto-login after registration successful');
+          return { success: true };
+        } else {
+          console.warn('Auto-login failed:', loginResult.error);
+          return {
+            success: true,
+            message: 'Registration successful! Please login with your credentials.'
+          };
+        }
       } else {
-        return { 
-          success: false, 
-          error: data.error || 'Registration failed' 
+        console.error('Unexpected response status:', response.status);
+        return {
+          success: false,
+          error: response.data?.error || 'Registration failed with unexpected response'
         };
       }
     } catch (error) {
       console.error('Registration error:', error);
-      return { 
-        success: false, 
-        error: 'Network error. Please check if the server is running.' 
+      return {
+        success: false,
+        error: error.message || 'Network error. Please check if the server is running.'
       };
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const logout = async () => {
     try {
+      // Call logout API endpoint
+      await apiService.logout();
+
+      // Clear stored data
       await AsyncStorage.removeItem('user');
-      await AsyncStorage.removeItem('user_data');
-      await AsyncStorage.removeItem('access_token');
+      await AsyncStorage.removeItem('accessToken');
+      await AsyncStorage.removeItem('refreshToken');
       setUser(null);
+
       return { success: true };
     } catch (error) {
       console.error('Logout error:', error);
-      return { success: false, error: 'Failed to logout' };
+      // Even if API call fails, clear local storage
+      await AsyncStorage.removeItem('user');
+      await AsyncStorage.removeItem('accessToken');
+      await AsyncStorage.removeItem('refreshToken');
+      setUser(null);
+      return { success: true };
     }
   };
 
@@ -142,10 +149,20 @@ export const AuthProvider = ({ children }) => {
     try {
       setIsLoading(true);
       const userData = await AsyncStorage.getItem('user');
+      const accessToken = await AsyncStorage.getItem('accessToken');
+
       if (userData) {
-        setUser(JSON.parse(userData));
+        const user = JSON.parse(userData);
+        setUser(user);
+
+        // Restore auth token in API service
+        if (accessToken) {
+          apiService.setAuthToken(accessToken);
+        }
+
+        return user;
       }
-      return userData ? JSON.parse(userData) : null;
+      return null;
     } catch (error) {
       console.error('Error checking auth:', error);
       return null;

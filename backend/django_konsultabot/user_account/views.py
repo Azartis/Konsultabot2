@@ -70,10 +70,16 @@ class LoginView(APIView):
     permission_classes = [AllowAny]
     
     def post(self, request):
+        logger.info(f"Login attempt received: {request.data}")
         serializer = LoginSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
         
-        user = serializer.validated_data['user']
+        try:
+            serializer.is_valid(raise_exception=True)
+            user = serializer.validated_data['user']
+            logger.info(f"Login validation successful for user: {user.username}")
+        except Exception as e:
+            logger.error(f"Login validation failed: {str(e)}")
+            raise
         
         # Update last login IP
         user.last_login_ip = self.get_client_ip(request)

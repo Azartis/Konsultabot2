@@ -7,6 +7,7 @@ import time
 from typing import Optional, Dict, Any
 from django.core.cache import cache
 from django.conf import settings
+from django.utils import timezone
 
 logger = logging.getLogger('konsultabot.network')
 
@@ -48,10 +49,12 @@ class NetworkDetector:
     
     def _test_connectivity(self, timeout: float) -> bool:
         """Test actual network connectivity"""
+        self.is_online = False  # Initialize is_online attribute
         for url in self.test_urls:
             try:
                 response = requests.head(url, timeout=timeout)
                 if response.status_code < 400:
+                    self.is_online = True
                     return True
             except (requests.RequestException, Exception) as e:
                 logger.debug(f"Connection test failed for {url}: {e}")

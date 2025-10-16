@@ -1,99 +1,104 @@
 """
 Gemini helper utilities for KonsultaBot
 - Loads GOOGLE_API_KEY from .env
-- Provides has_internet() and ask_gemini()
-- Configures google-generativeai with gemini-1.5-flash
+- Provides chat functionality using Gemini Pro model
 """
 from __future__ import annotations
 
 import os
 from typing import Optional
+import logging
 
 import requests
+import google.generativeai as genai
 from dotenv import load_dotenv
 
 # Load environment variables from .env
 load_dotenv()
 
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "").strip()
+# Get API key from environment
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "AIzaSyBRynLqVFbj1jZfAAzqIfLH6xL4rt6483U").strip()
 
-# Lazy import to avoid ImportError when package isn't installed in some environments
-_genai = None
-_model = None
+# Configure Gemini API
+genai.configure(api_key=GOOGLE_API_KEY)
 
+logger = logging.getLogger(__name__)
 
-def _ensure_model():
-    global _genai, _model
-    if _model is not None:
-        return _model
-
-    try:
-        import google.generativeai as genai  # type: ignore
-    except Exception as e:
-        raise RuntimeError(
-            "google-generativeai is not installed. Add it to requirements and install dependencies."
-        ) from e
-
-    if not GOOGLE_API_KEY:
-        raise RuntimeError(
-            "GOOGLE_API_KEY is missing. Create a .env file with GOOGLE_API_KEY=YOUR_KEY and restart."
-        )
-
-    genai.configure(api_key=GOOGLE_API_KEY)
-    
-    # Try multiple models in order of preference
-    models_to_try = [
-        "gemini-1.5-flash",
-        "gemini-1.5-pro", 
-        "gemini-pro",
-        "gemini-1.0-pro"
-    ]
-    
-    for model_name in models_to_try:
+class GeminiModelManager:
+    def __init__(self):
+        """Initialize the model manager."""
         try:
-            model = genai.GenerativeModel(model_name)
-            # Test the model with a simple query
-            test_response = model.generate_content("Hello")
-            if test_response and test_response.text:
-                _genai = genai
-                _model = model
-                print(f"✅ Successfully initialized Gemini model: {model_name}")
-                return _model
+            self.model = genai.GenerativeModel('models/gemini-pro-latest')
+            self.chat = None
         except Exception as e:
-            print(f"❌ Failed to initialize {model_name}: {e}")
-            continue
-    
-    raise RuntimeError("All Gemini models failed to initialize. Check API key and network connection.")
+            logger.error(f"Failed to initialize Gemini model: {e}")
+            raise
 
+    def generate_response(self, prompt, context=None):
+        """Generate a response from the model."""
+        try:
+            # Initialize chat session if needed
+            if not self.chat:
+                self.chat = self.model.start_chat()
 
-def has_internet(timeout: float = 3.0) -> bool:
-    """Quickly check if the machine has internet access.
+            # If there's context, send it first
+            if context:
+                self.chat.send_message(context)
 
-    Tries a HEAD request to a reliable endpoint. Uses small timeout.
-    """
-    try:
-        requests.head("https://www.gstatic.com/generate_204", timeout=timeout)
-        return True
-    except Exception:
-        return False
+            # Send the actual prompt
+            response = self.chat.send_message(prompt)
+            return response.text if response else None
 
+        except Exception as e:
+            logger.error(f"Error in Gemini response: {e}")
+            # Reset chat session in case of errors
+            self.chat = None
+            return None
 
-def ask_gemini(prompt: str, *, system_instruction: Optional[str] = None) -> str:
-    """Send a prompt to Gemini and return the response text.
+    @staticmethod
+    def is_configured():
+        """Check if API key is configured."""
+        try:
+            return bool(GOOGLE_API_KEY)
+        except Exception as e:
+            logger.error(f"Error checking configuration: {e}")
+            return False
+            
+    def has_internet(self, timeout: float = 3.0) -> bool:
+        """Quickly check if the machine has internet access.
 
-    - Uses gemini-1.5-flash
-    - Accepts optional system_instruction to bias behavior
-    """
-    model = _ensure_model()
+        Tries a HEAD request to a reliable endpoint. Uses small timeout.
+        """
+        try:
+            requests.head("https://www.gstatic.com/generate_204", timeout=timeout)
+            return True
+        except Exception:
+            return False
 
-    final_prompt = prompt
-    if system_instruction:
-        final_prompt = f"{system_instruction}\n\nUser: {prompt}"
+    def ask_gemini(self, prompt: str, *, system_instruction: Optional[str] = None) -> str:
+        """Send a prompt to Gemini and return the response text."""
+        try:
+            # Combine system instruction with user prompt if provided
+            final_prompt = f"{system_instruction}\n\nUser: {prompt}" if system_instruction else prompt
+            
+            # Initialize chat if needed
+            if not self.chat:
+                self.chat = self.model.start_chat()
+            
+            # Send message and get response
+            response = self.chat.send_message(final_prompt)
+            return response.text.strip() if response and response.text else ""
+        except Exception as e:
+            logger.error(f"Gemini request failed: {e}")
+            # Reset chat session on error
+            self.chat = None
+            raise RuntimeError(f"Gemini request failed: {e}")
 
-    try:
-        resp = model.generate_content(final_prompt)
-        # google-generativeai returns .text for the best candidate
-        return (resp.text or "").strip() if hasattr(resp, "text") else str(resp)
-    except Exception as e:
-        # Bubble up a concise error for callers to handle gracefully
-        raise RuntimeError(f"Gemini request failed: {e}")
+    def list_available_models(self) -> list[str]:
+        """List all available Gemini models."""
+        try:
+            models = genai.list_models()
+            return [model.name for model in models]
+        except Exception as e:
+            logger.error(f"Failed to list models: {e}")
+            return []

@@ -4,9 +4,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 
-// API Configuration - Flask Authentication Server
+// API Configuration - Django Authentication Server
 const API_BASE_URL = __DEV__ 
-  ? 'http://192.168.1.17:5000/api/auth'
+  ? 'http://localhost:8000/api/auth'
   : 'https://your-production-domain.com/api/auth';
 
 /**
@@ -144,6 +144,10 @@ export const refreshAccessToken = async () => {
 
     const { access } = response.data;
     
+    if (!access) {
+      throw new Error('No access token in refresh response');
+    }
+
     // Update stored access token
     await AsyncStorage.setItem('access_token', access);
     
@@ -152,6 +156,25 @@ export const refreshAccessToken = async () => {
     console.error('Token refresh failed:', error);
     // Clear auth data if refresh fails
     await clearAuthData();
+    throw error;
+  }
+};
+
+/**
+ * Login user
+ */
+export const login = async (username, password) => {
+  try {
+    const response = await axios.post(`${API_BASE_URL}/login/`, {
+      username,
+      password
+    });
+    
+    const { access, refresh, user } = response.data;
+    await storeAuthData(access, refresh, user.role, user);
+    return response.data;
+  } catch (error) {
+    console.error('Login error:', error.response?.data || error.message);
     throw error;
   }
 };

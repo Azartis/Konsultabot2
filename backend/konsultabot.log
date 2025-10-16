@@ -1552,3 +1552,395 @@ Not Found: /api/health
 "OPTIONS /api/chat/simple-gemini/ HTTP/1.1" 200 0
 Watching for file changes with StatReloader
 Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Not Found: /api/auth/register
+"POST /api/auth/register HTTP/1.1" 404 3613
+Not Found: /api/health/
+"GET /api/health/ HTTP/1.1" 404 3594
+Bad Request: /register/
+"POST /register/ HTTP/1.1" 400 48
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\konsultabot_backend\settings.py changed, reloading.
+Watching for file changes with StatReloader
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\konsultabot_backend\settings.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\konsultabot_backend\urls.py changed, reloading.
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Bad Request: /api/auth/register/
+"POST /api/auth/register/ HTTP/1.1" 400 48
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Bad Request: /api/auth/register/
+"POST /api/auth/register/ HTTP/1.1" 400 48
+Bad Request: /api/auth/login/
+"POST /api/auth/login/ HTTP/1.1" 400 40
+Watching for file changes with StatReloader
+- Broken pipe from ('127.0.0.1', 61810)
+Bad Request: /api/auth/token/
+"POST /api/auth/token/ HTTP/1.1" 400 86
+Bad Request: /api/auth/token/
+"POST /api/auth/token/ HTTP/1.1" 400 40
+Bad Request: /api/auth/token/
+"POST /api/auth/token/ HTTP/1.1" 400 86
+Bad Request: /api/auth/token/
+"POST /api/auth/token/ HTTP/1.1" 400 40
+Watching for file changes with StatReloader
+"GET /admin?id=ef6b99bf-bd26-49b0-98d9-ce12a6cb173c&vscodeBrowserReqId=1760452730160 HTTP/1.1" 301 0
+"GET /admin/?id=ef6b99bf-bd26-49b0-98d9-ce12a6cb173c&vscodeBrowserReqId=1760452730160 HTTP/1.1" 302 0
+"GET /admin/login/?next=/admin/%3Fid%3Def6b99bf-bd26-49b0-98d9-ce12a6cb173c%26vscodeBrowserReqId%3D1760452730160 HTTP/1.1" 200 4343
+"GET /admin?id=ef6b99bf-bd26-49b0-98d9-ce12a6cb173c&vscodeBrowserReqId=1760452747164 HTTP/1.1" 301 0
+"GET /admin/?id=ef6b99bf-bd26-49b0-98d9-ce12a6cb173c&vscodeBrowserReqId=1760452747164 HTTP/1.1" 302 0
+"GET /admin/login/?next=/admin/%3Fid%3Def6b99bf-bd26-49b0-98d9-ce12a6cb173c%26vscodeBrowserReqId%3D1760452747164 HTTP/1.1" 200 4343
+"GET /admin?id=ef6b99bf-bd26-49b0-98d9-ce12a6cb173c&vscodeBrowserReqId=1760452748556 HTTP/1.1" 301 0
+"GET /admin/?id=ef6b99bf-bd26-49b0-98d9-ce12a6cb173c&vscodeBrowserReqId=1760452748556 HTTP/1.1" 302 0
+"GET /admin/login/?next=/admin/%3Fid%3Def6b99bf-bd26-49b0-98d9-ce12a6cb173c%26vscodeBrowserReqId%3D1760452748556 HTTP/1.1" 200 4343
+"GET /admin?id=ef6b99bf-bd26-49b0-98d9-ce12a6cb173c&vscodeBrowserReqId=1760452767314 HTTP/1.1" 301 0
+"GET /admin/?id=ef6b99bf-bd26-49b0-98d9-ce12a6cb173c&vscodeBrowserReqId=1760452767314 HTTP/1.1" 302 0
+"GET /admin/login/?next=/admin/%3Fid%3Def6b99bf-bd26-49b0-98d9-ce12a6cb173c%26vscodeBrowserReqId%3D1760452767314 HTTP/1.1" 200 4343
+"GET /admin?id=ef6b99bf-bd26-49b0-98d9-ce12a6cb173c&vscodeBrowserReqId=1760452767530 HTTP/1.1" 301 0
+"GET /admin/?id=ef6b99bf-bd26-49b0-98d9-ce12a6cb173c&vscodeBrowserReqId=1760452767530 HTTP/1.1" 302 0
+"GET /admin/login/?next=/admin/%3Fid%3Def6b99bf-bd26-49b0-98d9-ce12a6cb173c%26vscodeBrowserReqId%3D1760452767530 HTTP/1.1" 200 4343
+"GET /admin?id=ef6b99bf-bd26-49b0-98d9-ce12a6cb173c&vscodeBrowserReqId=1760452768157 HTTP/1.1" 301 0
+"GET /admin/?id=ef6b99bf-bd26-49b0-98d9-ce12a6cb173c&vscodeBrowserReqId=1760452768157 HTTP/1.1" 302 0
+"GET /admin/login/?next=/admin/%3Fid%3Def6b99bf-bd26-49b0-98d9-ce12a6cb173c%26vscodeBrowserReqId%3D1760452768157 HTTP/1.1" 200 4343
+"GET /admin?id=ef6b99bf-bd26-49b0-98d9-ce12a6cb173c&vscodeBrowserReqId=1760452768388 HTTP/1.1" 301 0
+"GET /admin?id=ef6b99bf-bd26-49b0-98d9-ce12a6cb173c&vscodeBrowserReqId=1760452768688 HTTP/1.1" 301 0
+"GET /admin?id=ef6b99bf-bd26-49b0-98d9-ce12a6cb173c&vscodeBrowserReqId=1760452768935 HTTP/1.1" 301 0
+"GET /admin/?id=ef6b99bf-bd26-49b0-98d9-ce12a6cb173c&vscodeBrowserReqId=1760452768935 HTTP/1.1" 302 0
+"GET /admin/login/?next=/admin/%3Fid%3Def6b99bf-bd26-49b0-98d9-ce12a6cb173c%26vscodeBrowserReqId%3D1760452768935 HTTP/1.1" 200 4343
+"GET /admin?id=ef6b99bf-bd26-49b0-98d9-ce12a6cb173c&vscodeBrowserReqId=1760452769159 HTTP/1.1" 301 0
+"GET /admin/?id=ef6b99bf-bd26-49b0-98d9-ce12a6cb173c&vscodeBrowserReqId=1760452769159 HTTP/1.1" 302 0
+"GET /admin/login/?next=/admin/%3Fid%3Def6b99bf-bd26-49b0-98d9-ce12a6cb173c%26vscodeBrowserReqId%3D1760452769159 HTTP/1.1" 200 4343
+"GET /admin?id=ef6b99bf-bd26-49b0-98d9-ce12a6cb173c&vscodeBrowserReqId=1760452769375 HTTP/1.1" 301 0
+"GET /admin/?id=ef6b99bf-bd26-49b0-98d9-ce12a6cb173c&vscodeBrowserReqId=1760452769375 HTTP/1.1" 302 0
+"GET /admin/login/?next=/admin/%3Fid%3Def6b99bf-bd26-49b0-98d9-ce12a6cb173c%26vscodeBrowserReqId%3D1760452769375 HTTP/1.1" 200 4343
+"GET /admin?id=e01c0f3e-08e3-4d0e-b95e-6c78740a550a&vscodeBrowserReqId=1760452831024 HTTP/1.1" 301 0
+"GET /admin/?id=e01c0f3e-08e3-4d0e-b95e-6c78740a550a&vscodeBrowserReqId=1760452831024 HTTP/1.1" 302 0
+"GET /admin/login/?next=/admin/%3Fid%3De01c0f3e-08e3-4d0e-b95e-6c78740a550a%26vscodeBrowserReqId%3D1760452831024 HTTP/1.1" 200 4343
+"GET /admin?id=e01c0f3e-08e3-4d0e-b95e-6c78740a550a&vscodeBrowserReqId=1760452837061 HTTP/1.1" 301 0
+"GET /admin/?id=e01c0f3e-08e3-4d0e-b95e-6c78740a550a&vscodeBrowserReqId=1760452837061 HTTP/1.1" 302 0
+"GET /admin/login/?next=/admin/%3Fid%3De01c0f3e-08e3-4d0e-b95e-6c78740a550a%26vscodeBrowserReqId%3D1760452837061 HTTP/1.1" 200 4343
+"GET /admin?id=e01c0f3e-08e3-4d0e-b95e-6c78740a550a&vscodeBrowserReqId=1760452837270 HTTP/1.1" 301 0
+"GET /admin?id=e01c0f3e-08e3-4d0e-b95e-6c78740a550a&vscodeBrowserReqId=1760452837487 HTTP/1.1" 301 0
+"GET /admin?id=e01c0f3e-08e3-4d0e-b95e-6c78740a550a&vscodeBrowserReqId=1760452837703 HTTP/1.1" 301 0
+"GET /admin/?id=e01c0f3e-08e3-4d0e-b95e-6c78740a550a&vscodeBrowserReqId=1760452837703 HTTP/1.1" 302 0
+"GET /admin/login/?next=/admin/%3Fid%3De01c0f3e-08e3-4d0e-b95e-6c78740a550a%26vscodeBrowserReqId%3D1760452837703 HTTP/1.1" 200 4343
+Invalid HTTP_HOST header: '192.168.1.3:8000'. You may need to add '192.168.1.3' to ALLOWED_HOSTS.
+Traceback (most recent call last):
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\utils\deprecation.py", line 133, in __call__
+    response = self.process_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\middleware\common.py", line 48, in process_request
+    host = request.get_host()
+           ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\http\request.py", line 150, in get_host
+    raise DisallowedHost(msg)
+django.core.exceptions.DisallowedHost: Invalid HTTP_HOST header: '192.168.1.3:8000'. You may need to add '192.168.1.3' to ALLOWED_HOSTS.
+Bad Request: /api/auth/register/
+"POST /api/auth/register/ HTTP/1.1" 400 77627
+Bad Request: /api/auth/register/
+"POST /api/auth/register/ HTTP/1.1" 400 48
+New user registered: 2020-0001
+"POST /api/auth/register/ HTTP/1.1" 201 897
+"OPTIONS /api/auth/register/ HTTP/1.1" 200 0
+Invalid HTTP_HOST header: '192.168.1.3:8000'. You may need to add '192.168.1.3' to ALLOWED_HOSTS.
+Traceback (most recent call last):
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\utils\deprecation.py", line 133, in __call__
+    response = self.process_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\middleware\common.py", line 48, in process_request
+    host = request.get_host()
+           ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\http\request.py", line 150, in get_host
+    raise DisallowedHost(msg)
+django.core.exceptions.DisallowedHost: Invalid HTTP_HOST header: '192.168.1.3:8000'. You may need to add '192.168.1.3' to ALLOWED_HOSTS.
+Bad Request: /api/auth/register/
+"POST /api/auth/register/ HTTP/1.1" 400 78324
+Invalid HTTP_HOST header: '192.168.1.3:8000'. You may need to add '192.168.1.3' to ALLOWED_HOSTS.
+Traceback (most recent call last):
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\utils\deprecation.py", line 133, in __call__
+    response = self.process_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\middleware\common.py", line 48, in process_request
+    host = request.get_host()
+           ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\http\request.py", line 150, in get_host
+    raise DisallowedHost(msg)
+django.core.exceptions.DisallowedHost: Invalid HTTP_HOST header: '192.168.1.3:8000'. You may need to add '192.168.1.3' to ALLOWED_HOSTS.
+Bad Request: /api/auth/register/
+"POST /api/auth/register/ HTTP/1.1" 400 78324
+Invalid HTTP_HOST header: '192.168.1.3:8000'. You may need to add '192.168.1.3' to ALLOWED_HOSTS.
+Traceback (most recent call last):
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\utils\deprecation.py", line 133, in __call__
+    response = self.process_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\middleware\common.py", line 48, in process_request
+    host = request.get_host()
+           ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\http\request.py", line 150, in get_host
+    raise DisallowedHost(msg)
+django.core.exceptions.DisallowedHost: Invalid HTTP_HOST header: '192.168.1.3:8000'. You may need to add '192.168.1.3' to ALLOWED_HOSTS.
+Bad Request: /api/auth/register/
+"POST /api/auth/register/ HTTP/1.1" 400 78324
+Invalid HTTP_HOST header: '192.168.1.3:8000'. You may need to add '192.168.1.3' to ALLOWED_HOSTS.
+Traceback (most recent call last):
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\utils\deprecation.py", line 133, in __call__
+    response = self.process_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\middleware\common.py", line 48, in process_request
+    host = request.get_host()
+           ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\http\request.py", line 150, in get_host
+    raise DisallowedHost(msg)
+django.core.exceptions.DisallowedHost: Invalid HTTP_HOST header: '192.168.1.3:8000'. You may need to add '192.168.1.3' to ALLOWED_HOSTS.
+Bad Request: /api/auth/register/
+"POST /api/auth/register/ HTTP/1.1" 400 78324
+Invalid HTTP_HOST header: '192.168.1.3:8000'. You may need to add '192.168.1.3' to ALLOWED_HOSTS.
+Traceback (most recent call last):
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\utils\deprecation.py", line 133, in __call__
+    response = self.process_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\middleware\common.py", line 48, in process_request
+    host = request.get_host()
+           ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\http\request.py", line 150, in get_host
+    raise DisallowedHost(msg)
+django.core.exceptions.DisallowedHost: Invalid HTTP_HOST header: '192.168.1.3:8000'. You may need to add '192.168.1.3' to ALLOWED_HOSTS.
+Bad Request: /api/auth/register/
+"POST /api/auth/register/ HTTP/1.1" 400 78324
+Invalid HTTP_HOST header: '192.168.1.3:8000'. You may need to add '192.168.1.3' to ALLOWED_HOSTS.
+Traceback (most recent call last):
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\utils\deprecation.py", line 133, in __call__
+    response = self.process_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\middleware\common.py", line 48, in process_request
+    host = request.get_host()
+           ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\http\request.py", line 150, in get_host
+    raise DisallowedHost(msg)
+django.core.exceptions.DisallowedHost: Invalid HTTP_HOST header: '192.168.1.3:8000'. You may need to add '192.168.1.3' to ALLOWED_HOSTS.
+Bad Request: /api/auth/register/
+"POST /api/auth/register/ HTTP/1.1" 400 78324
+Invalid HTTP_HOST header: '192.168.1.3:8000'. You may need to add '192.168.1.3' to ALLOWED_HOSTS.
+Traceback (most recent call last):
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\utils\deprecation.py", line 133, in __call__
+    response = self.process_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\middleware\common.py", line 48, in process_request
+    host = request.get_host()
+           ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\http\request.py", line 150, in get_host
+    raise DisallowedHost(msg)
+django.core.exceptions.DisallowedHost: Invalid HTTP_HOST header: '192.168.1.3:8000'. You may need to add '192.168.1.3' to ALLOWED_HOSTS.
+Bad Request: /api/auth/register/
+"POST /api/auth/register/ HTTP/1.1" 400 78324
+Invalid HTTP_HOST header: '192.168.1.3:8000'. You may need to add '192.168.1.3' to ALLOWED_HOSTS.
+Traceback (most recent call last):
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\utils\deprecation.py", line 133, in __call__
+    response = self.process_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\middleware\common.py", line 48, in process_request
+    host = request.get_host()
+           ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\http\request.py", line 150, in get_host
+    raise DisallowedHost(msg)
+django.core.exceptions.DisallowedHost: Invalid HTTP_HOST header: '192.168.1.3:8000'. You may need to add '192.168.1.3' to ALLOWED_HOSTS.
+Bad Request: /api/auth/register/
+"POST /api/auth/register/ HTTP/1.1" 400 78324
+Invalid HTTP_HOST header: '192.168.1.3:8000'. You may need to add '192.168.1.3' to ALLOWED_HOSTS.
+Traceback (most recent call last):
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\utils\deprecation.py", line 133, in __call__
+    response = self.process_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\middleware\common.py", line 48, in process_request
+    host = request.get_host()
+           ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\http\request.py", line 150, in get_host
+    raise DisallowedHost(msg)
+django.core.exceptions.DisallowedHost: Invalid HTTP_HOST header: '192.168.1.3:8000'. You may need to add '192.168.1.3' to ALLOWED_HOSTS.
+Bad Request: /api/auth/register/
+"POST /api/auth/register/ HTTP/1.1" 400 78324
+Invalid HTTP_HOST header: '192.168.1.3:8000'. You may need to add '192.168.1.3' to ALLOWED_HOSTS.
+Traceback (most recent call last):
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\utils\deprecation.py", line 133, in __call__
+    response = self.process_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\middleware\common.py", line 48, in process_request
+    host = request.get_host()
+           ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\http\request.py", line 150, in get_host
+    raise DisallowedHost(msg)
+django.core.exceptions.DisallowedHost: Invalid HTTP_HOST header: '192.168.1.3:8000'. You may need to add '192.168.1.3' to ALLOWED_HOSTS.
+Bad Request: /api/auth/register/
+"POST /api/auth/register/ HTTP/1.1" 400 78324
+Invalid HTTP_HOST header: '192.168.1.3:8000'. You may need to add '192.168.1.3' to ALLOWED_HOSTS.
+Traceback (most recent call last):
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\utils\deprecation.py", line 133, in __call__
+    response = self.process_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\middleware\common.py", line 48, in process_request
+    host = request.get_host()
+           ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\http\request.py", line 150, in get_host
+    raise DisallowedHost(msg)
+django.core.exceptions.DisallowedHost: Invalid HTTP_HOST header: '192.168.1.3:8000'. You may need to add '192.168.1.3' to ALLOWED_HOSTS.
+Bad Request: /api/auth/register/
+"POST /api/auth/register/ HTTP/1.1" 400 78324
+"OPTIONS /api/register/ HTTP/1.1" 200 0
+Invalid HTTP_HOST header: '192.168.1.3:8000'. You may need to add '192.168.1.3' to ALLOWED_HOSTS.
+Traceback (most recent call last):
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\utils\deprecation.py", line 133, in __call__
+    response = self.process_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\middleware\common.py", line 48, in process_request
+    host = request.get_host()
+           ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\http\request.py", line 150, in get_host
+    raise DisallowedHost(msg)
+django.core.exceptions.DisallowedHost: Invalid HTTP_HOST header: '192.168.1.3:8000'. You may need to add '192.168.1.3' to ALLOWED_HOSTS.
+Bad Request: /api/register/
+"POST /api/register/ HTTP/1.1" 400 78171
+Invalid HTTP_HOST header: '192.168.1.3:8000'. You may need to add '192.168.1.3' to ALLOWED_HOSTS.
+Traceback (most recent call last):
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\utils\deprecation.py", line 133, in __call__
+    response = self.process_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\middleware\common.py", line 48, in process_request
+    host = request.get_host()
+           ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\http\request.py", line 150, in get_host
+    raise DisallowedHost(msg)
+django.core.exceptions.DisallowedHost: Invalid HTTP_HOST header: '192.168.1.3:8000'. You may need to add '192.168.1.3' to ALLOWED_HOSTS.
+Bad Request: /api/register/
+"POST /api/register/ HTTP/1.1" 400 78185
+C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\nltk\lm\api.py changed, reloading.
+Watching for file changes with StatReloader
+"OPTIONS /api/auth/register/ HTTP/1.1" 200 0
+Invalid HTTP_HOST header: '192.168.1.3:8000'. You may need to add '192.168.1.3' to ALLOWED_HOSTS.
+Traceback (most recent call last):
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\utils\deprecation.py", line 133, in __call__
+    response = self.process_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\middleware\common.py", line 48, in process_request
+    host = request.get_host()
+           ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\http\request.py", line 150, in get_host
+    raise DisallowedHost(msg)
+django.core.exceptions.DisallowedHost: Invalid HTTP_HOST header: '192.168.1.3:8000'. You may need to add '192.168.1.3' to ALLOWED_HOSTS.
+Bad Request: /api/auth/register/
+"POST /api/auth/register/ HTTP/1.1" 400 78337
+Invalid HTTP_HOST header: '192.168.1.3:8000'. You may need to add '192.168.1.3' to ALLOWED_HOSTS.
+Traceback (most recent call last):
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\utils\deprecation.py", line 133, in __call__
+    response = self.process_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\middleware\common.py", line 48, in process_request
+    host = request.get_host()
+           ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\http\request.py", line 150, in get_host
+    raise DisallowedHost(msg)
+django.core.exceptions.DisallowedHost: Invalid HTTP_HOST header: '192.168.1.3:8000'. You may need to add '192.168.1.3' to ALLOWED_HOSTS.
+Bad Request: /api/auth/register/
+"POST /api/auth/register/ HTTP/1.1" 400 78337
+Invalid HTTP_HOST header: '192.168.1.3:8000'. You may need to add '192.168.1.3' to ALLOWED_HOSTS.
+Traceback (most recent call last):
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\utils\deprecation.py", line 133, in __call__
+    response = self.process_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\middleware\common.py", line 48, in process_request
+    host = request.get_host()
+           ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\http\request.py", line 150, in get_host
+    raise DisallowedHost(msg)
+django.core.exceptions.DisallowedHost: Invalid HTTP_HOST header: '192.168.1.3:8000'. You may need to add '192.168.1.3' to ALLOWED_HOSTS.
+Bad Request: /api/auth/register/
+"POST /api/auth/register/ HTTP/1.1" 400 77626
+Invalid HTTP_HOST header: '192.168.1.3:8000'. You may need to add '192.168.1.3' to ALLOWED_HOSTS.
+Traceback (most recent call last):
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\utils\deprecation.py", line 133, in __call__
+    response = self.process_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\middleware\common.py", line 48, in process_request
+    host = request.get_host()
+           ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\http\request.py", line 150, in get_host
+    raise DisallowedHost(msg)
+django.core.exceptions.DisallowedHost: Invalid HTTP_HOST header: '192.168.1.3:8000'. You may need to add '192.168.1.3' to ALLOWED_HOSTS.
+Bad Request: /api/auth/register/
+"POST /api/auth/register/ HTTP/1.1" 400 78337
+Invalid HTTP_HOST header: '192.168.1.3:8000'. You may need to add '192.168.1.3' to ALLOWED_HOSTS.
+Traceback (most recent call last):
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\utils\deprecation.py", line 133, in __call__
+    response = self.process_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\middleware\common.py", line 48, in process_request
+    host = request.get_host()
+           ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python311\Lib\site-packages\django\http\request.py", line 150, in get_host
+    raise DisallowedHost(msg)
+django.core.exceptions.DisallowedHost: Invalid HTTP_HOST header: '192.168.1.3:8000'. You may need to add '192.168.1.3' to ALLOWED_HOSTS.
+Bad Request: /api/auth/register/
+"POST /api/auth/register/ HTTP/1.1" 400 78338

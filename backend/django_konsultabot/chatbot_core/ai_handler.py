@@ -85,28 +85,40 @@ class MultilingualAIHandler:
             
             # Step 4: Generate Response Based on Strategy
             if connection_info['connected'] and connection_info['recommended_mode'] in ['online', 'hybrid']:
-                # Try online processing
-                online_result = self._process_online_query(
-                    english_query, intent_data, context, lang_result['detected_language']
-                )
+                # First try knowledge base
+                kb_result = self._process_offline_query(english_query, intent_data)
                 
-                if online_result['success']:
+                # If knowledge base confidence is high enough, use it
+                if kb_result['confidence'] >= 0.8:
                     response_data.update({
-                        'message': online_result['message'],
-                        'source': online_result['source'],
-                        'method': 'online',
-                        'confidence': online_result['confidence']
+                        'message': kb_result['message'],
+                        'source': 'knowledge_base',
+                        'method': 'offline',
+                        'confidence': kb_result['confidence']
                     })
                 else:
-                    # Fallback to offline
-                    offline_result = self._process_offline_query(english_query, intent_data)
-                    response_data.update({
-                        'message': offline_result['message'],
-                        'source': offline_result['source'],
-                        'method': 'offline_fallback',
-                        'confidence': offline_result['confidence'],
-                        'fallback_used': True
-                    })
+                    # Try Gemini for more dynamic/complex queries
+                    online_result = self._process_online_query(
+                        english_query, intent_data, context, lang_result['detected_language']
+                    )
+                    
+                    if online_result['success']:
+                        response_data.update({
+                            'message': online_result['message'],
+                            'source': 'gemini',
+                            'method': 'online',
+                            'confidence': online_result['confidence']
+                        })
+                    else:
+                        # Fallback to offline
+                        offline_result = self._process_offline_query(english_query, intent_data)
+                        response_data.update({
+                            'message': offline_result['message'],
+                            'source': offline_result['source'],
+                            'method': 'offline_fallback',
+                            'confidence': offline_result['confidence'],
+                            'fallback_used': True
+                        })
             else:
                 # Use offline processing
                 offline_result = self._process_offline_query(english_query, intent_data)
@@ -188,6 +200,131 @@ class MultilingualAIHandler:
             result['english_query'] = query
         
         return result
+    
+    def process_with_gemini(self, query: str, context: Optional[Dict] = None,
+                        user=None) -> Dict[str, Any]:
+        """
+        Process a query using Gemini AI
+        
+        Args:
+            query: User query
+            context: Optional conversation context
+            user: Django User instance
+            
+        Returns:
+            Dict with response and metadata
+        """
+        try:
+            # Initialize timing
+            start_time = time.time()
+            
+            # Process with Gemini
+            gemini_response = gemini_processor.chat(
+                query=query,
+                context=context,
+                max_tokens=500
+            )
+            
+            response_data = {
+                'message': gemini_response.get('response', ''),
+                'processing_time': time.time() - start_time,
+                'model': gemini_response.get('model', 'gemini'),
+                'tokens': gemini_response.get('tokens', 0),
+                'finish_reason': gemini_response.get('finish_reason', ''),
+                'error': None
+            }
+            
+            # Log interaction
+            self._log_interaction(user, query, response_data)
+            
+            return response_data
+            
+        except Exception as e:
+            logger.error(f"Gemini processing error: {e}")
+            return {
+                'error': str(e),
+                'message': None,
+                'processing_time': time.time() - start_time
+            }
+    
+    def translate_with_gemini(self, text: str, target_lang: str) -> Dict[str, Any]:
+        """
+        Translate text using Gemini AI
+        
+        Args:
+            text: Text to translate
+            target_lang: Target language
+            
+        Returns:
+            Dict with translation and metadata
+        """
+        try:
+            start_time = time.time()
+            
+            # Format translation prompt
+            prompt = f"Translate the following text to {target_lang}:\n{text}"
+            
+            # Process with Gemini
+            gemini_response = gemini_processor.chat(
+                query=prompt,
+                max_tokens=300
+            )
+            
+            return {
+                'translated_text': gemini_response.get('response', ''),
+                'source_text': text,
+                'target_language': target_lang,
+                'processing_time': time.time() - start_time,
+                'error': None
+            }
+            
+        except Exception as e:
+            logger.error(f"Gemini translation error: {e}")
+            return {
+                'error': str(e),
+                'translated_text': None,
+                'processing_time': time.time() - start_time
+            }
+    
+    def generate_image_with_gemini(self, prompt: str, user=None) -> Dict[str, Any]:
+        """
+        Generate image using Gemini AI
+        
+        Args:
+            prompt: Image generation prompt
+            user: Django User instance
+            
+        Returns:
+            Dict with image data and metadata
+        """
+        try:
+            start_time = time.time()
+            
+            # Process with Gemini
+            image_response = gemini_processor.generate_image(
+                prompt=prompt,
+                size='1024x1024'
+            )
+            
+            response_data = {
+                'image_url': image_response.get('url'),
+                'prompt': prompt,
+                'processing_time': time.time() - start_time,
+                'error': None
+            }
+            
+            # Log interaction
+            self._log_interaction(user, f"Image generation: {prompt}", response_data)
+            
+            return response_data
+            
+        except Exception as e:
+            logger.error(f"Gemini image generation error: {e}")
+            return {
+                'error': str(e),
+                'image_url': None,
+                'processing_time': time.time() - start_time
+            }
     
     def _process_online_query(self, query: str, intent_data: Dict, 
                              context: Optional[List[Dict]], 

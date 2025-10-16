@@ -1,38 +1,53 @@
-import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
-import { createStackNavigator } from '@react-navigation/stack';
-import { Provider as PaperProvider } from 'react-native-paper';
+import React, { useState } from 'react';
+import { StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import LoginScreen from './src/screens/LoginScreen';
+import RegisterScreen from './src/screens/RegisterScreen';
+import ChatScreen from './src/screens/ChatScreen';
 
-import { AuthProvider } from './src/context/AuthContext';
-import { theme } from './src/theme/theme';
-import AuthNavigator from './src/navigation/AuthNavigator';
-import MainNavigator from './src/navigation/MainNavigator';
-import { useAuth } from './src/context/AuthContext';
+export default function App() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [showRegister, setShowRegister] = useState(false);
 
-const Stack = createStackNavigator();
+  const handleLoginSuccess = (userData) => {
+    setIsLoggedIn(true);
+    // TODO: Navigate to the chat screen
+  };
 
-function AppContent() {
-  const { user, isLoading } = useAuth();
+  const handleRegisterSuccess = () => {
+    setShowRegister(false); // Show login screen after successful registration
+  };
 
-  if (isLoading) {
-    return null; // You can add a loading screen here
+  if (!isLoggedIn) {
+    return (
+      <View style={styles.container}>
+        <StatusBar style="auto" />
+        {showRegister ? (
+          <RegisterScreen
+            onRegisterSuccess={handleRegisterSuccess}
+            onLoginPress={() => setShowRegister(false)}
+          />
+        ) : (
+          <LoginScreen
+            onLoginSuccess={handleLoginSuccess}
+            onRegisterPress={() => setShowRegister(true)}
+          />
+        )}
+      </View>
+    );
   }
 
   return (
-    <NavigationContainer>
-      <StatusBar style="light" backgroundColor={theme.colors.primary} />
-      {user ? <MainNavigator /> : <AuthNavigator />}
-    </NavigationContainer>
+    <View style={styles.container}>
+      <StatusBar style="auto" />
+      <ChatScreen />
+    </View>
   );
 }
 
-export default function App() {
-  return (
-    <PaperProvider theme={theme}>
-      <AuthProvider>
-        <AppContent />
-      </AuthProvider>
-    </PaperProvider>
-  );
-}
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+});

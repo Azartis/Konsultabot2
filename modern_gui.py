@@ -229,16 +229,25 @@ class ModernKonsultabotGUI:
         for widget in self.root.winfo_children():
             widget.destroy()
         
-        # Main container with futuristic background
+        # Main container with futuristic background (use grid for responsiveness)
         main_frame = tk.Frame(self.root, bg=self.bg_color)
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+        main_frame.grid(row=0, column=0, sticky='nsew', padx=20, pady=20)
+        try:
+            # make root and main_frame expand properly
+            self.root.grid_rowconfigure(0, weight=1)
+            self.root.grid_columnconfigure(0, weight=1)
+            main_frame.grid_rowconfigure(0, weight=1)
+            main_frame.grid_columnconfigure(0, weight=1)
+        except Exception:
+            pass
         
         # Create grid pattern background effect
         # self.create_grid_background(main_frame)  # Commented out for now
         
         # Central login panel
         center_frame = tk.Frame(main_frame, bg=self.bg_color)
-        center_frame.place(relx=0.5, rely=0.5, anchor='center')
+        # center_frame uses grid to remain centered while being responsive
+        center_frame.grid(row=0, column=0)
         
         # Futuristic title with glow effect
         title_frame = tk.Frame(center_frame, bg=self.bg_color)
@@ -261,9 +270,9 @@ class ModernKonsultabotGUI:
         
         # Login panel with border
         login_panel = tk.Frame(center_frame, bg=self.panel_color, 
-                              highlightbackground=self.primary_color, 
-                              highlightthickness=2)
-        login_panel.pack(pady=20, padx=40, fill=tk.X)
+                      highlightbackground=self.primary_color, 
+                      highlightthickness=2)
+        login_panel.grid(pady=20, padx=40, sticky='ew')
         
         # Login header
         login_header = tk.Label(login_panel, text="▼ ACCESS TERMINAL ▼", 
@@ -310,7 +319,7 @@ class ModernKonsultabotGUI:
         
         # Buttons with futuristic styling
         button_frame = tk.Frame(login_panel, bg=self.panel_color)
-        button_frame.pack(pady=(0, 20), padx=20, fill=tk.X)
+        button_frame.grid(pady=(0, 20), padx=20, sticky='ew')
         
         login_btn = tk.Button(button_frame, text="◤ INITIALIZE LOGIN ◥", 
                              command=self.handle_login,
@@ -351,7 +360,12 @@ class ModernKonsultabotGUI:
         
         # Main container
         main_frame = ttk.Frame(self.root, padding="20")
-        main_frame.pack(fill=tk.BOTH, expand=True)
+        main_frame.grid(row=0, column=0, sticky='nsew')
+        try:
+            self.root.grid_rowconfigure(0, weight=1)
+            self.root.grid_columnconfigure(0, weight=1)
+        except Exception:
+            pass
         
         # Title
         title_label = ttk.Label(main_frame, text="Create Account", style='Title.TLabel')
@@ -500,15 +514,40 @@ class ModernKonsultabotGUI:
         for widget in self.root.winfo_children():
             widget.destroy()
         
-        # Main container with dark theme - mobile optimized
+        # Main container with dark theme - make responsive
         main_frame = tk.Frame(self.root, bg=self.bg_color)
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        # Use grid for top-level responsiveness but keep inner packing to minimise changes
+        main_frame.grid(row=0, column=0, sticky='nsew', padx=5, pady=5)
+        try:
+            self.root.grid_rowconfigure(0, weight=1)
+            self.root.grid_columnconfigure(0, weight=1)
+        except Exception:
+            pass
+        # Configure root and main_frame weights so chat area expands
+        try:
+            self.root.grid_rowconfigure(0, weight=1)
+            self.root.grid_columnconfigure(0, weight=1)
+            main_frame.grid_rowconfigure(0, weight=0)
+            main_frame.grid_rowconfigure(1, weight=1)
+            main_frame.grid_columnconfigure(0, weight=1)
+        except Exception:
+            # Older Tkinter variants may not support grid config in the same way; ignore
+            pass
         
-        # Header panel - compact for mobile
+        # Header panel - compact for mobile; grid-based for responsiveness
         header_panel = tk.Frame(main_frame, bg=self.panel_color, 
-                               highlightbackground=self.primary_color, 
-                               highlightthickness=1)
-        header_panel.pack(fill=tk.X, pady=(0, 5))
+                                highlightbackground=self.primary_color, 
+                                highlightthickness=1)
+        header_panel.grid(row=0, column=0, sticky='ew', pady=(0, 5))
+
+        # Typing progress indicator (hidden by default)
+        try:
+            from tkinter import ttk as _ttk
+            self._typing_progress = _ttk.Progressbar(header_panel, mode='indeterminate', length=80)
+            self._typing_progress.grid(row=0, column=2, sticky='e', padx=8)
+            self._typing_progress.grid_remove()
+        except Exception:
+            self._typing_progress = None
         
         # Mobile-optimized header layout
         # Top row - User info
@@ -555,11 +594,17 @@ class ModernKonsultabotGUI:
                               cursor='hand2')
         logout_btn.pack(side=tk.RIGHT, padx=2)
         
-        # Chat area with futuristic styling - mobile optimized
+        # Chat area with futuristic styling - mobile optimized (grid-based)
         chat_panel = tk.Frame(main_frame, bg=self.panel_color,
-                             highlightbackground=self.primary_color,
-                             highlightthickness=1)
-        chat_panel.pack(fill=tk.BOTH, expand=True, pady=5)
+                              highlightbackground=self.primary_color,
+                              highlightthickness=1)
+        chat_panel.grid(row=1, column=0, sticky='nsew', pady=5)
+        # Ensure main_frame expands chat_panel
+        try:
+            main_frame.grid_rowconfigure(1, weight=1)
+            main_frame.grid_columnconfigure(0, weight=1)
+        except Exception:
+            pass
         
         # Chat display with terminal-like appearance - mobile optimized
         self.chat_display = scrolledtext.ScrolledText(
@@ -603,15 +648,15 @@ class ModernKonsultabotGUI:
         self.message_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, ipady=6)
         
         # Send button with futuristic styling - mobile optimized
-        send_btn = tk.Button(input_panel, text="◤SEND◥", 
-                            command=self.send_message,
-                            font=('Orbitron', 9, 'bold'),
-                            fg=self.bg_color, bg=self.primary_color,
-                            activeforeground=self.bg_color,
-                            activebackground=self.glow_color,
-                            bd=0, padx=8,
-                            cursor='hand2')
-        send_btn.pack(side=tk.RIGHT, padx=(5, 3))
+        self.send_btn = tk.Button(input_panel, text="◤SEND◥", 
+                                  command=self.send_message,
+                                  font=('Orbitron', 9, 'bold'),
+                                  fg=self.bg_color, bg=self.primary_color,
+                                  activeforeground=self.bg_color,
+                                  activebackground=self.glow_color,
+                                  bd=0, padx=8,
+                                  cursor='hand2')
+        self.send_btn.pack(side=tk.RIGHT, padx=(5, 3))
         
         # Voice button with animation capability - mobile optimized
         voice_text = "🎤" if self.voice_available else "🎤❌"
@@ -633,6 +678,12 @@ class ModernKonsultabotGUI:
         # Bind Enter key to send message
         self.message_entry.bind('<Return>', lambda e: self.send_message())
         self.message_entry.focus()
+
+        # Bind resize event to adjust responsive behaviours
+        try:
+            self.root.bind('<Configure>', self.on_resize)
+        except Exception:
+            pass
         
         # Display human-like welcome message
         welcome_messages = [
@@ -654,7 +705,14 @@ class ModernKonsultabotGUI:
         
         # Display user message
         self.display_message("You", user_message, "user")
-        
+        # Show typing state and disable inputs while waiting for response
+        try:
+            # Start a non-invasive typing indicator in the header status label
+            self._set_ui_busy(True)
+            self._start_typing_indicator()
+        except Exception:
+            pass
+
         # Get response in separate thread
         threading.Thread(target=self.get_bot_response, args=(user_message,), daemon=True).start()
     
@@ -673,10 +731,14 @@ class ModernKonsultabotGUI:
             if self.voice_available and self.tts_engine:
                 self.speak_response(response)
             
+            # Re-enable UI and clear typing indicators
+            self.root.after(0, self._on_response_complete)
+            
         except Exception as e:
             logging.error(f"Error getting bot response: {e}")
             error_response = "I'm sorry, I encountered an error. Please try again."
             self.root.after(0, lambda: self.display_message("Konsultabot", error_response, "bot"))
+            self.root.after(0, self._on_response_complete)
     
     def get_online_response(self, user_message):
         """Get response from Google AI API"""
@@ -692,13 +754,91 @@ class ModernKonsultabotGUI:
             
             Please provide a helpful, accurate response. If you don't know specific information about EVSU Dulag, 
             acknowledge this and provide general guidance or suggest contacting the appropriate office."""
-            
-            response = self.ai_model.generate_content(context)
-            return response.text
+            # Prefer using the shared gemini helper which handles model discovery
+            try:
+                from gemini_helper import ask_gemini
+                resp_text = ask_gemini(context)
+                return resp_text
+            except Exception:
+                # Fallback to direct model if available
+                try:
+                    resp = self.ai_model.generate_content(context)
+                    return resp.text if hasattr(resp, 'text') else str(resp)
+                except Exception as e:
+                    logging.error(f"Online response failed: {e}")
+                    return self.get_offline_response(user_message)
             
         except Exception as e:
             logging.error(f"Online response error: {e}")
             return self.get_offline_response(user_message)
+
+    def _set_ui_busy(self, busy: bool):
+        """Enable/disable input widgets while waiting for an AI response."""
+        try:
+            state = 'disabled' if busy else 'normal'
+            if hasattr(self, 'send_btn') and self.send_btn:
+                self.send_btn.config(state=state)
+            if hasattr(self, 'message_entry') and self.message_entry:
+                if busy:
+                    self.message_entry.config(state='disabled')
+                else:
+                    self.message_entry.config(state='normal')
+        except Exception:
+            pass
+
+    def _on_response_complete(self):
+        """Cleanup after receiving response: re-enable inputs and remove typing indicators."""
+        try:
+            # Re-enable UI
+            self._stop_typing_indicator()
+            self._set_ui_busy(False)
+        except Exception:
+            pass
+
+    def _start_typing_indicator(self):
+        """Animate the header status_label to show a typing indicator."""
+        try:
+            self._typing_frame = 0
+            self._typing_active = True
+            # Show and start progressbar if available
+            try:
+                if getattr(self, '_typing_progress', None):
+                    self._typing_progress.grid()
+                    self._typing_progress.start(10)
+            except Exception:
+                pass
+            self._animate_typing()
+        except Exception:
+            self._typing_active = False
+
+    def _animate_typing(self):
+        if not getattr(self, '_typing_active', False):
+            return
+        try:
+            dots = '.' * (self._typing_frame % 4)
+            text = f"KONSULTABOT is typing{dots}"
+            if hasattr(self, 'status_label') and self.status_label:
+                self.status_label.config(text=text)
+            self._typing_frame += 1
+            self.root.after(500, self._animate_typing)
+        except Exception:
+            self._typing_active = False
+
+    def _stop_typing_indicator(self):
+        try:
+            self._typing_active = False
+            # Stop and hide progressbar if present
+            try:
+                if getattr(self, '_typing_progress', None):
+                    self._typing_progress.stop()
+                    self._typing_progress.grid_remove()
+            except Exception:
+                pass
+            if hasattr(self, 'status_label') and self.status_label:
+                status_text = "◉ ONLINE" if self.online_mode else "◯ OFFLINE"
+                self.status_label.config(text=status_text)
+        except Exception:
+            pass
     
     def get_offline_response(self, user_message):
         """Get human-like response from local knowledge base"""
@@ -947,13 +1087,12 @@ class ModernKonsultabotGUI:
                 # Convert speech to text
                 try:
                     text = self.recognizer.recognize_google(audio)
-                    
-                    # Display the recognized text
-                    self.root.after(0, lambda: self.message_entry.insert(0, text))
-                    self.root.after(0, lambda: self.display_message("You (Voice)", text, "user"))
-                    
-                    # Automatically send the message
-                    self.root.after(100, lambda: self.send_voice_message(text))
+
+                    # Apply transcript in a single, thread-safe place
+                    self.root.after(0, lambda t=text: self._apply_transcript(t))
+
+                    # Automatically send the message shortly after applying transcript
+                    self.root.after(150, lambda t=text: self.send_voice_message(t))
                     
                 except sr.UnknownValueError:
                     self.root.after(0, lambda: self.display_message("System", "❌ Could not understand audio. Please try again.", "system"))
@@ -968,6 +1107,97 @@ class ModernKonsultabotGUI:
         finally:
             # Always stop listening animation
             self.root.after(0, self.stop_voice_input)
+
+    def _apply_transcript(self, text: str):
+        """Safely insert transcript into input and show in chat preview."""
+        try:
+            # Insert text into the entry (replace existing selection)
+            self.message_entry.delete(0, tk.END)
+            self.message_entry.insert(0, text)
+            # Also show a temporary user preview in the chat display
+            self.display_message("You (Voice)", text, "user")
+        except Exception as e:
+            logging.error(f"Error applying transcript to UI: {e}")
+
+    def on_resize(self, event):
+        """Simple responsive adjustments on window resize."""
+        try:
+            width = event.width
+            # Delegate to a helper that adjusts multiple UI elements
+            self.adjust_responsive_layout(width)
+        except Exception:
+            pass
+
+    def adjust_responsive_layout(self, width: int):
+        """Adjust fonts, paddings and some widget sizes according to window width.
+
+        This keeps the UI readable on small windows and improves usage on large screens.
+        """
+        try:
+            # Chat font scaling
+            if hasattr(self, 'chat_display') and self.chat_display:
+                if width >= 1400:
+                    chat_font = ('Consolas', 13)
+                elif width >= 1100:
+                    chat_font = ('Consolas', 12)
+                elif width >= 800:
+                    chat_font = ('Consolas', 11)
+                else:
+                    chat_font = ('Consolas', 10)
+                self.chat_display.configure(font=chat_font)
+
+            # Entry / button scaling
+            entry_font_size = 12
+            btn_font_size = 10
+            title_font_size = 20
+            if width >= 1400:
+                entry_font_size = 14
+                btn_font_size = 12
+                title_font_size = 28
+            elif width >= 1100:
+                entry_font_size = 13
+                btn_font_size = 11
+                title_font_size = 24
+            elif width >= 800:
+                entry_font_size = 12
+                btn_font_size = 10
+                title_font_size = 20
+            else:
+                entry_font_size = 11
+                btn_font_size = 9
+                title_font_size = 18
+
+            # Update ttk styles where possible
+            try:
+                self.style.configure('Title.TLabel', font=('Orbitron', title_font_size, 'bold'))
+            except Exception:
+                pass
+
+            # Update entry and button widget fonts if available
+            try:
+                if hasattr(self, 'message_entry') and self.message_entry:
+                    self.message_entry.config(font=('Consolas', entry_font_size))
+                if hasattr(self, 'login_email') and self.login_email:
+                    self.login_email.config(font=('Consolas', entry_font_size))
+                if hasattr(self, 'login_password') and self.login_password:
+                    self.login_password.config(font=('Consolas', entry_font_size))
+                if hasattr(self, 'send_btn') and self.send_btn:
+                    self.send_btn.config(font=('Orbitron', btn_font_size, 'bold'))
+            except Exception:
+                pass
+
+            # Make sure Jarvis overlay scales a bit for very small windows
+            try:
+                if getattr(self, 'jarvis_overlay', None):
+                    if width < 500:
+                        self.jarvis_overlay.place_configure(width=250, height=250)
+                    else:
+                        self.jarvis_overlay.place_configure(width=350, height=350)
+            except Exception:
+                pass
+        except Exception:
+            # Best-effort only; don't raise on layout hiccups
+            pass
     
     def send_voice_message(self, text):
         """Send voice message and get response"""

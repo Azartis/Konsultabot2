@@ -16,12 +16,14 @@ logger = logging.getLogger('konsultabot.speech')
 
 class SpeechProcessor:
     """
-    Advanced speech processing with cloud and local fallback
+    Speech processing with offline-first approach and optional cloud enhancement
     """
     
     def __init__(self):
-        self.use_cloud = self._check_cloud_credentials()
         self.recognizer = sr.Recognizer()
+        self.recognizer.energy_threshold = 4000
+        self.recognizer.dynamic_energy_threshold = True
+        
         self.supported_languages = {
             'english': 'en-US',
             'tagalog': 'tl-PH',
@@ -30,10 +32,15 @@ class SpeechProcessor:
             'spanish': 'es-ES'
         }
         
-        if self.use_cloud:
+        # Initialize with offline mode first
+        self.use_cloud = False
+        self.cloud_client = None
+        
+        # Try to initialize cloud services if available
+        if self._check_cloud_credentials():
             self._init_cloud_client()
         else:
-            logger.warning("Google Cloud credentials not found, using local speech recognition")
+            logger.info("Using offline speech recognition only")
     
     def _check_cloud_credentials(self) -> bool:
         """Check if Google Cloud credentials are available"""
@@ -45,9 +52,22 @@ class SpeechProcessor:
             return False
     
     def _init_cloud_client(self):
-        """Initialize Google Cloud Speech client"""
+        """Initialize speech recognition with offline fallback"""
         try:
-            from google.cloud import speech
+            # Initialize basic speech recognition
+            self.recognizer = sr.Recognizer()
+            self.recognizer.energy_threshold = 4000
+            self.recognizer.dynamic_energy_threshold = True
+            
+            # Try Google Cloud Speech if available
+            if self.use_cloud:
+                from google.cloud import speech
+                self.speech_client = speech.SpeechClient()
+                logger.info("Google Cloud Speech initialized successfully")
+        except Exception as e:
+            logger.error(f"Speech recognition initialization error: {e}")
+            self.use_cloud = False
+            logger.info("Using offline speech recognition only")
             self.cloud_client = speech.SpeechClient()
             logger.info("Google Cloud Speech client initialized")
         except Exception as e:

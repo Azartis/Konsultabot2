@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 from typing import Optional
+import logging
 
 import requests
 from dotenv import load_dotenv
@@ -20,6 +21,8 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "").strip()
 # Lazy import to avoid ImportError when package isn't installed in some environments
 _genai = None
 _model = None
+
+logger = logging.getLogger(__name__)
 
 
 def _ensure_model():
@@ -40,12 +43,53 @@ def _ensure_model():
         )
 
     genai.configure(api_key=GOOGLE_API_KEY)
-    # gemini-pro is the stable model
-    model = genai.GenerativeModel("gemini-pro")
 
-    _genai = genai
-    _model = model
-    return _model
+    # Preferred models to try first
+    preferred_models = ["gemini-pro", "gemini-1.5-pro", "gemini-1.5-flash", "gemini-1.0-pro"]
+    candidates = list(preferred_models)
+
+    try:
+        available_models = list(genai.list_models())
+        for m in available_models:
+            model_id = None
+            if hasattr(m, "name"):
+                model_id = getattr(m, "name")
+            elif isinstance(m, dict):
+                model_id = m.get("name") or m.get("id")
+            elif hasattr(m, "model"):
+                model_id = getattr(m, "model")
+
+            if model_id and model_id not in candidates:
+                candidates.append(model_id)
+        logger.info("Found %d candidate models via list_models()", len(available_models))
+    except Exception as e:
+        logger.warning("Could not list available models: %s", e)
+
+    for model_name in candidates:
+        try:
+            model = genai.GenerativeModel(model_name)
+            # quick test
+            try:
+                test_response = model.generate_content("Hello")
+                resp_text = getattr(test_response, "text", None) or (test_response if isinstance(test_response, str) else None)
+                if resp_text:
+                    _genai = genai
+                    _model = model
+                    logger.info("Successfully initialized Gemini model: %s", model_name)
+                    return _model
+            except Exception as e:
+                msg = str(e)
+                if "quota" in msg.lower() or "exceeded" in msg.lower() or "429" in msg:
+                    logger.error("Quota or rate limit error while testing model %s: %s", model_name, msg)
+                    logger.error("Check Google Cloud billing/quota for your project or try another model or time later.")
+                else:
+                    logger.debug("Model %s test failed: %s", model_name, msg)
+                continue
+        except Exception as e:
+            logger.debug("Failed to initialize %s: %s", model_name, e)
+            continue
+
+    raise RuntimeError("All Gemini models failed to initialize. Check API key and network connection.")
 
 
 def has_internet(timeout: float = 3.0) -> bool:

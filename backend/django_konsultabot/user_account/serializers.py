@@ -4,7 +4,10 @@ Serializers for KonsultaBot user authentication and management
 from rest_framework import serializers
 from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
+import logging
 from .models import User
+
+logger = logging.getLogger('konsultabot.auth')
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -41,9 +44,21 @@ class LoginSerializer(serializers.Serializer):
         password = data.get('password')
         
         if username and password:
+            # Try to find user first
+            try:
+                potential_user = User.objects.get(username=username)
+                logger.info(f"Found user with username: {username}")
+            except User.DoesNotExist:
+                logger.error(f"No user found with username: {username}")
+                raise serializers.ValidationError(
+                    'No account found with this username.',
+                    code='invalid_username'
+                )
+
             user = authenticate(username=username, password=password)
             
             if not user:
+                logger.error(f"Authentication failed for existing user: {username}")
                 raise serializers.ValidationError(
                     'Invalid credentials. Please check your username and password.',
                     code='invalid_credentials'
@@ -85,6 +100,13 @@ class RegisterSerializer(serializers.ModelSerializer):
             'first_name', 'last_name', 'department', 'student_id',
             'phone_number'
         ]
+        extra_kwargs = {
+            'first_name': {'required': False},
+            'last_name': {'required': False},
+            'department': {'required': False},
+            'student_id': {'required': False},
+            'phone_number': {'required': False},
+        }
     
     def validate(self, data):
         if data['password'] != data['password_confirm']:

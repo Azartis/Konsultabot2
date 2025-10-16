@@ -156,9 +156,9 @@ def register():
         'permissions': get_user_permissions('student')
     }
     
+    # Return fields expected by the mobile client: `token` and `user`
     return jsonify({
-        'access': access_token,
-        'refresh': access_token,
+        'token': access_token,
         'user': user_data,
         'message': 'Registration successful'
     }), 201
@@ -225,62 +225,7 @@ def permissions():
     except jwt.InvalidTokenError:
         return jsonify({'error': 'Invalid token'}), 401
 
-@app.route('/api/auth/register', methods=['POST'])
-def register():
-    data = request.get_json()
-    
-    if not data:
-        return jsonify({'success': False, 'error': 'No data provided'}), 400
-    
-    # Validate required fields
-    required_fields = ['username', 'email', 'password', 'first_name', 'last_name']
-    for field in required_fields:
-        if not data.get(field):
-            return jsonify({'success': False, 'error': f'{field} is required'}), 400
-    
-    try:
-        conn = sqlite3.connect('auth.db')
-        cursor = conn.cursor()
-        
-        # Check if user already exists
-        cursor.execute('SELECT id FROM users WHERE username = ? OR email = ?', 
-                      (data['username'], data['email']))
-        if cursor.fetchone():
-            conn.close()
-            return jsonify({'success': False, 'error': 'User already exists'}), 409
-        
-        # Hash password
-        password_hash = generate_password_hash(data['password'])
-        
-        # Insert new user
-        cursor.execute('''
-            INSERT INTO users (username, email, password_hash, role, first_name, last_name, department, student_id, year_level, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            data['username'],
-            data['email'],
-            password_hash,
-            data.get('role', 'student'),
-            data['first_name'],
-            data['last_name'],
-            data.get('department', ''),
-            data.get('student_id', ''),
-            data.get('year_level', ''),
-            datetime.utcnow()
-        ))
-        
-        conn.commit()
-        user_id = cursor.lastrowid
-        conn.close()
-        
-        return jsonify({
-            'success': True,
-            'message': 'User registered successfully',
-            'user_id': user_id
-        }), 201
-        
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+    # Note: duplicate register endpoint removed to avoid endpoint collision.
 
 @app.route('/api/auth/logout', methods=['POST'])
 def logout():

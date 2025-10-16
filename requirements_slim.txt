@@ -1,0 +1,12 @@
+# Slim requirements for Konsultabot minimal runtime
+Flask==2.3.3
+requests==2.31.0
+python-dotenv==1.0.0
+# GUI
+pillow==10.1.0
+# Optional voice (not included in slim)
+# speechrecognition
+# pyttsx3
+# pyaudio
+# Keep google-generativeai if you want online features in slim
+google-generativeai==0.3.2

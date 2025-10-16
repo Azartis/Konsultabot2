@@ -15,7 +15,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.pagination import PageNumberPagination
 
-from .models import User
+from user_account.models import User
 from .serializers import (
     UserSerializer, LoginSerializer, RegisterSerializer,
     ChangePasswordSerializer, UserManagementSerializer, UserStatsSerializer

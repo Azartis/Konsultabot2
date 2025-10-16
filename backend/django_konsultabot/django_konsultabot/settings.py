@@ -3,7 +3,9 @@ Django settings for KonsultaBot Advanced AI Platform
 """
 
 import os
+import json
 from pathlib import Path
+from datetime import timedelta
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -12,13 +14,39 @@ load_dotenv()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Load environment variables from parent directory's .env
+env_path = BASE_DIR.parent / '.env'
+if env_path.exists():
+    load_dotenv(str(env_path))
+
+# KonsultaBot Settings
+KONSULTABOT_SETTINGS = {
+    'OFFLINE_MODE': os.getenv('KONSULTABOT_OFFLINE_MODE', 'false').lower() == 'true',
+    'ENABLE_VOICE': os.getenv('KONSULTABOT_ENABLE_VOICE', 'true').lower() == 'true',
+    'GOOGLE_API_KEY': os.getenv('GOOGLE_API_KEY', 'AIzaSyBRynLqVFbj1jZfAAzqIfLH6xL4rt6483U'),
+    'AI_MODEL': os.getenv('KONSULTABOT_AI_MODEL', 'gemini-1.5-flash'),
+    'SESSION_TIMEOUT_MINUTES': 30,
+    'GEMINI_CONFIG': {
+        'HISTORY_ENABLED': True,
+        'MAX_OUTPUT_TOKENS': 2048,
+        'TEMPERATURE': 0.7,
+        'TOP_P': 0.8,
+        'TOP_K': 40,
+        'CANDIDATE_COUNT': 1,
+    }
+}
+
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-konsultabot-dev-key-change-in-production')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'True').lower() == 'true'
 
-ALLOWED_HOSTS = ['*'] if DEBUG else ['localhost', '127.0.0.1', '192.168.1.17']
+# Load Google API Key (for backward compatibility)
+GOOGLE_API_KEY = KONSULTABOT_SETTINGS['GOOGLE_API_KEY']
+
+# In development, allow all hosts. In production, this should be restricted.
+ALLOWED_HOSTS = ['*', 'localhost', '127.0.0.1']
 
 # Application definition
 INSTALLED_APPS = [
@@ -43,6 +71,53 @@ INSTALLED_APPS = [
     'user_account',  # RBAC system
 ]
 
+# Simplified settings for development
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
+CSRF_TRUSTED_ORIGINS = ['http://127.0.0.1:8000']
+USE_X_FORWARDED_HOST = False
+SECURE_PROXY_SSL_HEADER = None
+
+# REST Framework settings
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticatedOrReadOnly',
+    ],
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
+    ],
+    'DEFAULT_PARSER_CLASSES': [
+        'rest_framework.parsers.JSONParser',
+    ],
+    'EXCEPTION_HANDLER': 'rest_framework.views.exception_handler',
+    'DEFAULT_THROTTLE_CLASSES': [],
+    'DEFAULT_THROTTLE_RATES': {
+        'chat': '100/hour',
+        'voice': '50/hour',
+    }
+}
+
+# JWT Settings
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'UPDATE_LAST_LOGIN': True,
+    'ALGORITHM': 'HS256',
+    'SIGNING_KEY': SECRET_KEY,
+    'VERIFYING_KEY': None,
+    'AUTH_HEADER_TYPES': ('Bearer',),
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',
+    'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
+    'TOKEN_TYPE_CLAIM': 'token_type',
+}
+
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
@@ -51,7 +126,6 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
 ROOT_URLCONF = 'django_konsultabot.urls'
@@ -121,12 +195,11 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Custom user model for RBAC
 AUTH_USER_MODEL = 'user_account.User'
 
-# REST Framework configuration
+# REST Framework settings
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
         'rest_framework.authentication.SessionAuthentication',
-        'rest_framework.authentication.TokenAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticatedOrReadOnly',
@@ -183,19 +256,36 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:19006",  # Expo web
     "http://127.0.0.1:19006",
     "http://192.168.1.17:19006",
+    "http://localhost:8081",   # Expo web dev server
+    "http://127.0.0.1:8081",
+    "http://192.168.1.17:8081",
+    "exp://192.168.1.14:8081", # Expo Go app
 ]
 
 CORS_ALLOW_ALL_ORIGINS = DEBUG  # Only in development
 
 # KonsultaBot specific settings
 KONSULTABOT_SETTINGS = {
-    'GOOGLE_API_KEY': os.getenv('GOOGLE_API_KEY'),
-    'SESSION_TIMEOUT_MINUTES': 30,
-    'MAX_CONVERSATION_HISTORY': 10,
-    'ENABLE_VOICE_FEATURES': True,
-    'ENABLE_ANALYTICS': True,
+    'GEMINI_API_KEY': os.getenv('GEMINI_API_KEY'),
+    'SESSION_TIMEOUT_MINUTES': int(os.getenv('KONSULTABOT_SESSION_TIMEOUT', '30')),
+    'MAX_CONVERSATION_HISTORY': int(os.getenv('KONSULTABOT_MAX_HISTORY', '10')),
+    'ENABLE_VOICE_FEATURES': os.getenv('KONSULTABOT_ENABLE_VOICE', 'true').lower() == 'true',
+    'ENABLE_ANALYTICS': os.getenv('KONSULTABOT_ENABLE_ANALYTICS', 'true').lower() == 'true',
     'DEFAULT_LANGUAGE': 'english',
     'SUPPORTED_LANGUAGES': ['english', 'bisaya', 'waray', 'tagalog'],
+    'OFFLINE_MODE': False,  # Set to True to disable online features
+    'AI_MODEL': os.getenv('KONSULTABOT_AI_MODEL', 'gemini-1.5-flash'),
+    'SYSTEM_PROMPT': """
+You are KonsultaBot — an AI assistant for EVSU Dulag IT students.
+Be friendly, concise, and technical when needed.
+Provide clear, step-by-step solutions to IT-related problems.
+Focus on campus-specific solutions when relevant.
+Be encouraging and supportive.
+Keep responses practical and actionable.
+Use simple language and numbered steps for complex procedures.
+Suggest when to contact IT support for advanced issues.
+Only provide IT-related assistance and academic guidance.
+"""
 }
 
 # Logging configuration

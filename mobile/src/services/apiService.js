@@ -1,114 +1,194 @@
 import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 
-const API_BASE_URL = Constants.expoConfig?.extra?.apiUrl || 'http://localhost:8000/api';
+const BASE_URL = 'http://localhost:8000';
+const MOBILE_API_KEY = Constants.expoConfig?.extra?.apiKey || null;
 
 class ApiService {
   constructor() {
-    this.api = axios.create({
-      baseURL: API_BASE_URL,
-      timeout: 10000,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+    this.initializeApi();
+  }
 
-    // Request interceptor for auth token
+  async initializeApi() {
+    try {
+      this.api = axios.create({
+        baseURL: BASE_URL,
+        timeout: 10000,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(MOBILE_API_KEY ? { 'X-API-KEY': MOBILE_API_KEY } : {}),
+        },
+      });
+
+      this._setupInterceptors();
+      console.log('API Service initialized with base URL:', BASE_URL);
+    } catch (error) {
+      console.error('Failed to initialize API service:', error);
+      throw error;
+    }
+  }
+
+  _setupInterceptors() {
+    // Request interceptor
     this.api.interceptors.request.use(
-      (config) => {
-        if (this.authToken) {
-          config.headers.Authorization = `Token ${this.authToken}`;
+      async (config) => {
+        const token = await AsyncStorage.getItem('userToken');
+        if (token) {
+          config.headers.Authorization = `Token ${token}`;
         }
         return config;
       },
-      (error) => Promise.reject(error)
+      (error) => {
+        return Promise.reject(error);
+      }
     );
 
-    // Response interceptor for error handling
+    // Response interceptor
     this.api.interceptors.response.use(
       (response) => response,
-      (error) => {
+      async (error) => {
         if (error.response?.status === 401) {
-          // Handle unauthorized access
-          this.authToken = null;
+          await AsyncStorage.removeItem('userToken');
         }
         return Promise.reject(error);
       }
     );
   }
 
-  setAuthToken(token) {
-    this.authToken = token;
+  async login(username, password) {
+    try {
+      console.log('Attempting login for:', username);
+      const response = await this.api.post('/api/auth/login/', { username, password });
+      
+      // Check for either token or access token (JWT)
+      const token = response.data.token || response.data.access;
+      if (token) {
+        await AsyncStorage.setItem('userToken', token);
+        console.log('Login successful');
+      }
+      return response;
+    } catch (error) {
+      console.error('Login error:', error.response?.data || error.message);
+      if (error.response?.data) {
+        // Pass through the server's error message
+        throw new Error(
+          error.response.data.detail || 
+          error.response.data.message || 
+          error.response.data.non_field_errors?.[0] ||
+          'Invalid username or password'
+        );
+      }
+      throw error;
+    }
   }
 
-  // Auth endpoints
-  async login(email, password) {
-    return this.api.post('/auth/login/', { email, password });
-  }
-
-  async register(userData) {
-    return this.api.post('/auth/register/', userData);
+  async register(username, email, password, password_confirm = null, first_name = '', last_name = '') {
+    try {
+      const response = await this.api.post('/api/auth/register/', {
+        username,
+        email,
+        password,
+        password_confirm: password_confirm || password,
+        first_name,
+        last_name,
+      });
+      if (response.data.token) {
+        await AsyncStorage.setItem('userToken', response.data.token);
+      }
+      return response;
+    } catch (error) {
+      console.error('Registration error:', error.response?.data || error.message);
+      throw error;
+    }
   }
 
   async logout() {
-    return this.api.post('/auth/logout/');
-  }
-
-  async getProfile() {
-    return this.api.get('/auth/profile/');
-  }
-
-  async updateProfile(profileData) {
-    return this.api.put('/auth/profile/update/', profileData);
+    try {
+      await AsyncStorage.removeItem('userToken');
+      return true;
+    } catch (error) {
+      console.error('Logout error:', error);
+      throw error;
+    }
   }
 
   // Chat endpoints
   async sendMessage(message, language = 'english', sessionId = null) {
-    return this.api.post('/chat/send/', {
-      message,
-      language,
-      session_id: sessionId,
-    });
+    try {
+      console.log('Sending message:', { message, language, sessionId });
+      const response = await this.api.post('/api/v1/chat/', {
+        query: message,
+        language,
+        session_id: sessionId,
+        voice_response: false
+      });
+      console.log('Chat response:', response.data);
+      return response;
+    } catch (error) {
+      console.error('Send message error:', error.response?.data || error.message);
+      throw error;
+    }
   }
 
-  async getConversationHistory() {
-    return this.api.get('/chat/history/');
+  async getConversationHistory(sessionId = null) {
+    try {
+      const url = sessionId ? `/api/v1/chat/history/${sessionId}/` : '/api/v1/chat/history/';
+      const response = await this.api.get(url);
+      return response.data;
+    } catch (error) {
+      console.error('Get history error:', error.response?.data || error.message);
+      throw error;
+    }
   }
 
-  async getChatSessions() {
-    return this.api.get('/chat/sessions/');
+  async askGemini(message, context = null) {
+    try {
+      const response = await this.api.post('/api/v1/chat/gemini/', {
+        query: message,
+        context: context
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Gemini API error:', error.response?.data || error.message);
+      throw error;
+    }
   }
 
-  async endChatSession(sessionId) {
-    return this.api.post('/chat/sessions/end/', { session_id: sessionId });
+  async translateText(text, targetLang = 'English') {
+    try {
+      const response = await this.api.post('/api/v1/chat/gemini/translate/', {
+        text,
+        target_lang: targetLang
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Translation error:', error.response?.data || error.message);
+      throw error;
+    }
   }
 
-  async getKnowledgeBase(language = 'english', category = null) {
-    const params = { language };
-    if (category) params.category = category;
-    return this.api.get('/chat/knowledge/', { params });
+  async generateImage(prompt) {
+    try {
+      const response = await this.api.post('/api/v1/chat/gemini/image/', {
+        prompt
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Image generation error:', error.response?.data || error.message);
+      throw error;
+    }
   }
 
-  async getCampusInfo(language = 'english', category = null) {
-    const params = { language };
-    if (category) params.category = category;
-    return this.api.get('/chat/campus-info/', { params });
-  }
-
-  async searchKnowledge(query, language = 'english') {
-    return this.api.get('/chat/search/', {
-      params: { q: query, language },
-    });
-  }
-
-  // General endpoints
-  async healthCheck() {
-    return this.api.get('/health/');
-  }
-
-  async getApiStatus() {
-    return this.api.get('/status/');
+  async testGemini(message) {
+    try {
+      const response = await this.api.post('/api/chat/test-gemini/', { message });
+      return response;
+    } catch (error) {
+      console.error('Test Gemini error:', error.response?.data || error.message);
+      throw error;
+    }
   }
 }
 
-export const apiService = new ApiService();
+export default new ApiService();

@@ -20,6 +20,15 @@ DEBUG = os.getenv('DEBUG', 'True').lower() == 'true'
 
 ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '192.168.1.5', '192.168.1.11', '192.168.1.17', '192.168.1.25', '192.168.110.17', '0.0.0.0']
 
+# CORS settings
+CORS_ALLOW_ALL_ORIGINS = True  # For development only
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:8081",
+    "http://127.0.0.1:8081",
+    "http://localhost:3000",
+]
+
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',

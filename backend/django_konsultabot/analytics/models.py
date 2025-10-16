@@ -2,11 +2,14 @@
 Analytics Models for KonsultaBot Advanced AI Platform
 """
 from django.db import models
-from django.contrib.auth.models import User
+from django.conf import settings
 from django.utils import timezone
 from django.db.models import Avg, Count, Q
+from django.contrib.auth import get_user_model
 from datetime import timedelta
 import json
+
+User = get_user_model()
 
 
 class QueryLog(models.Model):
@@ -39,7 +42,7 @@ class QueryLog(models.Model):
     ]
     
     # Basic query information
-    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
     query = models.TextField()
     response_text = models.TextField(blank=True)
     
@@ -201,7 +204,7 @@ class UserSession(models.Model):
 class OfflineQuery(models.Model):
     """Queue for offline queries to be processed when connection returns"""
     
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     query = models.TextField()
     language = models.CharField(max_length=20, default='english')
     
@@ -244,7 +247,7 @@ class FeedbackReport(models.Model):
         ('feature_request', 'Feature Request'),
     ]
     
-    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
     query_log = models.ForeignKey(QueryLog, on_delete=models.CASCADE, null=True, blank=True)
     
     feedback_type = models.CharField(max_length=20, choices=FEEDBACK_TYPE_CHOICES)

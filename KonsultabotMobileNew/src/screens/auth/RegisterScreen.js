@@ -30,7 +30,20 @@ export default function RegisterScreen({ navigation }) {
     year_level: '',
   });
   const [loading, setLoading] = useState(false);
-  const { register } = useAuth();
+  const auth = useAuth();
+  
+  // Validate that we have access to the auth context
+  if (!auth || typeof auth.register !== 'function') {
+    console.error('Auth context not properly initialized:', auth);
+    Alert.alert(
+      'Error',
+      'Authentication system not initialized. Please try again or contact support.',
+      [{ text: 'OK', onPress: () => navigation.goBack() }]
+    );
+    return null;
+  }
+  
+  const { register } = auth;
 
   const updateField = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));

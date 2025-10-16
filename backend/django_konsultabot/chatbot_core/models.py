@@ -2,7 +2,7 @@
 Chatbot Core Models - Session-based conversation management
 """
 from django.db import models
-from django.contrib.auth.models import User
+from django.conf import settings
 from django.utils import timezone
 from datetime import timedelta
 import uuid
@@ -11,7 +11,7 @@ import uuid
 class ConversationSession(models.Model):
     """Manages conversation sessions with memory context"""
     
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='chat_sessions')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, blank=True, related_name='chat_sessions')
     session_id = models.CharField(max_length=100, unique=True, default=uuid.uuid4)
     title = models.CharField(max_length=200, blank=True)
     language = models.CharField(max_length=20, default='english')
@@ -95,6 +95,7 @@ class ChatMessage(models.Model):
     # Message context
     intent_detected = models.CharField(max_length=50, blank=True)  # wifi, printer, computer, etc.
     entities_extracted = models.JSONField(default=dict, blank=True)  # NER results
+    response = models.TextField(blank=True, null=True)  # Bot's response to the message
     
     # Feedback
     user_rating = models.IntegerField(null=True, blank=True)  # 1-5 rating

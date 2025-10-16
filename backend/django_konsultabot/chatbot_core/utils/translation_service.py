@@ -17,7 +17,15 @@ class TranslationService:
     """
     
     def __init__(self):
-        self.use_cloud = self._check_cloud_credentials()
+        # Initialize offline translation first
+        try:
+            from googletrans import Translator
+            self.offline_translator = Translator()
+            logger.info("Offline translator initialized")
+        except Exception as e:
+            logger.warning(f"Failed to initialize offline translator: {e}")
+            self.offline_translator = None
+            
         self.supported_languages = {
             'english': 'en',
             'tagalog': 'tl', 
@@ -32,10 +40,19 @@ class TranslationService:
         # Local translation dictionaries for common IT terms
         self.local_translations = self._load_local_translations()
         
-        if self.use_cloud:
-            self._init_cloud_client()
-        else:
-            logger.warning("Google Cloud credentials not found, using local translation")
+        # Try to initialize cloud services if available
+        self.use_cloud = False
+        self.cloud_client = None
+        
+        try:
+            from google.cloud import translate_v2
+            self.cloud_client = translate_v2.Client()
+            logger.info("Google Cloud Translation initialized")
+            self.use_cloud = True
+        except Exception as e:
+            logger.info(f"Using offline translation only: {str(e)}")
+            self.cloud_client = None
+            self.use_cloud = False
     
     def _check_cloud_credentials(self) -> bool:
         """Check if Google Cloud credentials are available"""
@@ -49,11 +66,33 @@ class TranslationService:
     def _init_cloud_client(self):
         """Initialize Google Cloud Translation client"""
         try:
-            from google.cloud import translate_v2 as translate
-            self.cloud_client = translate.Client()
-            logger.info("Google Cloud Translation client initialized")
+            from google.cloud import translate
+            self.translate_client = translate.TranslationServiceClient()
+            logger.info("Google Cloud Translation initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize Google Cloud Translation: {e}")
+            self.use_cloud = False
+            
+            # Fallback to local translation using googletrans library
+            try:
+                from googletrans import Translator
+                self.local_translator = Translator()
+                logger.info("Fallback: Using local translation service")
+            except Exception as local_e:
+                logger.error(f"Failed to initialize local translation: {local_e}")
+                # Will use simple language detection as last resort
+        try:
+            import google.cloud.translate_v2 as translate
+            from google.oauth2 import service_account
+            credentials_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'google-service-account.json')
+            if os.path.exists(credentials_path):
+                credentials = service_account.Credentials.from_service_account_file(credentials_path)
+                self.cloud_client = translate.Client(credentials=credentials)
+                logger.info("Google Cloud Translation client initialized with service account")
+            else:
+                raise ValueError(f"Google Cloud service account file not found at {credentials_path}")
+        except Exception as e:
+            logger.error(f"Failed to initialize Google Cloud Translation: {str(e)}")
             self.use_cloud = False
     
     def _load_local_translations(self) -> Dict[str, Dict[str, str]]:
