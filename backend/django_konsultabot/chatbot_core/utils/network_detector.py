@@ -69,30 +69,47 @@ class NetworkDetector:
         Returns:
             Dict with connection metrics
         """
+        # Check cache first
+        cached_quality = cache.get('connection_quality')
+        if cached_quality is not None:
+            return cached_quality
+            
         if not self.is_connected():
-            return {
+            quality_data = {
                 'connected': False,
                 'quality': 'offline',
                 'latency': None,
                 'recommended_mode': 'offline'
             }
+            cache.set('connection_quality', quality_data, 60)  # Cache for 1 minute
+            return quality_data
         
         # Test latency
-        start_time = time.time()
-        try:
-            requests.head('https://www.google.com', timeout=5)
-            latency = (time.time() - start_time) * 1000  # Convert to ms
-        except:
+        latencies = []
+        for _ in range(3):  # Test 3 times for accuracy
+            start_time = time.time()
+            try:
+                requests.head('https://www.google.com', timeout=5)
+                latency = (time.time() - start_time) * 1000  # Convert to ms
+                latencies.append(latency)
+            except Exception as e:
+                logger.warning(f"Latency test failed: {e}")
+                continue
+                
+        # Calculate average latency
+        if latencies:
+            latency = sum(latencies) / len(latencies)
+        else:
             latency = None
         
-        # Determine quality
+        # Determine quality based on stable thresholds
         if latency is None:
             quality = 'poor'
             recommended_mode = 'offline'
-        elif latency < 100:
+        elif latency < 150:  # More realistic threshold
             quality = 'excellent'
             recommended_mode = 'online'
-        elif latency < 300:
+        elif latency < 400:
             quality = 'good'
             recommended_mode = 'online'
         elif latency < 1000:

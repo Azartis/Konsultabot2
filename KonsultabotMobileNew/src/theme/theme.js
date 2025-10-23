@@ -1,9 +1,13 @@
-import { DefaultTheme } from 'react-native-paper';
+import { MD3DarkTheme, configureFonts } from 'react-native-paper';
+
+const fontConfig = {
+  fontFamily: 'System',
+};
 
 export const theme = {
-  ...DefaultTheme,
+  ...MD3DarkTheme,
   colors: {
-    ...DefaultTheme.colors,
+    ...MD3DarkTheme.colors,
     primary: '#0F1419',
     secondary: '#1E2328',
     accent: '#00D4FF',
@@ -19,21 +23,7 @@ export const theme = {
     disabled: '#30363D',
     backdrop: 'rgba(0, 0, 0, 0.5)',
   },
-  fonts: {
-    ...DefaultTheme.fonts,
-    regular: {
-      fontFamily: 'System',
-      fontWeight: '400',
-    },
-    medium: {
-      fontFamily: 'System',
-      fontWeight: '500',
-    },
-    bold: {
-      fontFamily: 'System',
-      fontWeight: '700',
-    },
-  },
+  fonts: configureFonts({ config: fontConfig }),
 };
 
 export const spacing = {

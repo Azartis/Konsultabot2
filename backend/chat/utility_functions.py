@@ -64,7 +64,7 @@ def search_web_for_complex_problem(query, language="english"):
         
         # Configure Google AI
         genai.configure(api_key=google_api_key)
-        model = genai.GenerativeModel('gemini-pro')
+        model = genai.GenerativeModel('gemini-2.0-flash-lite')
         
         # Create a human-like, empathetic prompt for any question
         search_prompt = f"""

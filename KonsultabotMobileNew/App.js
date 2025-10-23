@@ -3,11 +3,13 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, View, StyleSheet, Text, Button, LogBox } from 'react-native';
+import { Provider as PaperProvider } from 'react-native-paper';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import MainNavigator from './src/navigation/MainNavigator';
 import LoginScreen from './src/screens/auth/LoginScreen';
 import RegisterScreen from './src/screens/auth/RegisterScreen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { theme } from './src/theme/cleanTheme';
 
 const Stack = createStackNavigator();
 
@@ -18,6 +20,38 @@ LogBox.ignoreLogs([
 ]);
 
 // Error Boundary Component
+function NavigationWrapper() {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+      </View>
+    );
+  }
+
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerShown: false,
+        cardStyle: { backgroundColor: 'transparent' },
+      }}
+    >
+      {!user ? (
+        // Auth Stack
+        <>
+          <Stack.Screen name="Login" component={LoginScreen} />
+          <Stack.Screen name="Register" component={RegisterScreen} />
+        </>
+      ) : (
+        // Main App Stack
+        <Stack.Screen name="Main" component={MainNavigator} />
+      )}
+    </Stack.Navigator>
+  );
+}
+
 class ErrorBoundary extends React.Component {
   state = { hasError: false, error: null };
 
@@ -83,18 +117,24 @@ export default function App() {
   return (
     <ErrorBoundary>
       <SafeAreaProvider>
-        <AuthProvider>
-          <NavigationContainer>
-            <StatusBar style="auto" />
-            <Root />
-          </NavigationContainer>
-        </AuthProvider>
+        <PaperProvider theme={theme}>
+          <AuthProvider>
+            <NavigationContainer>
+              <StatusBar style="light" />
+              <NavigationWrapper />
+            </NavigationContainer>
+          </AuthProvider>
+        </PaperProvider>
       </SafeAreaProvider>
     </ErrorBoundary>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',

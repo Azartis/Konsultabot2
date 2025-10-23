@@ -18,6 +18,7 @@ export default {
       supportsTablet: true
     },
     android: {
+      package: "com.evsu.konsultabot",
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#FFFFFF"

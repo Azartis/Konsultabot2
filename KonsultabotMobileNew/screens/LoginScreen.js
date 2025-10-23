@@ -22,9 +22,9 @@ import axios from 'axios';
 
 const { width, height } = Dimensions.get('window');
 
-// API Configuration - Flask Authentication Server
+// API Configuration - Django Backend
 const API_BASE_URL = __DEV__ 
-  ? 'http://192.168.1.17:5000/api/auth'  // Flask auth server
+  ? 'http://192.168.1.17:8000/api/auth'  // Django backend
   : 'https://your-production-domain.com/api/auth';  // Production
 
 export default function LoginScreen({ navigation }) {

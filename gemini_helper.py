@@ -17,7 +17,16 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Get API key from environment
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "AIzaSyBRynLqVFbj1jZfAAzqIfLH6xL4rt6483U").strip()
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+if not GOOGLE_API_KEY:
+    # Load from .env file directly
+    if os.path.exists('.env'):
+        from dotenv import dotenv_values
+        config = dotenv_values('.env')
+        GOOGLE_API_KEY = config.get('GOOGLE_API_KEY', '').strip("'\"")
+        
+if not GOOGLE_API_KEY:
+    raise ValueError("GOOGLE_API_KEY not found in environment or .env file")
 
 # Configure Gemini API
 genai.configure(api_key=GOOGLE_API_KEY)

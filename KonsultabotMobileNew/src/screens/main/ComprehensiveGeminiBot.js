@@ -103,22 +103,25 @@ export default function ComprehensiveGeminiBot() {
       } catch (geminiError) {
         console.log('Gemini API failed, trying comprehensive AI server...');
         
-        // Try comprehensive AI server
+        // Try comprehensive AI server (Gemini + Knowledge Base hybrid)
         try {
-          const token = await AsyncStorage.getItem('access_token');
+          const token = await AsyncStorage.getItem('accessToken');
           if (token) {
+            console.log('🌐 Calling backend server with Gemini + KB hybrid...');
             const apiResponse = await axios.post('http://192.168.1.17:8000/api/v1/chat/', {
-              query: text
+              query: text, // Backend expects 'query' not 'message'
+              language: 'english'
             }, {
               headers: { Authorization: `Bearer ${token}` },
               timeout: 10000
             });
             
+            console.log('✅ Backend response:', apiResponse.data);
             response = {
-              response: apiResponse.data.response,
-              confidence: apiResponse.data.ai_confidence
+              response: apiResponse.data.message, // Backend returns 'message' not 'response'
+              confidence: apiResponse.data.confidence // Backend returns 'confidence' not 'ai_confidence'
             };
-            responseSource = 'comprehensive_ai';
+            responseSource = apiResponse.data.source || 'comprehensive_ai'; // Use actual source (gemini/knowledge_base)
           } else {
             throw new Error('No auth token');
           }
@@ -133,19 +136,41 @@ export default function ComprehensiveGeminiBot() {
         }
       }
 
+      // Extract response text based on structure
+      let responseText = '';
+      let confidence = 0.95;
+      
+      if (response?.data?.response) {
+        // Local Gemini AI structure: { data: { response, confidence } }
+        responseText = response.data.response;
+        confidence = response.data.confidence || 0.95;
+      } else if (response?.response) {
+        // Direct structure: { response, confidence }
+        responseText = response.response;
+        confidence = response.confidence || 0.95;
+      } else if (typeof response === 'string') {
+        // Direct string response
+        responseText = response;
+      } else {
+        // Unknown structure, try to extract text
+        responseText = response?.text || response?.message || 'Response received but could not parse text';
+      }
+
       const botMessage = {
         id: Date.now() + 1,
-        text: response.response,
+        text: responseText,
         sender: 'bot',
         timestamp: new Date(),
-        confidence: response.confidence,
+        confidence: confidence,
         source: responseSource
       };
 
       setMessages(prev => [...prev, botMessage]);
 
-      // Save to history
-      await saveToHistory(text, botMessage.text, botMessage.source);
+      // Save to history only if we have valid text
+      if (responseText && responseText !== 'Response received but could not parse text') {
+        await saveToHistory(text, responseText, botMessage.source);
+      }
 
     } catch (error) {
       console.error('All AI methods failed:', error);
@@ -191,11 +216,17 @@ export default function ComprehensiveGeminiBot() {
 
   const saveToHistory = async (userMessage, botResponse, source) => {
     try {
+      // Validate inputs
+      if (!userMessage || !botResponse) {
+        console.warn('Invalid message data, skipping history save');
+        return;
+      }
+
       const historyItem = {
         id: Date.now(),
-        userMessage,
-        botResponse,
-        source,
+        userMessage: String(userMessage),
+        botResponse: String(botResponse),
+        source: source || 'unknown',
         timestamp: new Date().toISOString(),
         userId: userData?.id || 'anonymous'
       };
@@ -211,9 +242,9 @@ export default function ComprehensiveGeminiBot() {
       await AsyncStorage.setItem('chat_history', JSON.stringify(updatedHistory));
       
       console.log('💾 Conversation saved to history:', {
-        user: userMessage.substring(0, 50),
-        bot: botResponse.substring(0, 50),
-        source
+        user: String(userMessage).substring(0, 50),
+        bot: String(botResponse).substring(0, 50),
+        source: source || 'unknown'
       });
     } catch (error) {
       console.error('Error saving to history:', error);

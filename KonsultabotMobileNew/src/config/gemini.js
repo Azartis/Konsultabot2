@@ -6,20 +6,16 @@
 
 export const GEMINI_CONFIG = {
   // Replace this with your actual Gemini API key
-  API_KEY: 'AIzaSyBRynLqVFbj1jZfAAzqIfLH6xL4rt6483U',
-  
-  // Try different API endpoints (fallback system)
-  API_URLS: [
-    'https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent',
-    'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',
-    'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent'
-  ],
+  API_KEY: 'AIzaSyDrDbp5ihtgWMAPMNswH2qr-pSzzwG7BKY',
   
   // Model configuration
-  MODEL: 'gemini-pro',
+  MODEL: 'gemini-flash-latest',
+  
+  // API endpoint  
+  API_URL: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent',
   
   // Request timeout (in milliseconds)
-  TIMEOUT: 15000,
+  TIMEOUT: 30000,
   
   // System prompt for IT support
   SYSTEM_PROMPT: `You are KonsultaBot, an intelligent IT support assistant powered by Google's Gemini AI. 

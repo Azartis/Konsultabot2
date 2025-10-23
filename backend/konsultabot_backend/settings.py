@@ -205,8 +205,8 @@ CORS_ALLOWED_HEADERS = [
     'x-requested-with',
 ]
 
-# Google AI Configuration
-GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY', 'AIzaSyBRynLqVFbj1jZfAAzqIfLH6xL4rt6483U')
+# Google AI Configuration - Load from environment variable for security
+GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY', '')
 
 # Application specific settings
 APP_NAME = "Konsultabot"
@@ -241,7 +241,3 @@ LOGGING = {
         },
     },
 }
-
-# Google AI API Key for web search functionality
-# Add your Google AI Studio API key here for enhanced web search capabilities
-GOOGLE_API_KEY = ''  # Add your API key here or set as environment variable

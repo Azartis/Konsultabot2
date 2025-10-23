@@ -31,10 +31,10 @@ export const AuthProvider = ({ children }) => {
     checkAuth();
   }, []);
 
-  const login = async (username, password) => {
+  const login = async (email, password) => {
     try {
       setIsLoading(true);
-      const response = await apiService.login(username, password);
+      const response = await apiService.login(email, password);
       const { access, refresh, user } = response.data;
 
       // Store tokens
@@ -75,15 +75,15 @@ export const AuthProvider = ({ children }) => {
 
       // Prepare registration data for backend API
       const registrationData = {
-        username: formData.student_id, // Use student_id as username
+        username: formData.email.toLowerCase().trim(), // Use email as username for login consistency
         email: formData.email.toLowerCase().trim(),
         password: formData.password,
+        password_confirm: formData.password_confirm, // Required by backend
         first_name: formData.first_name.trim(),
         last_name: formData.last_name.trim(),
-        role: 'student',
         department: formData.course?.trim() || 'Computer Science',
         student_id: formData.student_id.trim(),
-        year_level: formData.year_level?.trim() || '1st Year'
+        phone_number: formData.phone_number?.trim() || ''
       };
 
       // Make API call to register user in backend database
@@ -91,8 +91,8 @@ export const AuthProvider = ({ children }) => {
 
       if (response.status === 201) {
         // Registration successful, now login the user
-        console.log('Registration successful, attempting login...');
-        const loginResult = await login(registrationData.email, registrationData.password);
+        console.log('Registration successful, attempting auto-login...');
+        const loginResult = await login(registrationData.username, registrationData.password);
         
         if (loginResult.success) {
           console.log('Auto-login after registration successful');
@@ -113,9 +113,33 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (error) {
       console.error('Registration error:', error);
+      
+      // Extract detailed error message
+      let errorMessage = 'Registration failed. Please try again.';
+      
+      if (error.details) {
+        // Backend validation errors
+        const details = error.details;
+        if (details.username) {
+          errorMessage = `Username: ${details.username[0]}`;
+        } else if (details.email) {
+          errorMessage = `Email: ${details.email[0]}`;
+        } else if (details.password) {
+          errorMessage = `Password: ${details.password[0]}`;
+        } else if (details.password_confirm) {
+          errorMessage = `Confirmation: ${details.password_confirm[0]}`;
+        } else if (details.non_field_errors) {
+          errorMessage = details.non_field_errors[0];
+        } else {
+          errorMessage = JSON.stringify(details);
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       return {
         success: false,
-        error: error.message || 'Network error. Please check if the server is running.'
+        error: errorMessage
       };
     } finally {
       setIsLoading(false);

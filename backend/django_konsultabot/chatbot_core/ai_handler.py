@@ -41,6 +41,9 @@ class MultilingualAIHandler:
         """
         start_time = time.time()
         
+        # Log incoming query
+        logger.info(f'[INFO] Query: "{query}"')
+        
         # Initialize response structure
         response_data = {
             'message': '',
@@ -88,8 +91,12 @@ class MultilingualAIHandler:
                 # First try knowledge base
                 kb_result = self._process_offline_query(english_query, intent_data)
                 
+                # Log KB confidence
+                logger.info(f'[INFO] KB Confidence: {kb_result["confidence"]:.2f}')
+                
                 # If knowledge base confidence is high enough, use it
                 if kb_result['confidence'] >= 0.8:
+                    logger.info('[INFO] Decision: knowledge_base')
                     response_data.update({
                         'message': kb_result['message'],
                         'source': 'knowledge_base',
@@ -97,17 +104,19 @@ class MultilingualAIHandler:
                         'confidence': kb_result['confidence']
                     })
                 else:
+                    logger.info('[INFO] Decision: gemini')
                     # Try Gemini for more dynamic/complex queries
-                    online_result = self._process_online_query(
-                        english_query, intent_data, context, lang_result['detected_language']
+                    gemini_result = gemini_processor.generate_response(
+                        english_query,
+                        context=str(context) if context else None
                     )
                     
-                    if online_result['success']:
+                    if gemini_result['success']:
                         response_data.update({
-                            'message': online_result['message'],
+                            'message': gemini_result['message'],
                             'source': 'gemini',
                             'method': 'online',
-                            'confidence': online_result['confidence']
+                            'confidence': gemini_result['confidence']
                         })
                     else:
                         # Fallback to offline
@@ -155,6 +164,9 @@ class MultilingualAIHandler:
         
         # Calculate processing time
         response_data['processing_time'] = time.time() - start_time
+        
+        # Log final response
+        logger.info(f'[INFO] Final Response Sent: source={response_data["source"]}, confidence={response_data["confidence"]:.2f}')
         
         # Log interaction for analytics
         self._log_interaction(user, query, response_data)

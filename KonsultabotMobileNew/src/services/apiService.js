@@ -20,149 +20,126 @@ if (Platform.OS === 'web') {
 
 // Create Axios instance with longer timeout and retries
 const api = axios.create({
-  baseURL: 'http://192.168.1.17:8000/api',
+  baseURL: Platform.OS === 'web' ? 'http://localhost:8000/api' : 'http://10.0.2.2:8000/api',
   timeout: 45000, // 45 seconds
   headers: {
-    'Content-Type': 'application/json'
-  }
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    'X-Client-Version': '1.0.0',
+    'X-Client-Platform': Platform.OS
+  },
+  validateStatus: status => status >= 200 && status < 500 // Don't reject if status is < 500
 });
 
-// Add retry mechanism
+// Add enhanced retry mechanism
 axiosRetry(api, { 
-  retries: 2,
-  retryDelay: axiosRetry.exponentialDelay,
+  retries: 3,
+  retryDelay: (retryCount) => {
+    return axiosRetry.exponentialDelay(retryCount) + Math.random() * 1000; // Add jitter
+  },
   retryCondition: (error) => {
     return (
       axiosRetry.isNetworkOrIdempotentRequestError(error) ||
-      error.code === 'ECONNABORTED'
+      error.code === 'ECONNABORTED' ||
+      (error.response && error.response.status >= 500) ||
+      error.code === 'ERR_NETWORK'
     );
+  },
+  onRetry: (retryCount, error, requestConfig) => {
+    console.log(`Retry attempt ${retryCount} for ${requestConfig.url}:`, error.message);
   }
 });
 
-// Gemini API call function using official Google AI SDK
+// Gemini API call function - FIXED VERSION
 const callGeminiAPI = async (message) => {
-  // Check if API key is configured
   if (!validateGeminiConfig()) {
     throw new Error('Gemini API key not configured');
   }
 
   try {
-    // Add network check
     const netInfo = await NetInfo.fetch();
     if (!netInfo.isConnected) {
       throw new Error('No internet connection');
     }
 
-    console.log('🤖 Calling Gemini API with official SDK...');
+    console.log('🤖 Calling Gemini API...');
     
     // Try official Google AI SDK first (web only)
     if (Platform.OS === 'web' && GoogleGenerativeAI) {
-      const modelsToTry = ['gemini-pro', 'gemini-1.5-pro', 'gemini-1.0-pro'];
-      
-      for (const modelName of modelsToTry) {
-        try {
-          console.log(`Trying Gemini model: ${modelName}`);
-          const genAI = new GoogleGenerativeAI(GEMINI_CONFIG.API_KEY);
-          const model = genAI.getGenerativeModel({ model: modelName });
+      try {
+        const genAI = new GoogleGenerativeAI(GEMINI_CONFIG.API_KEY);
+        const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
+        const prompt = `${GEMINI_CONFIG.SYSTEM_PROMPT}\n\nUser: ${message}\n\nProvide a helpful IT support response.`;
+        
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 30000);
+        
+        const result = await model.generateContent(prompt, { signal: controller.signal });
+        clearTimeout(timeout);
+        
+        const response = await result.response;
+        const text = response.text();
 
-          const prompt = `${GEMINI_CONFIG.SYSTEM_PROMPT}
-
-User question: ${message}
-
-Please provide a helpful, detailed response as an IT support expert.`;
-
-          // Use AbortController for timeout
-          const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 45000);
-
-          const result = await model.generateContent(prompt, { signal: controller.signal });
-          clearTimeout(timeout);
-          
-          const response = await result.response;
-          const text = response.text();
-
-          console.log(`✅ Gemini SDK response received from ${modelName}`);
-          return {
-            data: {
-              response: text,
-              mode: 'gemini-sdk',
-              language: 'english'
-            }
-          };
-        } catch (sdkError) {
-          console.log(`${modelName} failed:`, sdkError.message);
-        }
+        console.log('✅ Gemini SDK success!');
+        return {
+          data: {
+            response: text,
+            mode: 'gemini-sdk',
+            language: 'english'
+          }
+        };
+      } catch (sdkError) {
+        console.log('SDK failed, trying REST API:', sdkError.message);
       }
-      console.log('All SDK models failed, trying REST API');
     }
 
-    // Fallback to REST API with multiple endpoints
-    const prompt = `${GEMINI_CONFIG.SYSTEM_PROMPT}
-
-User question: ${message}
-
-Please provide a helpful, detailed response as an IT support expert.`;
-
-    // Try REST API with timeout control
+    // Fallback to REST API
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 45000);
+    const timeout = setTimeout(() => controller.abort(), 30000);
 
     try {
-      const requestBody = {
-        contents: [{
-          parts: [{ text: `${GEMINI_CONFIG.SYSTEM_PROMPT}\n\nUser: ${message}` }]
-        }],
-        generationConfig: {
-          temperature: 0.7,
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 1024,
-        }
-      };
-
       const response = await axios.post(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_CONFIG.API_KEY}`,
-        requestBody,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_CONFIG.API_KEY}`,
         {
-          headers: {
-            'Content-Type': 'application/json',
-            'User-Agent': 'KonsultaBot/1.0'
-          },
+          contents: [{
+            parts: [{ text: `${GEMINI_CONFIG.SYSTEM_PROMPT}\n\nUser: ${message}` }]
+          }]
+        },
+        {
+          headers: { 'Content-Type': 'application/json' },
           signal: controller.signal
-        });
-
-        if (response.data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-          clearTimeout(timeout);
-          console.log('✅ Gemini REST API success!');
-          return {
-            data: {
-              response: response.data.candidates[0].content.parts[0].text,
-              mode: 'gemini-rest',
-              language: 'english'
-            }
-          };
         }
-        
-        console.log('Empty response from Gemini API, trying fallback...');
-        return await localGeminiAI.generateResponse(message);
-        
+      );
+
+      clearTimeout(timeout);
+
+      if (response.data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+        console.log('✅ Gemini REST API success!');
+        return {
+          data: {
+            response: response.data.candidates[0].content.parts[0].text,
+            mode: 'gemini-rest',
+            language: 'english'
+          }
+        };
+      }
+
+      throw new Error('Empty response from Gemini API');
     } catch (error) {
-      console.error('Gemini API error:', error.message, error.code, error.config?.url);
+      clearTimeout(timeout);
+      console.error('❌ Gemini API error:', error.response?.status, error.message);
       
-      // Check for specific error types
-      if (error.code === 'ECONNABORTED') {
-        throw new Error('Request timed out. Please try again.');
+      // Try local fallback
+      try {
+        return await localGeminiAI.generateResponse(message);
+      } catch (fallbackError) {
+        throw new Error('Unable to generate response. Please try again later.');
       }
-      if (error.name === 'AbortError') {
-        throw new Error('Request cancelled due to timeout.');
-      }
-      if (!navigator.onLine) {
-        throw new Error('No internet connection. Please check your network.');
-      }
-      
-      // Attempt local fallback
-      return await localGeminiAI.generateResponse(message);
     }
+  } catch (mainError) {
+    console.error('❌ Main API error:', mainError.message);
+    throw mainError;
+  }
 };
 
 // Cache for server IP to avoid re-discovery
@@ -306,12 +283,18 @@ class ApiService {
       }
 
       // Validate required fields
-      const requiredFields = ['username', 'email', 'password', 'first_name', 'last_name'];
+      const requiredFields = ['username', 'email', 'password', 'password_confirm'];
       for (const field of requiredFields) {
         if (!userData[field]) {
           throw new Error(`Missing required field: ${field}`);
         }
       }
+
+      console.log('Sending registration data:', {
+        ...userData,
+        password: '***',
+        password_confirm: '***'
+      });
 
       // Make the API call with retry logic
       let retries = 2;
@@ -322,6 +305,10 @@ class ApiService {
           return response;
         } catch (error) {
           if (retries === 0 || error.response?.status === 400) {
+            // Log detailed error for 400 responses
+            if (error.response?.status === 400) {
+              console.error('Registration validation error:', error.response?.data);
+            }
             throw error; // Don't retry client errors or if out of retries
           }
           retries--;
@@ -712,8 +699,14 @@ class ApiService {
   }
 }
 
-// Export configured API service
-export const apiService = {
+// Create and export the API service instance
+const apiServiceInstance = new ApiService();
+
+// Export configured API service with all methods
+export const apiService = apiServiceInstance;
+
+// Also export utility functions
+export {
   api,
   callGeminiAPI,
   checkNetworkStatus,

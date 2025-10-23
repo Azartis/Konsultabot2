@@ -32,12 +32,20 @@ export default function LoginScreen({ navigation }) {
       return;
     }
 
-    setLoading(true);
-    const result = await login(email, password);
-    setLoading(false);
-
-    if (!result.success) {
-      Alert.alert('Login Failed', result.error);
+    try {
+      setLoading(true);
+      const result = await login(email, password);
+      
+      if (!result.success) {
+        Alert.alert('Login Failed', result.error || 'Invalid credentials');
+      }
+    } catch (error) {
+      Alert.alert(
+        'Login Error',
+        error.message || 'An error occurred while logging in. Please try again.'
+      );
+    } finally {
+      setLoading(false);
     }
   };
 

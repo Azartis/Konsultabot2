@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   FlatList,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  Keyboard,
 } from 'react-native';
 import {
   TextInput,
@@ -17,11 +18,14 @@ import {
   Menu,
   Divider,
   ActivityIndicator,
+  Portal,
+  Modal,
 } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import * as Speech from 'expo-speech';
 import { Audio } from 'expo-av';
 import Voice from '@react-native-voice/voice';
+import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
 import { apiService } from '../../services/apiService';
 import { theme, spacing } from '../../theme/theme';
@@ -46,6 +50,29 @@ export default function ChatScreen() {
   ];
 
   useEffect(() => {
+    const initializeAudio = async () => {
+      try {
+        if (Platform.OS !== 'web') {
+          // Request audio permissions
+          const { status } = await Audio.requestPermissionsAsync();
+          if (status !== 'granted') {
+            Alert.alert('Permission required', 'Please grant microphone permission to use voice features');
+            return;
+          }
+
+          // Initialize Voice recognition
+          await Voice.destroy();
+          Voice.onSpeechStart = onSpeechStart;
+          Voice.onSpeechRecognized = onSpeechRecognized;
+          Voice.onSpeechEnd = onSpeechEnd;
+          Voice.onSpeechError = onSpeechError;
+          Voice.onSpeechResults = onSpeechResults;
+        }
+      } catch (error) {
+        console.error('Audio initialization error:', error);
+      }
+    };
+
     // Add welcome message with human-like personality
     const welcomeMessage = {
       id: 'welcome',
@@ -55,18 +82,14 @@ export default function ChatScreen() {
     };
     setMessages([welcomeMessage]);
 
-    // Initialize Voice recognition (only on mobile)
-    if (Platform.OS !== 'web') {
-      Voice.onSpeechStart = onSpeechStart;
-      Voice.onSpeechRecognized = onSpeechRecognized;
-      Voice.onSpeechEnd = onSpeechEnd;
-      Voice.onSpeechError = onSpeechError;
-      Voice.onSpeechResults = onSpeechResults;
-    }
+    initializeAudio();
 
     return () => {
       if (Platform.OS !== 'web') {
         Voice.destroy().then(Voice.removeAllListeners);
+      }
+      if (recording) {
+        recording.unloadAsync();
       }
     };
   }, []);
@@ -95,9 +118,45 @@ export default function ChatScreen() {
     if (e.value && e.value[0]) {
       const recognizedText = e.value[0];
       setInputText(recognizedText);
+      setIsRecording(false);
+      
       // Automatically send the message after a short delay
       setTimeout(() => {
         if (recognizedText.trim()) {
+          handleSubmit();
+        }
+      }, 500);
+    }
+  };
+
+  const speakText = async (text) => {
+    try {
+      // Stop any ongoing speech
+      await Speech.stop();
+
+      if (isSpeaking) {
+        const languageMap = {
+          'english': 'en-US',
+          'tagalog': 'fil-PH',
+          'bisaya': 'fil-PH',
+          'waray': 'fil-PH'
+        };
+
+        await Speech.speak(text, {
+          language: languageMap[language] || 'en-US',
+          pitch: 1.0,
+          rate: 0.9,
+          onStart: () => console.log('Started speaking'),
+          onDone: () => console.log('Done speaking'),
+          onStopped: () => console.log('Stopped speaking'),
+          onError: (error) => console.error('Speech error:', error)
+        });
+      }
+    } catch (error) {
+      console.error('Speech error:', error);
+      Alert.alert('Speech Error', 'Unable to use text-to-speech. Please try again.');
+    }
+  };
           handleVoiceMessage(recognizedText.trim());
         }
       }, 500);
@@ -168,6 +227,9 @@ export default function ChatScreen() {
   const sendMessage = async () => {
     if (!inputText.trim()) return;
 
+  const handleSubmit = async () => {
+    if (!inputText.trim()) return;
+
     const userMessage = {
       id: Date.now().toString(),
       text: inputText.trim(),
@@ -176,6 +238,96 @@ export default function ChatScreen() {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    setInputText('');
+    setLoading(true);
+
+    try {
+      // Check network connectivity first
+      const netInfo = await NetInfo.fetch();
+      if (!netInfo.isConnected) {
+        throw new Error('No internet connection');
+      }
+
+      // Create abort controller for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+      }, 30000);
+
+      const response = await apiService.post('/v1/chat/', {
+        query: userMessage.text,
+        language: language || 'english',
+        session_id: sessionId,
+        user_id: user?.id
+      }, {
+        signal: controller.signal,
+        timeout: 30000
+      });
+
+      clearTimeout(timeoutId);
+
+      if (response?.data?.success && response?.data?.message) {
+        const botMessage = {
+          id: (Date.now() + 1).toString(),
+          text: response.data.message,
+          isBot: true,
+          timestamp: new Date(),
+          language: response.data.language || language,
+          confidence: response.data.confidence || 1.0,
+          model: response.data.model || 'gemini'
+        };
+
+        setMessages(prev => [...prev, botMessage]);
+        
+        if (response.data.session_id) {
+          setSessionId(response.data.session_id);
+        }
+
+        // Auto-speak response if TTS is enabled
+        if (isSpeaking) {
+          speakText(botMessage.text);
+        }
+      } else {
+        throw new Error(response?.data?.error || 'Invalid response format');
+      }
+    } catch (error) {
+      console.error('Chat error:', error);
+      let errorMessage = 'An unknown error occurred';
+      
+      if (error.name === 'AbortError') {
+        errorMessage = 'Request timed out. Please try again.';
+      } else if (!navigator.onLine || error.message.includes('network')) {
+        errorMessage = 'No internet connection. Please check your network.';
+      } else {
+        errorMessage = error.response?.data?.error || error.message;
+      }
+
+      // Add error message to chat
+      const errorBotMessage = {
+        id: (Date.now() + 1).toString(),
+        text: `I apologize, but I'm having trouble right now: ${errorMessage}. Please try again in a moment.`,
+        isBot: true,
+        timestamp: new Date(),
+        isError: true,
+        language: language
+      };
+      setMessages(prev => [...prev, errorBotMessage]);
+      
+      Alert.alert(
+        'Chat Error',
+        errorMessage,
+        [
+          { text: 'OK' },
+          { 
+            text: 'Retry',
+            onPress: () => handleSubmit()
+          }
+        ]
+      );
+    } finally {
+      setLoading(false);
+    }
+  };    setMessages(prev => [...prev, userMessage]);
     setInputText('');
     setLoading(true);
 

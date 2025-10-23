@@ -23,7 +23,7 @@ def test_gemini():
         
     # Create model
     print("\nCreating model...")
-    model = genai.GenerativeModel('gemini-pro')
+    model = genai.GenerativeModel('gemini-1.0-base')
     
     # Generate content
     print("\nGenerating response...")

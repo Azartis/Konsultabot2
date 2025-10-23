@@ -125,7 +125,7 @@ class ModernKonsultabotGUI:
         if GOOGLE_AI_AVAILABLE and self.config.get('GOOGLE_API_KEY'):
             try:
                 genai.configure(api_key=self.config.get('GOOGLE_API_KEY'))
-                self.ai_model = genai.GenerativeModel('gemini-pro')
+                self.ai_model = genai.GenerativeModel('gemini-2.0-flash-lite')
                 logging.info("Google AI initialized successfully")
             except Exception as e:
                 logging.warning(f"Failed to initialize Google AI: {e}")

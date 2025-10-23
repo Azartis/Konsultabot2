@@ -22,18 +22,29 @@ class NetworkDetector:
         self._init_queue_db()
         
     def check_internet_connection(self):
-        """Check if internet connection is available"""
-        try:
-            # Try to connect to Google DNS
-            socket.create_connection(("8.8.8.8", 53), timeout=3)
-            return True
-        except OSError:
+        """Check if internet connection is available using multiple reliable endpoints"""
+        endpoints = [
+            ("localhost", 8000),    # Local Django server
+            ("8.8.8.8", 53),       # Google DNS
+            ("1.1.1.1", 53),       # Cloudflare DNS
+            ("208.67.222.222", 53), # OpenDNS
+            ("api.gemini.com", 443) # Gemini API
+        ]
+        
+        for host, port in endpoints:
             try:
-                # Fallback: try to connect to Cloudflare DNS
-                socket.create_connection(("1.1.1.1", 53), timeout=3)
+                socket.create_connection((host, port), timeout=2)
                 return True
             except OSError:
-                return False
+                continue
+                
+        # Try HTTPS connection as last resort
+        try:
+            import requests
+            response = requests.get("https://www.google.com", timeout=3)
+            return response.status_code == 200
+        except Exception:
+            return False
     
     def start_monitoring(self, interval=30):
         """Start monitoring internet connection"""

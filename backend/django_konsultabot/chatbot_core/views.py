@@ -255,14 +255,33 @@ def chat_endpoint(request):
         # Get conversation context
         context = session.get_recent_context(limit=5)
         
-        # Process AI query
-        ai_response = multilingual_ai_handler.handle_ai_query(
-            query=query,
-            user=request.user if request.user.is_authenticated else None,
-            language=language,
-            session=session,
-            context=context
-        )
+        # Process AI query with improved error handling
+        try:
+            ai_response = multilingual_ai_handler.handle_ai_query(
+                query=query,
+                user=request.user if request.user.is_authenticated else None,
+                language=language,
+                session=session,
+                context=context
+            )
+        except Exception as e:
+            # Check for API key error
+            if 'GOOGLE_API_KEY' in str(e):
+                return Response({
+                    'status': 'error',
+                    'message': 'AI service configuration error. Please contact system administrator.',
+                    'code': 'API_KEY_ERROR',
+                    'debug_info': str(e) if settings.DEBUG else None
+                }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+            
+            # Other errors
+            logger.error(f"AI query processing error: {e}")
+            return Response({
+                'status': 'error',
+                'message': 'An error occurred while processing your request.',
+                'code': 'PROCESSING_ERROR',
+                'debug_info': str(e) if settings.DEBUG else None
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
         # Save user message
         user_message = ChatMessage.objects.create(

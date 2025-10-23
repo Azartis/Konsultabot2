@@ -1944,3 +1944,5 @@ Traceback (most recent call last):
 django.core.exceptions.DisallowedHost: Invalid HTTP_HOST header: '192.168.1.3:8000'. You may need to add '192.168.1.3' to ALLOWED_HOSTS.
 Bad Request: /api/auth/register/
 "POST /api/auth/register/ HTTP/1.1" 400 78338
+Watching for file changes with StatReloader
+"GET /api/chat/server-info/ HTTP/1.1" 200 313
