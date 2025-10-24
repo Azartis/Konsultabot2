@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  Platform,
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigation } from '@react-navigation/native';
@@ -16,30 +17,51 @@ export default function SimpleProfileScreen() {
   const navigation = useNavigation();
 
   const handleLogout = async () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await logout();
-              // Navigation is handled by the RootNavigator based on auth state
-            } catch (error) {
-              console.error('Logout error:', error);
-              Alert.alert('Error', 'Failed to logout. Please try again.');
-            }
+    // Web-compatible confirmation
+    if (Platform.OS === 'web') {
+      if (window.confirm('Are you sure you want to logout?')) {
+        try {
+          console.log('Logging out...');
+          const result = await logout();
+          if (result.success) {
+            console.log('Logout successful');
+          } else {
+            alert('Failed to logout. Please try again.');
+          }
+        } catch (error) {
+          console.error('Logout error:', error);
+          alert('Failed to logout. Please try again.');
+        }
+      }
+    } else {
+      // Mobile Alert
+      Alert.alert(
+        'Logout',
+        'Are you sure you want to logout?',
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
           },
-        },
-      ],
-      { cancelable: false }
-    );
+          {
+            text: 'Logout',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                const result = await logout();
+                if (!result.success) {
+                  Alert.alert('Error', 'Failed to logout. Please try again.');
+                }
+              } catch (error) {
+                console.error('Logout error:', error);
+                Alert.alert('Error', 'Failed to logout. Please try again.');
+              }
+            },
+          },
+        ],
+        { cancelable: false }
+      );
+    }
   };
 
   return (
@@ -54,7 +76,11 @@ export default function SimpleProfileScreen() {
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>👤</Text>
           </View>
-          <Text style={styles.userName}>{user?.name || 'EVSU Student'}</Text>
+          <Text style={styles.userName}>
+            {user?.first_name && user?.last_name 
+              ? `${user.first_name} ${user.last_name}` 
+              : user?.username || 'EVSU Student'}
+          </Text>
           <Text style={styles.userEmail}>{user?.email || 'student@evsu.edu.ph'}</Text>
         </View>
 
@@ -65,7 +91,7 @@ export default function SimpleProfileScreen() {
             <Text style={styles.menuIcon}>📧</Text>
             <View style={styles.menuContent}>
               <Text style={styles.menuTitle}>Email</Text>
-              <Text style={styles.menuSubtitle}>student@evsu.edu.ph</Text>
+              <Text style={styles.menuSubtitle}>{user?.email || 'student@evsu.edu.ph'}</Text>
             </View>
           </TouchableOpacity>
 

@@ -1,22 +1,21 @@
 import React, { useState } from 'react';
 import {
   View,
+  Text,
+  TextInput,
   StyleSheet,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
   Alert,
+  TouchableOpacity,
+  Animated,
 } from 'react-native';
-import {
-  Text,
-  TextInput,
-  Button,
-  Card,
-  Title,
-  ActivityIndicator,
-} from 'react-native-paper';
+import { LinearGradient } from 'expo-linear-gradient';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
-import { theme, spacing } from '../../theme/cleanTheme';
+import { lumaTheme } from '../../theme/lumaTheme';
+import HolographicOrb from '../../components/HolographicOrb';
 
 export default function RegisterScreen({ navigation }) {
   const [formData, setFormData] = useState({
@@ -104,112 +103,170 @@ export default function RegisterScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboardView}
       >
-        <ScrollView contentContainerStyle={styles.scrollContainer}>
-          <Card style={styles.card}>
-            <Card.Content>
-              <Title style={styles.cardTitle}>Student Registration</Title>
+        <ScrollView 
+          contentContainerStyle={styles.scrollContainer}
+          showsVerticalScrollIndicator={true}
+          bounces={true}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Header */}
+          <View style={styles.header}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => navigation.goBack()}
+            >
+              <MaterialIcons name="arrow-back" size={24} color={lumaTheme.colors.text} />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>KonsultaBot</Text>
+          </View>
+
+          {/* Holographic Orb */}
+          <View style={styles.orbContainer}>
+            <HolographicOrb size={80} animate={true} />
+          </View>
+
+          {/* Title */}
+          <View style={styles.titleContainer}>
+            <Text style={styles.appTitle}>Student Registration</Text>
+            <Text style={styles.subtitle}>Create your account to get started</Text>
+          </View>
+
+          <View style={styles.formCard}>
               
+            {/* Student ID Input */}
+            <View style={styles.inputContainer}>
+              <MaterialIcons name="badge" size={20} color={lumaTheme.colors.primary} style={styles.inputIcon} />
               <TextInput
-                label="Student ID *"
+                placeholder="Student ID *"
+                placeholderTextColor={lumaTheme.colors.textMuted}
                 value={formData.student_id}
                 onChangeText={(value) => updateField('student_id', value)}
-                mode="outlined"
                 style={styles.input}
-                theme={{ colors: { primary: theme.colors.accent } }}
               />
+            </View>
 
+            {/* Email Input */}
+            <View style={styles.inputContainer}>
+              <MaterialIcons name="email" size={20} color={lumaTheme.colors.primary} style={styles.inputIcon} />
               <TextInput
-                label="EVSU Email *"
+                placeholder="EVSU Email *"
+                placeholderTextColor={lumaTheme.colors.textMuted}
                 value={formData.email}
                 onChangeText={(value) => updateField('email', value)}
-                mode="outlined"
                 keyboardType="email-address"
                 autoCapitalize="none"
                 style={styles.input}
-                theme={{ colors: { primary: theme.colors.accent } }}
               />
+            </View>
 
+            {/* Password Input */}
+            <View style={styles.inputContainer}>
+              <MaterialIcons name="lock" size={20} color={lumaTheme.colors.primary} style={styles.inputIcon} />
               <TextInput
-                label="Password *"
+                placeholder="Password *"
+                placeholderTextColor={lumaTheme.colors.textMuted}
                 value={formData.password}
                 onChangeText={(value) => updateField('password', value)}
-                mode="outlined"
                 secureTextEntry
                 style={styles.input}
-                theme={{ colors: { primary: theme.colors.accent } }}
               />
+            </View>
 
+            {/* Confirm Password Input */}
+            <View style={styles.inputContainer}>
+              <MaterialIcons name="lock-outline" size={20} color={lumaTheme.colors.primary} style={styles.inputIcon} />
               <TextInput
-                label="Confirm Password *"
+                placeholder="Confirm Password *"
+                placeholderTextColor={lumaTheme.colors.textMuted}
                 value={formData.password_confirm}
                 onChangeText={(value) => updateField('password_confirm', value)}
-                mode="outlined"
                 secureTextEntry
                 style={styles.input}
-                theme={{ colors: { primary: theme.colors.accent } }}
               />
+            </View>
 
+            {/* First Name Input */}
+            <View style={styles.inputContainer}>
+              <MaterialIcons name="person" size={20} color={lumaTheme.colors.primary} style={styles.inputIcon} />
               <TextInput
-                label="First Name *"
+                placeholder="First Name *"
+                placeholderTextColor={lumaTheme.colors.textMuted}
                 value={formData.first_name}
                 onChangeText={(value) => updateField('first_name', value)}
-                mode="outlined"
                 style={styles.input}
-                theme={{ colors: { primary: theme.colors.accent } }}
               />
+            </View>
 
+            {/* Last Name Input */}
+            <View style={styles.inputContainer}>
+              <MaterialIcons name="person-outline" size={20} color={lumaTheme.colors.primary} style={styles.inputIcon} />
               <TextInput
-                label="Last Name *"
+                placeholder="Last Name *"
+                placeholderTextColor={lumaTheme.colors.textMuted}
                 value={formData.last_name}
                 onChangeText={(value) => updateField('last_name', value)}
-                mode="outlined"
                 style={styles.input}
-                theme={{ colors: { primary: theme.colors.accent } }}
               />
+            </View>
 
+            {/* Course Input */}
+            <View style={styles.inputContainer}>
+              <MaterialIcons name="school" size={20} color={lumaTheme.colors.primary} style={styles.inputIcon} />
               <TextInput
-                label="Course"
+                placeholder="Course (Optional)"
+                placeholderTextColor={lumaTheme.colors.textMuted}
                 value={formData.course}
                 onChangeText={(value) => updateField('course', value)}
-                mode="outlined"
                 style={styles.input}
-                theme={{ colors: { primary: theme.colors.accent } }}
               />
+            </View>
 
+            {/* Year Level Input */}
+            <View style={styles.inputContainer}>
+              <MaterialIcons name="calendar-today" size={20} color={lumaTheme.colors.primary} style={styles.inputIcon} />
               <TextInput
-                label="Year Level"
+                placeholder="Year Level (Optional)"
+                placeholderTextColor={lumaTheme.colors.textMuted}
                 value={formData.year_level}
                 onChangeText={(value) => updateField('year_level', value)}
-                mode="outlined"
                 keyboardType="numeric"
                 style={styles.input}
-                theme={{ colors: { primary: theme.colors.accent } }}
               />
+            </View>
 
-              <Button
-                mode="contained"
-                onPress={handleRegister}
-                loading={loading}
-                disabled={loading}
+            {/* Register Button */}
+            <TouchableOpacity
+              onPress={handleRegister}
+              disabled={loading}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={lumaTheme.gradients.primary}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
                 style={styles.registerButton}
-                buttonColor={theme.colors.accent}
               >
-                {loading ? 'Creating Account...' : 'Register'}
-              </Button>
+                {loading ? (
+                  <Text style={styles.buttonText}>Creating Account...</Text>
+                ) : (
+                  <Text style={styles.buttonText}>Register</Text>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
 
-              <Button
-                mode="text"
-                onPress={() => navigation.navigate('Login')}
-                style={styles.loginButton}
-                textColor={theme.colors.primary}
-              >
-                Already have an account? Login
-              </Button>
-            </Card.Content>
-          </Card>
+            {/* Login Link */}
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Login')}
+              style={styles.loginLink}
+            >
+              <Text style={styles.loginLinkText}>
+                Already have an account? <Text style={styles.loginLinkBold}>Login</Text>
+              </Text>
+            </TouchableOpacity>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
@@ -219,33 +276,107 @@ export default function RegisterScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: lumaTheme.colors.background,
   },
   keyboardView: {
     flex: 1,
   },
   scrollContainer: {
-    flexGrow: 1,
-    padding: spacing.md,
+    paddingHorizontal: lumaTheme.spacing.lg,
+    paddingTop: lumaTheme.spacing.md,
+    paddingBottom: 200,
+    alignItems: 'center',
   },
-  card: {
-    backgroundColor: theme.colors.surface,
-    elevation: 8,
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: lumaTheme.spacing.md,
   },
-  cardTitle: {
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: lumaTheme.colors.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: lumaTheme.spacing.md,
+  },
+  headerTitle: {
+    fontSize: lumaTheme.fontSize.lg,
+    fontWeight: lumaTheme.fontWeight.semibold,
+    color: lumaTheme.colors.text,
+  },
+  orbContainer: {
+    alignItems: 'center',
+    marginVertical: lumaTheme.spacing.md,
+  },
+  titleContainer: {
+    width: '100%',
+    maxWidth: 480,
+    alignItems: 'center',
+    marginBottom: lumaTheme.spacing.md,
+  },
+  appTitle: {
+    fontSize: lumaTheme.fontSize.xl,
+    fontWeight: lumaTheme.fontWeight.bold,
+    color: lumaTheme.colors.text,
+    letterSpacing: 1,
+  },
+  subtitle: {
+    fontSize: lumaTheme.fontSize.sm,
+    color: lumaTheme.colors.textSecondary,
+    marginTop: lumaTheme.spacing.xs,
     textAlign: 'center',
-    marginBottom: spacing.lg,
-    color: theme.colors.text,
+  },
+  formCard: {
+    width: '100%',
+    maxWidth: 480,
+    backgroundColor: lumaTheme.colors.surface,
+    borderRadius: lumaTheme.borderRadius.xl,
+    padding: lumaTheme.spacing.xl,
+    ...lumaTheme.shadows.medium,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: lumaTheme.colors.inputBackground,
+    borderRadius: lumaTheme.borderRadius.lg,
+    paddingHorizontal: lumaTheme.spacing.md,
+    marginBottom: lumaTheme.spacing.md,
+    borderWidth: 1,
+    borderColor: lumaTheme.colors.border,
+  },
+  inputIcon: {
+    marginRight: lumaTheme.spacing.sm,
   },
   input: {
-    marginBottom: spacing.md,
-    backgroundColor: theme.colors.background,
+    flex: 1,
+    color: lumaTheme.colors.text,
+    fontSize: lumaTheme.fontSize.md,
+    paddingVertical: lumaTheme.spacing.md,
   },
   registerButton: {
-    marginTop: spacing.lg,
-    paddingVertical: spacing.xs,
+    borderRadius: lumaTheme.borderRadius.lg,
+    paddingVertical: lumaTheme.spacing.md,
+    alignItems: 'center',
+    marginTop: lumaTheme.spacing.lg,
+    ...lumaTheme.shadows.glow,
   },
-  loginButton: {
-    marginTop: spacing.md,
+  buttonText: {
+    color: lumaTheme.colors.text,
+    fontSize: lumaTheme.fontSize.md,
+    fontWeight: lumaTheme.fontWeight.bold,
+  },
+  loginLink: {
+    marginTop: lumaTheme.spacing.lg,
+    alignItems: 'center',
+  },
+  loginLinkText: {
+    color: lumaTheme.colors.textSecondary,
+    fontSize: lumaTheme.fontSize.md,
+  },
+  loginLinkBold: {
+    color: lumaTheme.colors.primary,
+    fontWeight: lumaTheme.fontWeight.bold,
   },
 });

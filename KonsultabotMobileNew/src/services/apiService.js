@@ -337,6 +337,34 @@ class ApiService {
     return this.api.put('/auth/profile/', profileData);
   }
 
+  // NEW: Hybrid chat endpoint (Gemini + Knowledge Base)
+  // Using simple-gemini endpoint (no auth required for demo)
+  async sendChatMessage(query) {
+    try {
+      console.log('📡 Calling backend chat endpoint: /chat/simple-gemini/');
+      const payload = { message: query };
+      console.log('📤 Sending payload:', payload);
+      
+      const response = await this.api.post('/chat/simple-gemini/', payload);
+      console.log('✅ Backend response:', response.data);
+      
+      // Return in consistent format
+      return {
+        message: response.data.response || response.data.message || response.data.text,
+        source: response.data.source || 'gemini',
+        confidence: response.data.confidence || response.data.ai_confidence || 0.95
+      };
+    } catch (error) {
+      console.error('❌ Backend chat error:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data?.detail || error.response?.data,
+        message: error.message
+      });
+      throw error;
+    }
+  }
+
   // Chat endpoints with offline support
   async sendMessage(message, language = 'english', sessionId = null) {
     // Check if we're on web platform - try real Gemini API first

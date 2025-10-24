@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   Alert,
   SafeAreaView,
+  FlatList,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -19,13 +20,25 @@ import axios from 'axios';
 import { Audio } from 'expo-av';
 import * as Speech from 'expo-speech';
 import { apiService } from '../../services/apiService';
-import { theme } from '../../theme/cleanTheme';
+import { lumaTheme } from '../../theme/lumaTheme';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
+import { useChatHistory } from '../../context/ChatHistoryContext';
+import HolographicOrb from '../../components/HolographicOrb';
+import StarryBackground from '../../components/StarryBackground';
 
 const { width, height } = Dimensions.get('window');
 
-export default function ComprehensiveGeminiBot() {
+export default function ComprehensiveGeminiBot({ navigation }) {
   const { logout } = useAuth();
+  const { 
+    currentChatId, 
+    getCurrentChat, 
+    createNewChat, 
+    updateChatMessages,
+    chats 
+  } = useChatHistory();
+  
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -34,6 +47,7 @@ export default function ComprehensiveGeminiBot() {
   const [recording, setRecording] = useState(null);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [userData, setUserData] = useState(null);
+  const [showHistory, setShowHistory] = useState(false);
   const scrollViewRef = useRef();
 
   useEffect(() => {
@@ -64,7 +78,7 @@ export default function ComprehensiveGeminiBot() {
       
       const welcomeMessage = {
         id: Date.now(),
-        text: "Hello! I'm KonsultaBot with Gemini AI integration! 🤖✨\n\nI can help you with:\n• IT support and technical issues (powered by Gemini AI)\n• Academic questions and study tips\n• Fun conversations and jokes\n• Voice interactions 🎤\n• Silly or random questions\n• Creative discussions\n• EVSU campus information\n\nYou can type your question or use the microphone to speak! What would you like to chat about today?",
+        text: "Hello! I'm KonsultaBot, your AI assistant! 🤖✨\n\nI can help you with:\n• IT support and technical issues\n• Academic questions and study tips\n• Fun conversations and jokes\n• Voice interactions 🎤\n• Silly or random questions\n• Creative discussions\n• EVSU campus information\n\nYou can type your question or use the microphone to speak! What would you like to chat about today?",
         sender: 'bot',
         timestamp: new Date(),
         type: 'welcome'
@@ -312,6 +326,14 @@ export default function ComprehensiveGeminiBot() {
 
   // Voice Recording Functions
   const startRecording = async () => {
+    // Voice recording not available on web
+    if (Platform.OS === 'web') {
+      if (window.confirm) {
+        alert('Voice recording is not available in the web version. Please type your message instead.');
+      }
+      return;
+    }
+
     try {
       setIsRecording(true);
       const { recording } = await Audio.Recording.createAsync(
@@ -320,12 +342,20 @@ export default function ComprehensiveGeminiBot() {
       setRecording(recording);
     } catch (error) {
       console.error('Failed to start recording:', error);
-      Alert.alert('Recording Error', 'Could not start voice recording');
+      if (Platform.OS === 'web') {
+        alert('Could not start voice recording');
+      } else {
+        Alert.alert('Recording Error', 'Could not start voice recording');
+      }
       setIsRecording(false);
     }
   };
 
   const stopRecording = async () => {
+    if (Platform.OS === 'web' || !recording) {
+      return;
+    }
+
     try {
       setIsRecording(false);
       await recording.stopAndUnloadAsync();
@@ -390,9 +420,9 @@ export default function ComprehensiveGeminiBot() {
               message.source === 'comprehensive_ai' && styles.comprehensiveSource,
               message.source === 'local_ai' && styles.localSource
             ]}>
-              {message.source === 'gemini' && '✨ Powered by Gemini AI'}
-              {message.source === 'comprehensive_ai' && '🤖 Comprehensive AI Server'}
-              {message.source === 'local_ai' && '💡 Local AI (Offline)'}
+              {message.source === 'gemini' && '✨ AI Response'}
+              {message.source === 'comprehensive_ai' && '🤖 AI Server'}
+              {message.source === 'local_ai' && '💡 AI (Offline)'}
               {message.source === 'fallback' && '🔄 Fallback Response'}
             </Text>
           )}
@@ -413,7 +443,7 @@ export default function ComprehensiveGeminiBot() {
                 <MaterialIcons 
                   name={isSpeaking ? "volume-off" : "volume-up"} 
                   size={16} 
-                  color={theme.colors.primary} 
+                  color={lumaTheme.colors.primary} 
                 />
               </TouchableOpacity>
             )}
@@ -441,6 +471,11 @@ export default function ComprehensiveGeminiBot() {
       >
         {/* Header */}
         <View style={styles.header}>
+          {/* Small Orb Icon */}
+          <View style={styles.headerOrb}>
+            <HolographicOrb size={40} animate={true} />
+          </View>
+          
           <View style={styles.headerLeft}>
             <Text style={styles.headerTitle}>KonsultaBot + Gemini AI</Text>
             <Text style={styles.headerSubtitle}>
@@ -454,9 +489,7 @@ export default function ComprehensiveGeminiBot() {
             )}
           </View>
           
-          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-            <MaterialIcons name="logout" size={24} color="white" />
-          </TouchableOpacity>
+          {/* Logout button removed as requested */}
         </View>
 
         {/* Messages */}
@@ -465,13 +498,24 @@ export default function ComprehensiveGeminiBot() {
           style={styles.messagesContainer}
           onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
         >
+          {/* Holographic Orb - shown on first screen */}
+          {messages.length === 1 && (
+            <View style={styles.orbContainer}>
+              <HolographicOrb size={120} animate={true} />
+            </View>
+          )}
+          
           {messages.map(renderMessage)}
           
           {isLoading && (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color={theme.colors.primary} />
+              <View style={styles.thinkingAnimation}>
+                <View style={[styles.dot, styles.dot1]} />
+                <View style={[styles.dot, styles.dot2]} />
+                <View style={[styles.dot, styles.dot3]} />
+              </View>
               <Text style={styles.loadingText}>
-                {isConnected ? 'Gemini AI thinking...' : 'Processing locally...'}
+                {isConnected ? 'Thinking...' : 'Processing...'}
               </Text>
             </View>
           )}
@@ -503,7 +547,7 @@ export default function ComprehensiveGeminiBot() {
             value={inputText}
             onChangeText={setInputText}
             placeholder="Ask me anything - I have Gemini AI + comprehensive responses! 🤖✨"
-            placeholderTextColor={theme.colors.placeholder}
+            placeholderTextColor={lumaTheme.colors.textMuted}
             multiline
             maxLength={500}
           />
@@ -517,7 +561,7 @@ export default function ComprehensiveGeminiBot() {
             <MaterialIcons 
               name={isRecording ? "stop" : "mic"} 
               size={20} 
-              color={isRecording ? "#EF4444" : theme.colors.primary} 
+              color={isRecording ? "#EF4444" : lumaTheme.colors.primary} 
             />
           </TouchableOpacity>
           
@@ -533,7 +577,7 @@ export default function ComprehensiveGeminiBot() {
             <MaterialIcons 
               name="send" 
               size={20} 
-              color={(!inputText.trim() || isLoading) ? theme.colors.placeholder : 'white'} 
+              color={(!inputText.trim() || isLoading) ? lumaTheme.colors.textMuted : 'white'} 
             />
           </TouchableOpacity>
         </View>
@@ -545,16 +589,24 @@ export default function ComprehensiveGeminiBot() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: lumaTheme.colors.background,
+    alignItems: 'center',
   },
   header: {
-    backgroundColor: theme.colors.primary,
-    paddingTop: 10,
+    width: '100%',
+    maxWidth: 768,
+    backgroundColor: lumaTheme.colors.surface,
+    paddingTop: Platform.OS === 'ios' ? 50 : 10,
     paddingBottom: 15,
     paddingHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: lumaTheme.colors.border,
+  },
+  headerOrb: {
+    marginRight: lumaTheme.spacing.md,
   },
   headerLeft: {
     flex: 1,
@@ -562,11 +614,11 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: 'white',
+    color: lumaTheme.colors.text,
   },
   headerSubtitle: {
     fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.9)',
+    color: lumaTheme.colors.textSecondary,
     marginTop: 2,
   },
   offlineIndicator: {
@@ -586,8 +638,14 @@ const styles = StyleSheet.create({
   },
   messagesContainer: {
     flex: 1,
+    width: '100%',
+    maxWidth: 768,
     paddingHorizontal: 15,
-    paddingVertical: 10,
+    paddingTop: 10,
+  },
+  orbContainer: {
+    alignItems: 'center',
+    marginVertical: lumaTheme.spacing.xl,
   },
   messageContainer: {
     marginVertical: 5,
@@ -605,18 +663,18 @@ const styles = StyleSheet.create({
     borderRadius: 18,
   },
   userMessage: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: lumaTheme.colors.userBubble,
     borderBottomRightRadius: 5,
   },
   botMessage: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: lumaTheme.colors.aiBubble,
     borderBottomLeftRadius: 5,
     borderWidth: 1,
-    borderColor: theme.colors.disabled,
+    borderColor: lumaTheme.colors.border,
   },
   welcomeMessage: {
-    backgroundColor: '#F0F9FF',
-    borderColor: theme.colors.primary,
+    backgroundColor: lumaTheme.colors.surface,
+    borderColor: lumaTheme.colors.primary,
     borderWidth: 1,
   },
   messageText: {
@@ -624,14 +682,14 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   userMessageText: {
-    color: 'white',
+    color: lumaTheme.colors.text,
   },
   botMessageText: {
-    color: theme.colors.text,
+    color: lumaTheme.colors.text,
   },
   confidenceText: {
     fontSize: 10,
-    color: theme.colors.placeholder,
+    color: lumaTheme.colors.textMuted,
     marginTop: 5,
     fontStyle: 'italic',
   },
@@ -657,72 +715,96 @@ const styles = StyleSheet.create({
   },
   timestamp: {
     fontSize: 10,
-    color: theme.colors.placeholder,
+    color: lumaTheme.colors.textMuted,
   },
   speakButton: {
     padding: 5,
   },
   loadingContainer: {
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 15,
   },
+  thinkingAnimation: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: lumaTheme.colors.primary,
+    marginHorizontal: 3,
+  },
+  dot1: {
+    opacity: 0.3,
+  },
+  dot2: {
+    opacity: 0.6,
+  },
+  dot3: {
+    opacity: 1,
+  },
   loadingText: {
-    marginLeft: 10,
-    color: theme.colors.placeholder,
+    color: lumaTheme.colors.textMuted,
     fontStyle: 'italic',
+    fontSize: 12,
   },
   suggestionsContainer: {
     paddingHorizontal: 15,
     paddingVertical: 10,
   },
   suggestionButton: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: lumaTheme.colors.surface,
     paddingHorizontal: 15,
     paddingVertical: 8,
     borderRadius: 20,
     marginRight: 10,
     borderWidth: 1,
-    borderColor: theme.colors.disabled,
+    borderColor: lumaTheme.colors.border,
   },
   suggestionText: {
-    color: theme.colors.primary,
+    color: lumaTheme.colors.primary,
     fontSize: 14,
     fontWeight: '500',
   },
   inputContainer: {
+    width: '100%',
+    maxWidth: 768,
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     paddingHorizontal: 15,
     paddingVertical: 10,
-    backgroundColor: theme.colors.surface,
+    paddingBottom: Platform.OS === 'ios' ? 25 : 10,
+    backgroundColor: lumaTheme.colors.surface,
     borderTopWidth: 1,
-    borderTopColor: theme.colors.disabled,
+    borderTopColor: lumaTheme.colors.border,
   },
   textInput: {
     flex: 1,
     fontSize: 16,
-    color: theme.colors.text,
-    backgroundColor: theme.colors.background,
+    color: lumaTheme.colors.text,
+    backgroundColor: lumaTheme.colors.inputBackground,
     borderRadius: 25,
     paddingHorizontal: 15,
     paddingVertical: 10,
     marginRight: 10,
     maxHeight: 100,
     borderWidth: 1,
-    borderColor: theme.colors.disabled,
+    borderColor: lumaTheme.colors.border,
   },
   voiceButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: theme.colors.background,
+    backgroundColor: lumaTheme.colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,
     borderWidth: 2,
-    borderColor: theme.colors.primary,
+    borderColor: lumaTheme.colors.primary,
   },
   voiceButtonActive: {
     backgroundColor: '#FEE2E2',
@@ -732,12 +814,12 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: lumaTheme.colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
   sendButtonDisabled: {
-    backgroundColor: theme.colors.disabled,
+    backgroundColor: lumaTheme.colors.border,
   },
   logoutButton: {
     padding: 8,

@@ -28,13 +28,31 @@ export default function ProfileScreen({ navigation }) {
     darkMode: true,
   });
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     Alert.alert(
       'Logout',
       'Are you sure you want to logout?',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Logout', style: 'destructive', onPress: logout },
+        { 
+          text: 'Logout', 
+          style: 'destructive', 
+          onPress: async () => {
+            setLoading(true);
+            try {
+              const result = await logout();
+              if (!result.success) {
+                Alert.alert('Error', 'Logout failed. Please try again.');
+              }
+              // Navigation will be handled by AuthContext
+            } catch (error) {
+              console.error('Logout error:', error);
+              Alert.alert('Error', 'Logout failed. Please try again.');
+            } finally {
+              setLoading(false);
+            }
+          }
+        },
       ]
     );
   };

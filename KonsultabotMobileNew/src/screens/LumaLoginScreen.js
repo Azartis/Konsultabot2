@@ -10,21 +10,18 @@ import {
   ScrollView,
   Animated,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useAuth } from '../../context/AuthContext';
-import { lumaTheme } from '../../theme/lumaTheme';
-import HolographicOrb from '../../components/HolographicOrb';
+import { useAuth } from '../context/AuthContext';
+import { lumaTheme } from '../theme/lumaTheme';
 
-export default function LoginScreen({ navigation }) {
-  const { login } = useAuth();
+export default function LumaLoginScreen({ navigation }) {
+  const { login, isLoading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -43,19 +40,10 @@ export default function LoginScreen({ navigation }) {
     }
 
     setError('');
-    setLoading(true);
+    const result = await login(email.toLowerCase().trim(), password);
     
-    try {
-      const result = await login(email.toLowerCase().trim(), password);
-      
-      if (!result.success) {
-        setError(result.error || 'Invalid credentials');
-      }
-    } catch (error) {
-      console.error('Login error:', error);
-      setError(error.message || 'An error occurred. Please try again.');
-    } finally {
-      setLoading(false);
+    if (!result.success) {
+      setError(result.error || 'Login failed');
     }
   };
 
@@ -82,11 +70,6 @@ export default function LoginScreen({ navigation }) {
                 <MaterialIcons name="arrow-back" size={24} color={lumaTheme.colors.text} />
               </TouchableOpacity>
               <Text style={styles.headerTitle}>KonsultaBot</Text>
-            </View>
-
-            {/* Holographic Orb */}
-            <View style={styles.orbContainer}>
-              <HolographicOrb size={80} animate={true} />
             </View>
 
             {/* Title */}
@@ -150,11 +133,16 @@ export default function LoginScreen({ navigation }) {
                 </View>
               ) : null}
 
+              {/* Forgot Password */}
+              <TouchableOpacity style={styles.forgotPassword}>
+                <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+              </TouchableOpacity>
+
               {/* Login Button */}
               <TouchableOpacity
                 style={styles.loginButton}
                 onPress={handleLogin}
-                disabled={loading}
+                disabled={isLoading}
                 activeOpacity={0.8}
               >
                 <LinearGradient
@@ -163,12 +151,25 @@ export default function LoginScreen({ navigation }) {
                   end={{ x: 1, y: 0 }}
                   style={styles.loginButtonGradient}
                 >
-                  {loading ? (
+                  {isLoading ? (
                     <ActivityIndicator color={lumaTheme.colors.text} />
                   ) : (
                     <Text style={styles.loginButtonText}>Sign In</Text>
                   )}
                 </LinearGradient>
+              </TouchableOpacity>
+
+              {/* Divider */}
+              <View style={styles.divider}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>or</Text>
+                <View style={styles.dividerLine} />
+              </View>
+
+              {/* Social Login */}
+              <TouchableOpacity style={styles.socialButton} activeOpacity={0.8}>
+                <MaterialIcons name="mail" size={20} color={lumaTheme.colors.text} />
+                <Text style={styles.socialButtonText}>Continue with Email</Text>
               </TouchableOpacity>
 
               {/* Sign Up Link */}
@@ -195,23 +196,16 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    alignItems: 'center',
   },
   content: {
     flex: 1,
-    width: '100%',
-    maxWidth: 480,
-    paddingHorizontal: lumaTheme.spacing.lg,
-    paddingTop: Platform.OS === 'ios' ? 40 : lumaTheme.spacing.md,
+    paddingHorizontal: lumaTheme.spacing.xl,
+    paddingTop: Platform.OS === 'ios' ? 60 : lumaTheme.spacing.xl,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: lumaTheme.spacing.md,
-  },
-  orbContainer: {
-    alignItems: 'center',
-    marginVertical: lumaTheme.spacing.md,
+    marginBottom: lumaTheme.spacing.xl,
   },
   backButton: {
     width: 40,
@@ -228,18 +222,18 @@ const styles = StyleSheet.create({
     color: lumaTheme.colors.text,
   },
   titleContainer: {
-    marginBottom: lumaTheme.spacing.md,
+    marginBottom: lumaTheme.spacing.xl,
   },
   title: {
-    fontSize: lumaTheme.fontSize.xxl,
+    fontSize: lumaTheme.fontSize.xxxl,
     fontWeight: lumaTheme.fontWeight.bold,
     color: lumaTheme.colors.text,
-    marginBottom: lumaTheme.spacing.xs,
+    marginBottom: lumaTheme.spacing.sm,
   },
   subtitle: {
-    fontSize: lumaTheme.fontSize.sm,
+    fontSize: lumaTheme.fontSize.md,
     color: lumaTheme.colors.textSecondary,
-    lineHeight: 20,
+    lineHeight: 24,
   },
   form: {
     flex: 1,
@@ -251,8 +245,8 @@ const styles = StyleSheet.create({
     borderRadius: lumaTheme.borderRadius.md,
     borderWidth: 1,
     borderColor: lumaTheme.colors.border,
-    marginBottom: lumaTheme.spacing.sm,
-    height: 48,
+    marginBottom: lumaTheme.spacing.md,
+    height: 56,
     paddingHorizontal: lumaTheme.spacing.md,
   },
   inputIconContainer: {
@@ -279,11 +273,19 @@ const styles = StyleSheet.create({
     color: lumaTheme.colors.error,
     marginLeft: lumaTheme.spacing.sm,
   },
+  forgotPassword: {
+    alignSelf: 'flex-end',
+    marginBottom: lumaTheme.spacing.lg,
+  },
+  forgotPasswordText: {
+    fontSize: lumaTheme.fontSize.sm,
+    color: lumaTheme.colors.primary,
+    fontWeight: lumaTheme.fontWeight.medium,
+  },
   loginButton: {
-    height: 48,
+    height: 56,
     borderRadius: lumaTheme.borderRadius.xl,
     overflow: 'hidden',
-    marginTop: lumaTheme.spacing.md,
     ...lumaTheme.shadows.medium,
   },
   loginButtonGradient: {
@@ -296,14 +298,45 @@ const styles = StyleSheet.create({
     fontWeight: lumaTheme.fontWeight.semibold,
     color: lumaTheme.colors.text,
   },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: lumaTheme.spacing.lg,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: lumaTheme.colors.border,
+  },
+  dividerText: {
+    marginHorizontal: lumaTheme.spacing.md,
+    fontSize: lumaTheme.fontSize.sm,
+    color: lumaTheme.colors.textMuted,
+  },
+  socialButton: {
+    height: 56,
+    borderRadius: lumaTheme.borderRadius.xl,
+    backgroundColor: lumaTheme.colors.surface,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: lumaTheme.spacing.sm,
+    borderWidth: 1,
+    borderColor: lumaTheme.colors.border,
+  },
+  socialButtonText: {
+    fontSize: lumaTheme.fontSize.md,
+    fontWeight: lumaTheme.fontWeight.medium,
+    color: lumaTheme.colors.text,
+  },
   signupContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: lumaTheme.spacing.md,
-    marginBottom: lumaTheme.spacing.sm,
+    marginTop: lumaTheme.spacing.lg,
+    marginBottom: lumaTheme.spacing.xl,
   },
   signupText: {
-    fontSize: lumaTheme.fontSize.sm,
+    fontSize: lumaTheme.fontSize.md,
     color: lumaTheme.colors.textSecondary,
   },
   signupLink: {

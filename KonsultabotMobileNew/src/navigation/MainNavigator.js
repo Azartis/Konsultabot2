@@ -3,7 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 
-import ComprehensiveGeminiBot from '../screens/main/ComprehensiveGeminiBot';
+import ImprovedChatScreen from '../screens/main/ImprovedChatScreen';
 import SimpleHistoryScreen from '../screens/main/SimpleHistoryScreen';
 import SimpleProfileScreen from '../screens/main/SimpleProfileScreen';
 import SimpleSettingsScreen from '../screens/main/SimpleSettingsScreen';
@@ -27,7 +27,7 @@ function ChatStack() {
     >
       <Stack.Screen 
         name="ChatMain" 
-        component={ComprehensiveGeminiBot}
+        component={ImprovedChatScreen}
         options={{ headerShown: false }}
       />
     </Stack.Navigator>

@@ -5,11 +5,13 @@ import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, View, StyleSheet, Text, Button, LogBox } from 'react-native';
 import { Provider as PaperProvider } from 'react-native-paper';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { ChatHistoryProvider } from './src/context/ChatHistoryContext';
 import MainNavigator from './src/navigation/MainNavigator';
 import LoginScreen from './src/screens/auth/LoginScreen';
 import RegisterScreen from './src/screens/auth/RegisterScreen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { theme } from './src/theme/cleanTheme';
+import { lumaTheme } from './src/theme/lumaTheme';
+import WelcomeScreen from './src/screens/WelcomeScreen';
 
 const Stack = createStackNavigator();
 
@@ -26,7 +28,7 @@ function NavigationWrapper() {
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <ActivityIndicator size="large" color={lumaTheme.colors.primary} />
       </View>
     );
   }
@@ -35,12 +37,13 @@ function NavigationWrapper() {
     <Stack.Navigator
       screenOptions={{
         headerShown: false,
-        cardStyle: { backgroundColor: 'transparent' },
+        cardStyle: { backgroundColor: lumaTheme.colors.background },
       }}
     >
       {!user ? (
         // Auth Stack
         <>
+          <Stack.Screen name="Welcome" component={WelcomeScreen} />
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="Register" component={RegisterScreen} />
         </>
@@ -117,12 +120,14 @@ export default function App() {
   return (
     <ErrorBoundary>
       <SafeAreaProvider>
-        <PaperProvider theme={theme}>
+        <PaperProvider theme={lumaTheme}>
           <AuthProvider>
-            <NavigationContainer>
-              <StatusBar style="light" />
-              <NavigationWrapper />
-            </NavigationContainer>
+            <ChatHistoryProvider>
+              <NavigationContainer>
+                <StatusBar style="light" />
+                <NavigationWrapper />
+              </NavigationContainer>
+            </ChatHistoryProvider>
           </AuthProvider>
         </PaperProvider>
       </SafeAreaProvider>
@@ -131,6 +136,17 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
+  responsiveWrapper: {
+    flex: 1,
+    backgroundColor: lumaTheme.colors.background,
+    alignItems: 'center',
+  },
+  responsiveContainer: {
+    flex: 1,
+    width: '100%',
+    maxWidth: 480,
+    backgroundColor: lumaTheme.colors.background,
+  },
   container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
@@ -139,7 +155,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: lumaTheme.colors.background,
   },
   loadingText: {
     marginTop: 10,

@@ -1946,3 +1946,120 @@ Bad Request: /api/auth/register/
 "POST /api/auth/register/ HTTP/1.1" 400 78338
 Watching for file changes with StatReloader
 "GET /api/chat/server-info/ HTTP/1.1" 200 313
+"GET /api/health HTTP/1.1" 301 0
+"GET /api/health/ HTTP/1.1" 200 77
+"GET /api/health/ HTTP/1.1" 200 77
+"OPTIONS /api/auth/register/ HTTP/1.1" 200 0
+Bad Request: /api/auth/register/
+"POST /api/auth/register/ HTTP/1.1" 400 48
+"OPTIONS /api/auth/login/ HTTP/1.1" 200 0
+Bad Request: /api/auth/login/
+"POST /api/auth/login/ HTTP/1.1" 400 86
+"GET /api/health/ HTTP/1.1" 200 77
+"GET /api/health/ HTTP/1.1" 200 77
+New user registered: ace@evsu.edu.ph
+"POST /api/auth/register/ HTTP/1.1" 201 893
+User ace@evsu.edu.ph logged in successfully
+"POST /api/auth/login/ HTTP/1.1" 200 886
+"GET /api/health/ HTTP/1.1" 200 77
+"GET /api/health/ HTTP/1.1" 200 77
+"GET /api/health/ HTTP/1.1" 200 77
+"GET /api/health/ HTTP/1.1" 200 77
+"GET /api/health/ HTTP/1.1" 200 77
+"GET /api/health/ HTTP/1.1" 200 77
+"GET /api/health HTTP/1.1" 301 0
+"GET /api/health/ HTTP/1.1" 200 77
+"GET /api/health/ HTTP/1.1" 200 77
+"GET /api/health/ HTTP/1.1" 200 77
+"OPTIONS /api/auth/login/ HTTP/1.1" 200 0
+User ace@evsu.edu.ph logged in successfully
+"POST /api/auth/login/ HTTP/1.1" 200 886
+"GET /api/health/ HTTP/1.1" 200 77
+"GET /api/health/ HTTP/1.1" 200 77
+"GET /api/health/ HTTP/1.1" 200 77
+"GET /api/health/ HTTP/1.1" 200 77
+"GET /api/health/ HTTP/1.1" 200 77
+"GET /api/health/ HTTP/1.1" 200 77
+"GET /api/health/ HTTP/1.1" 200 77
+"GET /api/health/ HTTP/1.1" 200 77
+"GET /api/health/ HTTP/1.1" 200 77
+"GET /api/health/ HTTP/1.1" 200 77
+"GET /api/health/ HTTP/1.1" 200 77
+"GET /api/health/ HTTP/1.1" 200 77
+"GET /api/health/ HTTP/1.1" 200 77
+"GET /api/health/ HTTP/1.1" 200 77
+"GET /api/health/ HTTP/1.1" 200 77
+"GET /api/health/ HTTP/1.1" 200 77
+"GET /api/health HTTP/1.1" 301 0
+"GET /api/health/ HTTP/1.1" 200 77
+"OPTIONS /api/auth/login/ HTTP/1.1" 200 0
+User ace@evsu.edu.ph logged in successfully
+"POST /api/auth/login/ HTTP/1.1" 200 886
+"GET /api/health HTTP/1.1" 301 0
+"GET /api/health/ HTTP/1.1" 200 77
+"OPTIONS /api/auth/login/ HTTP/1.1" 200 0
+User ace@evsu.edu.ph logged in successfully
+"POST /api/auth/login/ HTTP/1.1" 200 886
+"GET /api/health/ HTTP/1.1" 200 77
+"GET /api/health HTTP/1.1" 301 0
+"GET /api/health/ HTTP/1.1" 200 77
+"GET /api/health HTTP/1.1" 301 0
+"GET /api/health/ HTTP/1.1" 200 77
+"OPTIONS /api/auth/login/ HTTP/1.1" 200 0
+User ace@evsu.edu.ph logged in successfully
+"POST /api/auth/login/ HTTP/1.1" 200 886
+"GET /api/health/ HTTP/1.1" 200 77
+"OPTIONS /api/auth/login/ HTTP/1.1" 200 0
+Bad Request: /api/auth/login/
+"POST /api/auth/login/ HTTP/1.1" 400 86
+User ace@evsu.edu.ph logged in successfully
+"POST /api/auth/login/ HTTP/1.1" 200 886
+"GET /api/health HTTP/1.1" 301 0
+"GET /api/health/ HTTP/1.1" 200 77
+"GET /api/health/ HTTP/1.1" 200 77
+"GET /api/health/ HTTP/1.1" 200 77
+"GET /api/health/ HTTP/1.1" 200 77
+Watching for file changes with StatReloader
+"GET /api/health HTTP/1.1" 301 0
+"GET /api/health/ HTTP/1.1" 200 77
+"OPTIONS /api/auth/login/ HTTP/1.1" 200 0
+User ace@evsu.edu.ph logged in successfully
+"POST /api/auth/login/ HTTP/1.1" 200 886
+"GET /api/health/ HTTP/1.1" 200 77
+"GET /api/health/ HTTP/1.1" 200 77
+"GET /api/health/ HTTP/1.1" 200 77
+"GET /api/health/ HTTP/1.1" 200 77
+"GET /api/health/ HTTP/1.1" 200 77
+Watching for file changes with StatReloader
+"GET /api/health HTTP/1.1" 301 0
+"GET /api/health/ HTTP/1.1" 200 77
+"GET /api/health/ HTTP/1.1" 200 77
+"OPTIONS /api/auth/login/ HTTP/1.1" 200 0
+Bad Request: /api/auth/login/
+"POST /api/auth/login/ HTTP/1.1" 400 86
+"GET /api/health/ HTTP/1.1" 200 77
+"OPTIONS /api/auth/register/ HTTP/1.1" 200 0
+Bad Request: /api/auth/register/
+"POST /api/auth/register/ HTTP/1.1" 400 58
+"GET /api/health/ HTTP/1.1" 200 77
+"GET /api/health/ HTTP/1.1" 200 77
+Bad Request: /api/auth/register/
+"POST /api/auth/register/ HTTP/1.1" 400 58
+Bad Request: /api/auth/login/
+"POST /api/auth/login/ HTTP/1.1" 400 86
+"GET /api/health/ HTTP/1.1" 200 77
+"GET /api/health/ HTTP/1.1" 200 77
+"GET /api/health/ HTTP/1.1" 200 77
+User ace@evsu.edu.ph logged in successfully
+"POST /api/auth/login/ HTTP/1.1" 200 886
+"GET /api/health/ HTTP/1.1" 200 77
+"GET /api/health/ HTTP/1.1" 200 77
+"GET /api/health/ HTTP/1.1" 200 77
+Unauthorized: /api/auth/logout/
+"POST /api/auth/logout/ HTTP/1.1" 401 58
+"GET /api/health/ HTTP/1.1" 200 77
+User ace@evsu.edu.ph logged in successfully
+"POST /api/auth/login/ HTTP/1.1" 200 886
+"GET /api/health/ HTTP/1.1" 200 77
+C:\Users\Ace Ziegfred Culapas\CascadeProjects\CapProj\backend\konsultabot_backend\settings.py changed, reloading.
+Watching for file changes with StatReloader
