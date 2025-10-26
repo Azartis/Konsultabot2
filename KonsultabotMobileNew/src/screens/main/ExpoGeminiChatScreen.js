@@ -503,7 +503,6 @@ const styles = StyleSheet.create({
   suggestionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
   },
   suggestionChip: {
     flexDirection: 'row',

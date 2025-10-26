@@ -169,7 +169,6 @@ const styles = StyleSheet.create({
   dotsContainer: {
     flexDirection: 'row',
     marginTop: lumaTheme.spacing.xl,
-    gap: lumaTheme.spacing.sm,
   },
   dot: {
     width: 8,
@@ -183,7 +182,6 @@ const styles = StyleSheet.create({
   },
   buttonsContainer: {
     marginTop: lumaTheme.spacing.xl,
-    gap: lumaTheme.spacing.md,
   },
   primaryButton: {
     height: 56,
@@ -208,7 +206,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: lumaTheme.spacing.sm,
     borderWidth: 1,
     borderColor: lumaTheme.colors.border,
   },

@@ -7,10 +7,13 @@ import {
   TouchableOpacity,
   Alert,
   Platform,
+  SafeAreaView,
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigation } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons';
+import { MaterialIcons } from '@expo/vector-icons';
+import { lumaTheme } from '../../theme/lumaTheme';
+import StarryBackground from '../../components/StarryBackground';
 
 export default function SimpleProfileScreen() {
   const { user, logout } = useAuth();
@@ -65,16 +68,14 @@ export default function SimpleProfileScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Profile</Text>
-        <Text style={styles.headerSubtitle}>Your KonsultaBot account</Text>
-      </View>
+    <SafeAreaView style={styles.container}>
+      <StarryBackground />
       
-      <ScrollView style={styles.content}>
-        <View style={styles.profileSection}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>👤</Text>
+      <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
+        {/* Profile Header */}
+        <View style={styles.profileHeader}>
+          <View style={styles.avatarContainer}>
+            <Text style={styles.avatarEmoji}>👤</Text>
           </View>
           <Text style={styles.userName}>
             {user?.first_name && user?.last_name 
@@ -84,167 +85,175 @@ export default function SimpleProfileScreen() {
           <Text style={styles.userEmail}>{user?.email || 'student@evsu.edu.ph'}</Text>
         </View>
 
+        {/* Account Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Account Information</Text>
           
-          <TouchableOpacity style={styles.menuItem}>
-            <Text style={styles.menuIcon}>📧</Text>
-            <View style={styles.menuContent}>
-              <Text style={styles.menuTitle}>Email</Text>
-              <Text style={styles.menuSubtitle}>{user?.email || 'student@evsu.edu.ph'}</Text>
+          <View style={styles.card}>
+            <View style={styles.menuItem}>
+              <MaterialIcons name="email" size={24} color={lumaTheme.colors.primary} />
+              <View style={styles.menuContent}>
+                <Text style={styles.menuTitle}>Email</Text>
+                <Text style={styles.menuSubtitle}>{user?.email || 'student@evsu.edu.ph'}</Text>
+              </View>
             </View>
-          </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
-            <Text style={styles.menuIcon}>🏫</Text>
-            <View style={styles.menuContent}>
-              <Text style={styles.menuTitle}>Campus</Text>
-              <Text style={styles.menuSubtitle}>EVSU Dulag</Text>
+            <View style={styles.menuItem}>
+              <MaterialIcons name="school" size={24} color={lumaTheme.colors.primary} />
+              <View style={styles.menuContent}>
+                <Text style={styles.menuTitle}>Campus</Text>
+                <Text style={styles.menuSubtitle}>EVSU Dulag</Text>
+              </View>
             </View>
-          </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
-            <Text style={styles.menuIcon}>🎓</Text>
-            <View style={styles.menuContent}>
-              <Text style={styles.menuTitle}>Status</Text>
-              <Text style={styles.menuSubtitle}>Active Student</Text>
+            <View style={styles.menuItem}>
+              <MaterialIcons name="verified" size={24} color={lumaTheme.colors.primary} />
+              <View style={styles.menuContent}>
+                <Text style={styles.menuTitle}>Status</Text>
+                <Text style={styles.menuSubtitle}>Active Student</Text>
+              </View>
             </View>
-          </TouchableOpacity>
+          </View>
         </View>
 
+        {/* Support Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Support</Text>
           
-          <TouchableOpacity style={styles.menuItem}>
-            <Text style={styles.menuIcon}>❓</Text>
-            <View style={styles.menuContent}>
-              <Text style={styles.menuTitle}>Help & FAQ</Text>
-              <Text style={styles.menuSubtitle}>Get help using KonsultaBot</Text>
-            </View>
-          </TouchableOpacity>
+          <View style={styles.card}>
+            <TouchableOpacity style={styles.menuItem}>
+              <MaterialIcons name="help" size={24} color={lumaTheme.colors.primary} />
+              <View style={styles.menuContent}>
+                <Text style={styles.menuTitle}>Help & FAQ</Text>
+                <Text style={styles.menuSubtitle}>Get help using KonsultaBot</Text>
+              </View>
+              <MaterialIcons name="chevron-right" size={20} color={lumaTheme.colors.textMuted} />
+            </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
-            <Text style={styles.menuIcon}>📞</Text>
-            <View style={styles.menuContent}>
-              <Text style={styles.menuTitle}>Contact IT Support</Text>
-              <Text style={styles.menuSubtitle}>Reach our IT team directly</Text>
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={[styles.menuItem, styles.logoutButton]} 
-            onPress={handleLogout}
-          >
-            <Ionicons name="log-out-outline" size={24} color="#d32f2f" />
-            <View style={styles.menuContent}>
-              <Text style={[styles.menuTitle, { color: '#d32f2f' }]}>Logout</Text>
-            </View>
-          </TouchableOpacity>
+            <TouchableOpacity style={styles.menuItem}>
+              <MaterialIcons name="support-agent" size={24} color={lumaTheme.colors.primary} />
+              <View style={styles.menuContent}>
+                <Text style={styles.menuTitle}>Contact IT Support</Text>
+                <Text style={styles.menuSubtitle}>Reach our IT team directly</Text>
+              </View>
+              <MaterialIcons name="chevron-right" size={20} color={lumaTheme.colors.textMuted} />
+            </TouchableOpacity>
+          </View>
         </View>
+
+        {/* Logout Button */}
+        <TouchableOpacity 
+          style={styles.logoutButton} 
+          onPress={handleLogout}
+        >
+          <MaterialIcons name="logout" size={24} color="#EF4444" />
+          <Text style={styles.logoutText}>Logout</Text>
+        </TouchableOpacity>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
-  },
-  header: {
-    backgroundColor: '#fff',
-    paddingTop: 60,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    marginBottom: 4,
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: '#666',
+    backgroundColor: lumaTheme.colors.background,
   },
   content: {
     flex: 1,
   },
-  profileSection: {
-    backgroundColor: '#fff',
+  scrollContent: {
+    paddingTop: 20,
+    paddingBottom: 40,
+  },
+  profileHeader: {
     alignItems: 'center',
     paddingVertical: 30,
-    marginBottom: 20,
+    paddingHorizontal: 20,
   },
-  avatar: {
+  avatarContainer: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#1976d2',
+    backgroundColor: 'rgba(147, 51, 234, 0.3)',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
+    borderWidth: 2,
+    borderColor: lumaTheme.colors.primary,
   },
-  avatarText: {
-    fontSize: 32,
+  avatarEmoji: {
+    fontSize: 40,
   },
   userName: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#1a1a1a',
-    marginBottom: 4,
+    color: lumaTheme.colors.text,
+    marginBottom: 8,
+    textAlign: 'center',
   },
   userEmail: {
     fontSize: 16,
-    color: '#666',
+    color: lumaTheme.colors.textMuted,
+    textAlign: 'center',
   },
   section: {
-    backgroundColor: '#fff',
-    marginBottom: 20,
-    paddingVertical: 10,
+    paddingHorizontal: 20,
+    marginBottom: 24,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderBottomColor: '#f0f0f0',
+    fontSize: 14,
+    fontWeight: '600',
+    color: lumaTheme.colors.textMuted,
+    marginBottom: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  card: {
+    backgroundColor: 'rgba(40, 40, 50, 0.9)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(147, 51, 234, 0.3)',
+    overflow: 'hidden',
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 16,
-    paddingHorizontal: 20,
-    backgroundColor: '#fff',
+    paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  logoutButton: {
-    marginTop: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-    borderBottomWidth: 0,
-    paddingTop: 20,
-  },
-  menuIcon: {
-    fontSize: 24,
-    marginRight: 15,
-    width: 30,
+    borderBottomColor: 'rgba(147, 51, 234, 0.1)',
   },
   menuContent: {
     flex: 1,
+    marginLeft: 12,
   },
   menuTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 2,
+    color: lumaTheme.colors.text,
+    marginBottom: 4,
   },
   menuSubtitle: {
     fontSize: 14,
-    color: '#666',
+    color: lumaTheme.colors.textMuted,
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    marginHorizontal: 20,
+    marginTop: 20,
+    paddingVertical: 16,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+  },
+  logoutText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#EF4444',
+    marginLeft: 8,
   },
 });

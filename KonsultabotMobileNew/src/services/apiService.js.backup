@@ -20,13 +20,14 @@ if (Platform.OS === 'web') {
 
 // Dynamic Backend URL Discovery
 const POSSIBLE_BACKEND_URLS = [
-  'http://10.143.17.242:8000/api',  // Current WiFi IP
-  'http://10.143.17.1:8000/api',      // Router IP variation
-  'http://10.143.17.100:8000/api',    // Common range
-  'http://192.168.1.17:8000/api',  // Fallback 1
-  'http://192.168.0.17:8000/api',  // Fallback 2
-  'http://192.168.100.17:8000/api', // Campus WiFi
-  'http://10.0.0.17:8000/api',     // Alternative
+  'http://192.168.1.9:8000/api',   // Current detected IP
+  'http://192.168.1.17:8000/api',  // Common home WiFi range
+  'http://192.168.0.9:8000/api',   // Alternative range
+  'http://192.168.0.17:8000/api',  // Alternative home WiFi
+  'http://192.168.100.9:8000/api', // Campus/Office WiFi variant
+  'http://192.168.100.17:8000/api', // Campus/Office WiFi
+  'http://10.0.0.9:8000/api',      // Corporate variant
+  'http://10.0.0.17:8000/api',     // Another common range
   'http://172.20.10.2:8000/api',   // Mobile hotspot
   'http://10.0.2.2:8000/api',      // Android emulator
 ];
@@ -144,7 +145,7 @@ const callGeminiAPI = async (message) => {
       try {
         const genAI = new GoogleGenerativeAI(GEMINI_CONFIG.API_KEY);
         const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
-        const prompt = `${GEMINI_CONFIG.SYSTEM_PROMPT}\n\nUser: ${message}\n\nProvide a comprehensive, accurate answer.`;
+        const prompt = `${GEMINI_CONFIG.SYSTEM_PROMPT}\n\nUser: ${message}\n\nProvide a helpful IT support response.`;
         
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 30000);
@@ -157,7 +158,6 @@ const callGeminiAPI = async (message) => {
 
         console.log('✅ Gemini SDK success!');
         return {
-          text: text,
           data: {
             response: text,
             mode: 'gemini-sdk',
@@ -191,11 +191,9 @@ const callGeminiAPI = async (message) => {
 
       if (response.data?.candidates?.[0]?.content?.parts?.[0]?.text) {
         console.log('✅ Gemini REST API success!');
-        const responseText = response.data.candidates[0].content.parts[0].text;
         return {
-          text: responseText,
           data: {
-            response: responseText,
+            response: response.data.candidates[0].content.parts[0].text,
             mode: 'gemini-rest',
             language: 'english'
           }
@@ -286,7 +284,7 @@ class ApiService {
     this.offlineMode = false;
     this.api = axios.create({
       baseURL: API_BASE_URL,
-      timeout: 60000, // 60 seconds for AI processing
+      timeout: 8000, // Increased timeout for mobile networks
       headers: {
         'Content-Type': 'application/json',
       },
@@ -423,9 +421,7 @@ class ApiService {
       const payload = { message: query };
       console.log('📤 Sending payload:', payload);
       
-      const response = await this.api.post('/chat/simple-gemini/', payload, {
-        timeout: 60000 // 60 seconds for AI processing
-      });
+      const response = await this.api.post('/chat/simple-gemini/', payload);
       console.log('✅ Backend response:', response.data);
       
       // Return in consistent format

@@ -402,7 +402,6 @@ const styles = StyleSheet.create({
   },
   thinkingDots: {
     flexDirection: 'row',
-    gap: lumaTheme.spacing.sm,
     marginBottom: lumaTheme.spacing.sm,
   },
   thinkingDot: {
@@ -452,7 +451,6 @@ const styles = StyleSheet.create({
     padding: lumaTheme.spacing.md,
     borderTopWidth: 1,
     borderTopColor: lumaTheme.colors.border,
-    gap: lumaTheme.spacing.sm,
   },
   inputWrapper: {
     flex: 1,

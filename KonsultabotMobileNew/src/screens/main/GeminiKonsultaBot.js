@@ -162,7 +162,7 @@ const GeminiKonsultaBot = ({ navigation }) => {
           const welcomeMessage = {
             id: 'welcome',
             text: Platform.OS === 'web' 
-              ? 'Hello! I\'m KonsultaBot, powered by Gemini AI with intelligent fallback systems. I\'m your advanced IT support assistant ready to help with computer problems, software issues, network troubleshooting, gaming questions, and more. How can I assist you today?'
+              ? 'Hello! I\'m KonsultaBot, your advanced AI assistant with intelligent fallback systems. I\'m ready to help with computer problems, software issues, network troubleshooting, gaming questions, and more. How can I assist you today?'
               : 'Hello! I\'m KonsultaBot. How can I help you today?',
             isBot: true,
             timestamp: new Date(),
