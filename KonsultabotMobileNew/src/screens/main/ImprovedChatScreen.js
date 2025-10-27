@@ -58,6 +58,8 @@ export default function ImprovedChatScreen({ navigation }) {
   const [speechRecognition, setSpeechRecognition] = useState(null);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isVoiceInput, setIsVoiceInput] = useState(false);
+  const [wakeWordListening, setWakeWordListening] = useState(false);
+  const [wakeWordRecognition, setWakeWordRecognition] = useState(null);
   const scrollViewRef = useRef();
   const carouselRef = useRef();
 
@@ -65,7 +67,19 @@ export default function ImprovedChatScreen({ navigation }) {
   useEffect(() => {
     initializeChat();
     initializeSpeechRecognition();
+    initializeWakeWordDetection();
   }, []);
+
+  // Cleanup wake word listener on unmount
+  useEffect(() => {
+    return () => {
+      if (wakeWordRecognition) {
+        try {
+          wakeWordRecognition.stop();
+        } catch (e) {}
+      }
+    };
+  }, [wakeWordRecognition]);
 
   // Initialize Speech Recognition (Web Speech API)
   const initializeSpeechRecognition = () => {
@@ -112,6 +126,104 @@ export default function ImprovedChatScreen({ navigation }) {
       } else {
         console.log('⚠️ Speech Recognition not supported in this browser');
       }
+    }
+  };
+
+  // Initialize Wake Word Detection
+  const initializeWakeWordDetection = () => {
+    if (Platform.OS === 'web') {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        const wakeRecognition = new SpeechRecognition();
+        wakeRecognition.continuous = true;
+        wakeRecognition.interimResults = true;
+        wakeRecognition.lang = 'en-US';
+        
+        wakeRecognition.onresult = (event) => {
+          const last = event.results.length - 1;
+          const transcript = event.results[last][0].transcript.toLowerCase().trim();
+          
+          console.log('👂 Wake word listener heard:', transcript);
+          
+          // Check for wake word "help"
+          if (transcript.includes('help')) {
+            console.log('🔊 WAKE WORD DETECTED: "help"!');
+            // Stop wake word listening
+            stopWakeWordListening();
+            // Start recording
+            setTimeout(() => {
+              startRecording();
+            }, 300);
+          }
+        };
+        
+        wakeRecognition.onerror = (event) => {
+          console.error('❌ Wake word recognition error:', event.error);
+          if (event.error === 'no-speech') {
+            // Restart if no speech detected
+            if (wakeWordListening) {
+              setTimeout(() => {
+                try {
+                  wakeRecognition.start();
+                } catch (e) {}
+              }, 100);
+            }
+          }
+        };
+        
+        wakeRecognition.onend = () => {
+          // Restart if still supposed to be listening
+          if (wakeWordListening) {
+            console.log('🔄 Restarting wake word listener...');
+            setTimeout(() => {
+              try {
+                wakeRecognition.start();
+              } catch (e) {}
+            }, 100);
+          }
+        };
+        
+        setWakeWordRecognition(wakeRecognition);
+        console.log('✅ Wake Word Detection initialized (Say "Help" to activate)');
+      }
+    }
+  };
+
+  // Toggle Wake Word Listening
+  const toggleWakeWordListening = () => {
+    if (!wakeWordRecognition) {
+      Alert.alert(
+        'Wake Word Not Available',
+        'Wake word detection is only available in Chrome, Edge, or Safari browsers.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    if (wakeWordListening) {
+      stopWakeWordListening();
+    } else {
+      startWakeWordListening();
+    }
+  };
+
+  const startWakeWordListening = () => {
+    try {
+      wakeWordRecognition.start();
+      setWakeWordListening(true);
+      console.log('👂 Wake word listening started - say "Help" to activate mic');
+    } catch (error) {
+      console.error('Failed to start wake word listening:', error);
+    }
+  };
+
+  const stopWakeWordListening = () => {
+    try {
+      wakeWordRecognition.stop();
+      setWakeWordListening(false);
+      console.log('🔇 Wake word listening stopped');
+    } catch (error) {
+      console.error('Failed to stop wake word listening:', error);
     }
   };
 
@@ -686,6 +798,7 @@ export default function ImprovedChatScreen({ navigation }) {
               </View>
             </View>
             <Text style={styles.headerSubtitle}>
+              {wakeWordListening && Platform.OS === 'web' && '👂 Listening for "Help"... '}
               {!isOnline && 'Working offline with local knowledge'}
               {isOnline && !isBackendOnline && 'Using fallback responses'}
               {isOnline && isBackendOnline && 'Connected to AI backend'}
@@ -703,6 +816,22 @@ export default function ImprovedChatScreen({ navigation }) {
               color={isOnline && isBackendOnline ? '#10B981' : '#F59E0B'} 
             />
           </TouchableOpacity>
+
+          {Platform.OS === 'web' && (
+            <TouchableOpacity 
+              style={[
+                styles.headerButton,
+                wakeWordListening && styles.headerButtonActive
+              ]}
+              onPress={toggleWakeWordListening}
+            >
+              <MaterialIcons 
+                name={wakeWordListening ? 'hearing' : 'hearing-disabled'} 
+                size={22} 
+                color={wakeWordListening ? '#10B981' : lumaTheme.colors.textMuted} 
+              />
+            </TouchableOpacity>
+          )}
 
           <TouchableOpacity 
             style={styles.headerButton}
@@ -906,15 +1035,20 @@ const styles = StyleSheet.create({
   },
   header: {
     width: '100%',
-    maxWidth: 768,
-    backgroundColor: 'rgba(20, 20, 30, 0.95)',
+    maxWidth: width > 1024 ? 1200 : 768,
+    backgroundColor: 'rgba(20, 20, 30, 0.98)',
     paddingTop: Platform.OS === 'ios' ? 10 : 10,
-    paddingBottom: 12,
-    paddingHorizontal: 16,
+    paddingBottom: width > 768 ? 16 : 12,
+    paddingHorizontal: width > 768 ? 24 : 16,
     flexDirection: 'row',
     alignItems: 'center',
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    borderBottomColor: 'rgba(147, 51, 234, 0.3)',
+    shadowColor: '#9333EA',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
   },
   headerOrb: {
     marginRight: 12,
@@ -927,9 +1061,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: width > 768 ? 22 : 18,
     fontWeight: 'bold',
     color: lumaTheme.colors.text,
+    letterSpacing: 0.5,
   },
   statusBadge: {
     flexDirection: 'row',
@@ -954,29 +1089,41 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   headerSubtitle: {
-    fontSize: 11,
+    fontSize: width > 768 ? 12 : 11,
     color: lumaTheme.colors.textSecondary,
     marginTop: 4,
   },
   headerButton: {
-    padding: 8,
-    marginLeft: 4,
-    borderRadius: 8,
+    padding: width > 768 ? 10 : 8,
+    marginLeft: width > 768 ? 6 : 4,
+    borderRadius: width > 768 ? 10 : 8,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(147, 51, 234, 0.2)',
+  },
+  headerButtonActive: {
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    borderColor: 'rgba(16, 185, 129, 0.5)',
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   messagesContainer: {
     flex: 1,
     width: '100%',
-    maxWidth: 768,
+    maxWidth: width > 1024 ? 1200 : 768,
+    alignSelf: 'center',
   },
   messagesContent: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 16,
+    paddingHorizontal: width > 768 ? 32 : 16,
+    paddingTop: width > 768 ? 24 : 16,
+    paddingBottom: width > 768 ? 24 : 16,
   },
   messageContainer: {
-    marginVertical: 8,
-    maxWidth: '80%',
+    marginVertical: width > 768 ? 12 : 8,
+    maxWidth: width > 768 ? '70%' : '80%',
     flexDirection: 'row',
     alignItems: 'flex-end',
   },
@@ -1009,10 +1156,10 @@ const styles = StyleSheet.create({
     ...lumaTheme.shadows.medium,
   },
   messageBubble: {
-    padding: 14,
-    borderRadius: 18,
+    padding: width > 768 ? 18 : 14,
+    borderRadius: width > 768 ? 24 : 18,
     maxWidth: '100%',
-    ...lumaTheme.shadows.small,
+    ...lumaTheme.shadows.medium,
   },
   messageHeader: {
     flexDirection: 'row',
@@ -1043,11 +1190,21 @@ const styles = StyleSheet.create({
   },
   userMessage: {
     backgroundColor: lumaTheme.colors.primary,
+    shadowColor: lumaTheme.colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 3,
   },
   botMessage: {
-    backgroundColor: 'rgba(30, 30, 40, 0.95)',
+    backgroundColor: 'rgba(30, 30, 40, 0.98)',
     borderWidth: 1,
-    borderColor: 'rgba(147, 51, 234, 0.3)',
+    borderColor: 'rgba(147, 51, 234, 0.4)',
+    shadowColor: '#9333EA',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 2,
   },
   userMessageText: {
     color: '#FFFFFF',
@@ -1108,40 +1265,54 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     width: '100%',
-    maxWidth: 768,
+    maxWidth: width > 1024 ? 1200 : 768,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    paddingBottom: Platform.OS === 'ios' ? 24 : 12,
-    backgroundColor: 'rgba(20, 20, 30, 0.95)',
+    paddingHorizontal: width > 768 ? 32 : 16,
+    paddingVertical: width > 768 ? 16 : 12,
+    paddingBottom: Platform.OS === 'ios' ? 24 : width > 768 ? 16 : 12,
+    backgroundColor: 'rgba(20, 20, 30, 0.98)',
     borderTopWidth: 1,
-    borderTopColor: 'rgba(147, 51, 234, 0.2)',
+    borderTopColor: 'rgba(147, 51, 234, 0.3)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
   },
   textInput: {
     flex: 1,
-    fontSize: 15,
+    fontSize: width > 768 ? 16 : 15,
     color: lumaTheme.colors.text,
-    backgroundColor: 'rgba(40, 40, 50, 0.9)',
-    borderRadius: 24,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    maxHeight: 100,
+    backgroundColor: 'rgba(40, 40, 50, 0.95)',
+    borderRadius: width > 768 ? 28 : 24,
+    paddingHorizontal: width > 768 ? 24 : 18,
+    paddingVertical: width > 768 ? 14 : 12,
+    maxHeight: width > 768 ? 120 : 100,
     marginRight: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(147, 51, 234, 0.3)',
+    borderWidth: 2,
+    borderColor: 'rgba(147, 51, 234, 0.4)',
+    shadowColor: '#9333EA',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 2,
   },
   voiceButton: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: 'rgba(147, 51, 234, 0.1)',
+    width: width > 768 ? 52 : 46,
+    height: width > 768 ? 52 : 46,
+    borderRadius: width > 768 ? 26 : 23,
+    backgroundColor: 'rgba(147, 51, 234, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 6,
     borderWidth: 2,
     borderColor: lumaTheme.colors.primary,
-    ...lumaTheme.shadows.small,
+    shadowColor: lumaTheme.colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 3,
   },
   voiceButtonActive: {
     backgroundColor: 'rgba(239, 68, 68, 0.2)',
