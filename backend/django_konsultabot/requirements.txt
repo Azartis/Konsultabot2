@@ -1,0 +1,52 @@
+# KonsultaBot Advanced AI Platform - Full Requirements
+# Core Django & API
+Django==4.2.7
+djangorestframework==3.14.0
+django-cors-headers==4.3.1
+python-dotenv==1.0.0
+
+# AI & Machine Learning
+google-generativeai==0.3.2
+google-cloud-speech==2.21.0
+google-cloud-translate==3.12.1
+langdetect==1.0.9
+
+# Database & Analytics
+sqlite3  # Built into Python
+pandas==2.1.1
+matplotlib==3.7.2
+seaborn==0.12.2
+
+# Audio Processing
+pydub==0.25.1
+speechrecognition==3.10.0
+pyttsx3==2.90
+
+# NLP & Text Processing
+nltk==3.8.1
+textblob==0.17.1
+spacy==3.7.2
+
+# Utilities & Security
+requests==2.31.0
+cryptography==41.0.7
+python-dateutil==2.8.2
+pytz==2023.3
+
+# File Processing
+Pillow==10.0.1
+python-magic==0.4.27
+
+# Development & Testing
+pytest==7.4.2
+pytest-django==4.5.2
+pytest-cov==4.1.0
+
+# Production Deployment
+gunicorn==21.2.0
+whitenoise==6.6.0
+supervisor==4.2.5
+
+# Optional: Advanced NLP (uncomment if needed)
+# transformers==4.35.0
+# torch==2.1.0

@@ -1,0 +1,58 @@
+{
+  "name": "KonsultaBot - EVSU Dulag AI Assistant",
+  "short_name": "KonsultaBot",
+  "description": "AI Assistant for EVSU Dulag Campus - Multi-language support for students",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#1976d2",
+  "background_color": "#ffffff",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "en",
+  "categories": ["education", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshot-mobile.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow"
+    }
+  ],
+  "features": [
+    "Multi-language chat (English, Bisaya, Waray, Tagalog)",
+    "Voice recognition and text-to-speech",
+    "Offline mode support",
+    "Campus information database",
+    "Technical support assistance"
+  ],
+  "prefer_related_applications": false,
+  "related_applications": [],
+  "shortcuts": [
+    {
+      "name": "Quick Chat",
+      "short_name": "Chat",
+      "description": "Start chatting with KonsultaBot",
+      "url": "/chat",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
+}

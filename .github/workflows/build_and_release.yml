@@ -1,0 +1,53 @@
+name: Build and Release Konsultabot
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies (full)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements_enhanced.txt
+          pip install pyinstaller
+
+      - name: Build full exe
+        run: |
+          pyinstaller --onefile --add-data "VOICE_SETUP.md;." --name Konsultabot launcher.py
+
+      - name: Build slim exe
+        run: |
+          python -m venv .venv_slim
+          .\.venv_slim\Scripts\activate
+          pip install -r requirements_slim.txt
+          pip install pyinstaller
+          pyinstaller --onefile --add-data "VOICE_SETUP.md;." --name Konsultabot_slim launcher.py
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifacts
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./dist/Konsultabot.exe
+          asset_name: Konsultabot.exe
+          asset_content_type: application/octet-stream
+*** End Patch

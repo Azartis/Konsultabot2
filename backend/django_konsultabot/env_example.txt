@@ -1,0 +1,56 @@
+# KonsultaBot Advanced AI Platform - Environment Configuration
+# Copy this file to .env and fill in your actual values
+
+# Django Configuration
+DJANGO_SECRET_KEY=your-super-secret-django-key-change-this-in-production
+DEBUG=True
+ALLOWED_HOSTS=localhost,127.0.0.1,192.168.1.17
+
+# Google AI & Cloud Services
+GOOGLE_API_KEY=AIzaSyBRynLqVFbj1jZfAAzqIfLH6xL4rt6483U
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/your/service-account.json
+
+# Database Configuration (SQLite by default)
+DATABASE_URL=sqlite:///konsultabot_advanced.db
+
+# Redis Configuration (optional, for caching)
+REDIS_URL=redis://localhost:6379/0
+
+# Email Configuration (for notifications)
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USE_TLS=True
+EMAIL_HOST_USER=your-email@gmail.com
+EMAIL_HOST_PASSWORD=your-app-password
+
+# Security Settings
+SECURE_SSL_REDIRECT=False
+SECURE_HSTS_SECONDS=0
+SESSION_COOKIE_SECURE=False
+CSRF_COOKIE_SECURE=False
+
+# KonsultaBot Specific Settings
+KONSULTABOT_SESSION_TIMEOUT_MINUTES=30
+KONSULTABOT_MAX_CONVERSATION_HISTORY=10
+KONSULTABOT_ENABLE_VOICE_FEATURES=True
+KONSULTABOT_ENABLE_ANALYTICS=True
+KONSULTABOT_DEFAULT_LANGUAGE=english
+
+# API Rate Limiting
+KONSULTABOT_CHAT_RATE_LIMIT=100/hour
+KONSULTABOT_VOICE_RATE_LIMIT=50/hour
+
+# External API Keys (optional)
+WIT_AI_KEY=your-wit-ai-key-for-speech-recognition
+OPENAI_API_KEY=your-openai-key-for-fallback
+
+# Logging Configuration
+LOG_LEVEL=INFO
+LOG_FILE_PATH=logs/konsultabot.log
+
+# Production Settings (set these in production)
+# SECURE_SSL_REDIRECT=True
+# SECURE_HSTS_SECONDS=31536000
+# SESSION_COOKIE_SECURE=True
+# CSRF_COOKIE_SECURE=True
+# DEBUG=False
