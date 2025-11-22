@@ -6,7 +6,7 @@ let BASE_URL;
 
 // Auto-detect whether running on web or mobile
 if (Platform.OS === 'web') {
-  BASE_URL = LOCAL_API_URL || 'http://127.0.0.1:8000/api/'; // Use localhost for web builds
+  BASE_URL = LOCAL_API_URL || 'http://192.168.103.243:8000/api/'; // Use local backend for web builds
 } else {
   BASE_URL = PUBLIC_API_URL || 'https://your-ngrok-url.ngrok.io/api/'; // Use ngrok/public for mobile
 }

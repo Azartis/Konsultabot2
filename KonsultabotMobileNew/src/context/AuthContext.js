@@ -1,4 +1,11 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { Platform } from 'react-native';
+import { Buffer } from 'buffer';
+
+// Ensure Buffer is available in React Native environment
+if (typeof global !== 'undefined' && !global.Buffer) {
+  global.Buffer = Buffer;
+}
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiService } from '../services/apiService';
 
@@ -62,49 +69,110 @@ export const AuthProvider = ({ children }) => {
         return { success: false, error: 'Please enter both email and password' };
       }
       
-      const response = await apiService.login(email, password);
+      // Check network status
+      const NetInfo = require('@react-native-community/netinfo').default;
+      const netInfo = await NetInfo.fetch();
+      const isConnected = netInfo.isConnected && netInfo.isInternetReachable;
       
-      // Handle different response formats
-      const accessToken = response.data?.access || response.data?.access_token || response.data?.token;
-      const refreshToken = response.data?.refresh || response.data?.refresh_token;
-      const userData = response.data?.user || response.data;
-      
-      if (!accessToken) {
-        return { 
-          success: false, 
-          error: response.data?.error || response.data?.message || 'Login failed. Invalid response from server.' 
-        };
+      // Try online login first
+      try {
+        const response = await apiService.login(email, password);
+        
+        // Handle different response formats
+        const accessToken = response.data?.access || response.data?.access_token || response.data?.token;
+        const refreshToken = response.data?.refresh || response.data?.refresh_token;
+        const userData = response.data?.user || response.data;
+        
+        if (!accessToken) {
+          throw new Error(response.data?.error || response.data?.message || 'Login failed. Invalid response from server.');
+        }
+
+        // Store tokens and user data
+        await AsyncStorage.setItem('accessToken', accessToken);
+        if (refreshToken) {
+          await AsyncStorage.setItem('refreshToken', refreshToken);
+        }
+        await AsyncStorage.setItem('user', JSON.stringify(userData));
+        // Store credentials for offline login (simple hash for verification)
+        await AsyncStorage.setItem('cachedEmail', email.toLowerCase().trim());
+        // Use a simple hash that works in both web and React Native
+        const passwordHash = Platform.OS === 'web' 
+          ? btoa(password).substring(0, 20)
+          : Buffer.from(password).toString('base64').substring(0, 20);
+        await AsyncStorage.setItem('cachedPasswordHash', passwordHash);
+
+        // Set auth token in API service
+        apiService.setAuthToken(accessToken);
+
+        setUser(userData);
+        return { success: true };
+      } catch (onlineError) {
+        console.log('Online login failed:', onlineError.message);
+        
+        // If offline or connection error, try offline login
+        if (!isConnected || 
+            onlineError.code === 'ECONNREFUSED' || 
+            onlineError.code === 'ENOTFOUND' || 
+            onlineError.message?.includes('Network Error') ||
+            onlineError.message?.includes('Cannot connect to server')) {
+          
+          console.log('📴 Attempting offline login...');
+          
+          // Check if we have cached credentials
+          const cachedEmail = await AsyncStorage.getItem('cachedEmail');
+          const cachedPasswordHash = await AsyncStorage.getItem('cachedPasswordHash');
+          
+          if (cachedEmail && cachedEmail.toLowerCase().trim() === email.toLowerCase().trim()) {
+            // Verify password hash matches
+            const passwordHash = Platform.OS === 'web'
+              ? btoa(password).substring(0, 20)
+              : Buffer.from(password).toString('base64').substring(0, 20);
+            if (cachedPasswordHash === passwordHash) {
+              // Check if we have cached user data
+              const cachedUserData = await AsyncStorage.getItem('user');
+              if (cachedUserData) {
+                try {
+                  const user = JSON.parse(cachedUserData);
+                  setUser(user);
+                  console.log('✅ Offline login successful with cached credentials');
+                  return { 
+                    success: true, 
+                    offline: true,
+                    message: 'Logged in offline. Some features may be limited.'
+                  };
+                } catch (parseError) {
+                  console.error('Error parsing cached user data:', parseError);
+                }
+              }
+            }
+          }
+          
+          // If offline login fails, return helpful error
+          return { 
+            success: false, 
+            error: 'Cannot connect to server. Please check:\n\n• Backend is running on port 8000\n• Device is on the same network\n• Firewall allows port 8000\n\nOr use previously logged-in account for offline mode.',
+            offline: true
+          };
+        }
+        
+        // For other errors (invalid credentials, etc.), return the original error
+        let errorMessage = 'Login failed. Please check your credentials.';
+        
+        if (onlineError.message) {
+          errorMessage = onlineError.message;
+        } else if (onlineError.response?.data?.error) {
+          errorMessage = onlineError.response.data.error;
+        } else if (onlineError.response?.data?.message) {
+          errorMessage = onlineError.response.data.message;
+        } else if (onlineError.response?.data?.detail) {
+          errorMessage = onlineError.response.data.detail;
+        }
+        
+        return { success: false, error: errorMessage };
       }
-
-      // Store tokens
-      await AsyncStorage.setItem('accessToken', accessToken);
-      if (refreshToken) {
-        await AsyncStorage.setItem('refreshToken', refreshToken);
-      }
-      await AsyncStorage.setItem('user', JSON.stringify(userData));
-
-      // Set auth token in API service
-      apiService.setAuthToken(accessToken);
-
-      setUser(userData);
-      return { success: true };
     } catch (error) {
       console.error('Login error:', error);
-      
-      // Extract error message
-      let errorMessage = 'Login failed. Please check your credentials.';
-      
-      if (error.message) {
-        errorMessage = error.message;
-      } else if (error.response?.data?.error) {
-        errorMessage = error.response.data.error;
-      } else if (error.response?.data?.message) {
-        errorMessage = error.response.data.message;
-      } else if (error.response?.data?.detail) {
-        errorMessage = error.response.data.detail;
-      }
-      
-      return { success: false, error: errorMessage };
+      return { success: false, error: error.message || 'An unexpected error occurred during login.' };
     } finally {
       setIsLoading(false);
     }

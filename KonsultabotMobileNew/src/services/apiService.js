@@ -18,19 +18,101 @@ if (Platform.OS === 'web') {
   }
 }
 
+// Helper to extract IP from Expo Metro bundler URL
+const getMetroBundlerIP = () => {
+  try {
+    // Try to get IP from Expo Constants
+    if (Constants.expoConfig?.hostUri) {
+      // Format: "192.168.1.17:8081" or "192.168.1.17"
+      const hostUri = Constants.expoConfig.hostUri;
+      const ip = hostUri.split(':')[0];
+      if (ip && ip !== 'localhost' && ip !== '127.0.0.1') {
+        console.log('📱 Found Metro bundler IP:', ip);
+        return ip;
+      }
+    }
+    
+    // Try manifest2
+    if (Constants.manifest2?.extra?.expoGo?.debuggerHost) {
+      const debuggerHost = Constants.manifest2.extra.expoGo.debuggerHost;
+      const ip = debuggerHost.split(':')[0];
+      if (ip && ip !== 'localhost' && ip !== '127.0.0.1') {
+        console.log('📱 Found Metro bundler IP from manifest2:', ip);
+        return ip;
+      }
+    }
+    
+    // Try legacy manifest
+    if (Constants.manifest?.hostUri) {
+      const hostUri = Constants.manifest.hostUri;
+      const ip = hostUri.split(':')[0];
+      if (ip && ip !== 'localhost' && ip !== '127.0.0.1') {
+        console.log('📱 Found Metro bundler IP from manifest:', ip);
+        return ip;
+      }
+    }
+  } catch (error) {
+    console.log('⚠️ Could not extract Metro bundler IP:', error);
+  }
+  return null;
+};
+
+// Helper to detect if running on emulator
+const isEmulator = () => {
+  if (Platform.OS === 'web') return false;
+  // Check if running on Android emulator
+  if (Platform.OS === 'android') {
+    // Emulator typically has specific device names or model
+    // We'll use a heuristic: if we can't reach network IPs, we might be on emulator
+    return false; // Let discovery determine this
+  }
+  return false;
+};
+
 // Dynamic Backend URL Discovery
-// Priority order: Emulator first, then network discovery
-const POSSIBLE_BACKEND_URLS = [
-  'http://10.0.2.2:8000/api',      // Android emulator (highest priority)
-  'http://10.143.17.242:8000/api',  // Current WiFi IP
-  'http://10.143.17.1:8000/api',      // Router IP variation
-  'http://10.143.17.100:8000/api',    // Common range
-  'http://192.168.1.17:8000/api',  // Fallback 1
-  'http://192.168.0.17:8000/api',  // Fallback 2
-  'http://192.168.100.17:8000/api', // Campus WiFi
-  'http://10.0.0.17:8000/api',     // Alternative
-  'http://172.20.10.2:8000/api',   // Mobile hotspot
-];
+// Priority order: Metro bundler IP first, then network IPs, then emulator IP
+const getPossibleBackendURLs = () => {
+  const urls = [];
+  
+  // Get Metro bundler IP (most reliable for physical devices)
+  const metroIP = getMetroBundlerIP();
+  if (metroIP) {
+    urls.push(`http://${metroIP}:8000/api`);
+    console.log('🎯 Using Metro bundler IP for backend discovery');
+  }
+  
+  // For physical devices, prioritize network IPs
+  // For emulator, prioritize 10.0.2.2
+  if (Platform.OS === 'android') {
+    // Try network IPs (physical device) - prioritize current IP first
+    urls.push(
+      'http://192.168.103.243:8000/api',  // Current network IP (PRIORITY)
+      'http://10.143.17.242:8000/api',  // Previous WiFi IP
+      'http://10.143.17.1:8000/api',      // Router IP variation
+      'http://10.143.17.100:8000/api',    // Common range
+      'http://192.168.1.17:8000/api',  // Common home network
+      'http://192.168.0.17:8000/api',  // Alternative home network
+      'http://192.168.100.17:8000/api', // Campus WiFi
+      'http://10.0.0.17:8000/api',     // Alternative
+      'http://172.20.10.2:8000/api',   // Mobile hotspot
+      'http://10.0.2.2:8000/api'       // Android emulator (last resort)
+    );
+  } else if (Platform.OS === 'ios') {
+    // iOS - try network IPs - prioritize current IP first
+    urls.push(
+      'http://192.168.103.243:8000/api',  // Current network IP (PRIORITY)
+      'http://10.143.17.242:8000/api',
+      'http://192.168.1.17:8000/api',
+      'http://192.168.0.17:8000/api'
+    );
+  } else {
+    // Web - current IP
+    urls.push('http://192.168.103.243:8000/api');
+  }
+  
+  // Remove duplicates
+  return [...new Set(urls)];
+};
 
 // Cache for discovered backend URL
 let cachedBackendURL = null;
@@ -44,7 +126,8 @@ const discoverBackendURL = async () => {
       // Verify cached URL still works
       try {
         const testResponse = await axios.get(`${stored.replace('/api', '')}/api/health/`, {
-          timeout: 2000
+          timeout: 5000,
+          headers: { 'Accept': 'application/json' }
         });
         if (testResponse.status === 200) {
           console.log('📦 Using cached backend URL:', stored);
@@ -63,16 +146,48 @@ const discoverBackendURL = async () => {
 
   console.log('🔍 Discovering backend URL...');
   
+  // Get platform-specific URLs
+  const POSSIBLE_BACKEND_URLS = getPossibleBackendURLs();
+  
+  // Check for manually set backend URL
+  try {
+    const manualURL = await AsyncStorage.getItem('manual_backend_url');
+    if (manualURL) {
+      try {
+        const testResponse = await axios.get(`${manualURL.replace('/api', '')}/api/health/`, {
+          timeout: 5000,
+          headers: { 'Accept': 'application/json' }
+        });
+        if (testResponse.status === 200) {
+          console.log('✅ Using manually set backend URL:', manualURL);
+          cachedBackendURL = manualURL;
+          await AsyncStorage.setItem('backend_url', manualURL);
+          return manualURL;
+        }
+      } catch (e) {
+        console.log('⚠️ Manually set URL not working, trying discovery...');
+      }
+    }
+  } catch (error) {
+    // Ignore
+  }
+
   // Try each possible URL with better error handling
+  let triedCount = 0;
   for (const url of POSSIBLE_BACKEND_URLS) {
+    triedCount++;
     try {
-      console.log('🔍 Trying:', url);
+      // Only log first few attempts to reduce noise
+      if (triedCount <= 3) {
+        console.log('🔍 Trying:', url);
+      }
       const healthUrl = url.replace('/api', '') + '/api/health/';
       const response = await axios.get(healthUrl, {
-        timeout: 3000,
+        timeout: 5000, // Increased timeout for better reliability
         validateStatus: (status) => status === 200,
         headers: {
-          'Cache-Control': 'no-cache'
+          'Cache-Control': 'no-cache',
+          'Accept': 'application/json'
         }
       });
       
@@ -90,21 +205,45 @@ const discoverBackendURL = async () => {
       }
     } catch (error) {
       // Continue to next URL - don't log every failure to reduce noise
+      if (triedCount <= 3 && error.code !== 'ECONNABORTED') {
+        // Only log first few failures
+        continue;
+      }
       continue;
     }
   }
   
   // Fallback based on platform
-  const fallbackURL = Platform.OS === 'web' 
-    ? 'http://localhost:8000/api' 
-    : 'http://10.0.2.2:8000/api'; // Android emulator default
+  let fallbackURL;
+  if (Platform.OS === 'web') {
+    fallbackURL = 'http://192.168.103.243:8000/api';
+  } else if (Platform.OS === 'android') {
+    // For Android, try emulator IP as last resort
+    fallbackURL = 'http://192.168.103.243:8000/api';
+  } else {
+    // iOS or other
+    fallbackURL = 'http://192.168.103.243:8000/api';
+  }
   
-  console.log('⚠️ No backend found, using fallback:', fallbackURL);
+  console.log('⚠️ No backend found after trying', POSSIBLE_BACKEND_URLS.length, 'URLs');
+  console.log('💡 Using fallback:', fallbackURL);
+  console.log('💡 Troubleshooting:');
+  console.log('   1. Make sure backend is running: python manage.py runserver 0.0.0.0:8000');
+  console.log('   2. Check your computer IP matches one in the discovery list');
+  console.log('   3. Ensure phone and computer are on same WiFi network');
+  console.log('   4. Try accessing http://YOUR_IP:8000/api/health/ from phone browser');
+  console.log('   5. Check Windows Firewall allows port 8000');
+  
+  // Store fallback for potential retry
+  cachedBackendURL = fallbackURL;
   return fallbackURL;
 };
 
-// Get initial baseURL
-let initialBaseURL = Platform.OS === 'web' ? 'http://localhost:8000/api' : 'http://10.0.2.2:8000/api';
+// Get initial baseURL - will be updated by discovery
+// For mobile, we'll discover the correct URL, so start with a placeholder
+let initialBaseURL = Platform.OS === 'web' 
+  ? 'http://192.168.103.243:8000/api' 
+  : 'http://192.168.103.243:8000/api'; // Temporary - will be discovered
 
 // Create Axios instance with longer timeout and retries
 const api = axios.create({
@@ -266,7 +405,7 @@ const getApiUrl = async () => {
   try {
     // Web (browser) - Use localhost
     if (Platform.OS === 'web') {
-      return 'http://localhost:8000/api';
+      return 'http://192.168.103.243:8000/api';
     }
 
     // Mobile - Use network discovery
@@ -291,19 +430,19 @@ const getApiUrl = async () => {
     }
 
     // Fallback to default IP
-    const defaultIP = Platform.OS === 'web' ? 'localhost' : '10.0.2.2'; // Android emulator default
+    const defaultIP = '192.168.103.243';
     console.warn(`Using default server IP: ${defaultIP}`);
     return `http://${defaultIP}:8000/api`;
   } catch (error) {
     console.error('Error in getApiUrl:', error);
     // Fallback based on platform
-    const fallbackIP = Platform.OS === 'web' ? 'localhost' : '10.0.2.2';
+    const fallbackIP = '192.168.103.243';
     return `http://${fallbackIP}:8000/api`;
   }
 };
 
 // Initialize with a default URL, will be updated
-let API_BASE_URL = 'http://192.168.1.17:8000/api';
+let API_BASE_URL = 'http://192.168.103.243:8000/api';
 
 class ApiService {
   constructor() {
@@ -364,10 +503,26 @@ class ApiService {
 
   async checkHealth() {
     try {
-      const response = await this.api.get('/health');
+      // Try /api/health/ endpoint (full path)
+      const healthUrl = this.api.defaults.baseURL.replace('/api', '') + '/api/health/';
+      const response = await axios.get(healthUrl, {
+        timeout: 5000,
+        validateStatus: (status) => status < 500 // Accept 200-499 as valid responses
+      });
+      console.log('✅ Backend health check successful:', healthUrl, response.status);
       return response.status === 200;
     } catch (error) {
-      return false;
+      console.log('❌ Backend health check failed:', error.message);
+      // Also try the /health endpoint without /api prefix
+      try {
+        const altHealthUrl = this.api.defaults.baseURL.replace('/api', '') + '/health/';
+        const altResponse = await axios.get(altHealthUrl, { timeout: 5000 });
+        console.log('✅ Backend health check successful (alt endpoint):', altHealthUrl);
+        return altResponse.status === 200;
+      } catch (altError) {
+        console.log('❌ Backend health check failed (alt endpoint):', altError.message);
+        return false;
+      }
     }
   }
 
@@ -819,7 +974,8 @@ class ApiService {
       if (this.api.defaults.baseURL) {
         try {
           const healthCheck = await axios.get(`${this.api.defaults.baseURL.replace('/api', '')}/api/health/`, {
-            timeout: 2000
+            timeout: 5000,
+            headers: { 'Accept': 'application/json' }
           });
           if (healthCheck.status === 200) {
             console.log('✅ Current backend URL is working:', this.api.defaults.baseURL);
@@ -850,9 +1006,7 @@ class ApiService {
     } catch (error) {
       console.error('❌ Error ensuring backend URL:', error);
       // Don't throw - use fallback URL
-      const fallbackURL = Platform.OS === 'web' 
-        ? 'http://localhost:8000/api' 
-        : 'http://10.0.2.2:8000/api';
+    const fallbackURL = 'http://192.168.103.243:8000/api';
       this.api.defaults.baseURL = fallbackURL;
       console.log('⚠️ Using fallback URL:', fallbackURL);
     }

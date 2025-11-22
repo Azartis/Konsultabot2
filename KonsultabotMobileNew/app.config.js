@@ -6,19 +6,21 @@ export default {
     orientation: "portrait",
     icon: "./assets/icon.png",
     userInterfaceStyle: "light",
-    newArchEnabled: false,
+    newArchEnabled: true,
+
     splash: {
       image: "./assets/splash-icon.png",
       resizeMode: "contain",
       backgroundColor: "#ffffff"
     },
-    assetBundlePatterns: [
-      "**/*"
-    ],
+
+    assetBundlePatterns: ["**/*"],
+
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.evsu.konsultabot"
     },
+
     android: {
       package: "com.evsu.konsultabot",
       versionCode: 1,
@@ -45,26 +47,53 @@ export default {
         }
       ]
     },
+
     web: {
       favicon: "./assets/favicon.png",
       bundler: "metro",
       output: "single"
     },
+
     extra: {
-      apiUrl: "http://localhost:8000/api"
+      apiUrl: "http://192.168.103.243:8000/api",
+      eas: {
+        projectId: "a026b613-0cb1-45f4-8057-b32705e327f6"
+      }
     },
+
     plugins: [
       "expo-secure-store",
       [
         "expo-av",
         {
-          microphonePermission: "Allow Konsultabot to access your microphone for voice input."
+          microphonePermission:
+            "Allow Konsultabot to access your microphone for voice input."
         }
       ],
       [
         "expo-speech-recognition",
         {
-          microphonePermission: "Allow Konsultabot to access your microphone for voice input."
+          microphonePermission:
+            "Allow Konsultabot to access your microphone for voice input."
+        }
+      ],
+
+      // ✅ FIXES THE GRADLE MERGE CONFLICT - Duplicate META-INF files
+      [
+        "expo-build-properties",
+        {
+          android: {
+            packagingOptions: {
+              pickFirst: [
+                "META-INF/androidx.localbroadcastmanager_localbroadcastmanager.version",
+                "META-INF/androidx.customview_customview.version",
+                "META-INF/androidx.*.version"
+              ],
+              exclude: [
+                "META-INF/com.android.support_*.version"
+              ]
+            }
+          }
         }
       ]
     ]

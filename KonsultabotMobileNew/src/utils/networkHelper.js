@@ -13,13 +13,13 @@ export const getBackendURL = async () => {
   try {
     // For web, always use localhost
     if (Platform.OS === 'web') {
-      return 'http://localhost:8000/api';
+      return 'http://192.168.103.243:8000/api';
     }
 
     // For Android emulator
     if (Platform.OS === 'android' && __DEV__) {
       // Check if running in emulator (10.0.2.2 is emulator's localhost)
-      return 'http://10.0.2.2:8000/api';
+    return 'http://192.168.103.243:8000/api';
     }
 
     // For physical devices, try to discover backend
@@ -59,7 +59,7 @@ export const getBackendURL = async () => {
   } catch (error) {
     console.error('Error getting backend URL:', error);
     return Platform.OS === 'web' 
-      ? 'http://localhost:8000/api' 
+      ? 'http://192.168.103.243:8000/api' 
       : 'http://192.168.1.17:8000/api';
   }
 };

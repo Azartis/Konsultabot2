@@ -34,49 +34,69 @@ class UserSerializer(serializers.ModelSerializer):
 
 class LoginSerializer(serializers.Serializer):
     """
-    Serializer for user login
+    Serializer for user login - accepts both username and email
     """
-    username = serializers.CharField(max_length=150)
+    username = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    email = serializers.EmailField(required=False, allow_blank=True)
     password = serializers.CharField(write_only=True, style={'input_type': 'password'})
     
     def validate(self, data):
-        username = data.get('username')
+        username = data.get('username', '').strip()
+        email = data.get('email', '').strip()
         password = data.get('password')
         
-        if username and password:
-            # Try to find user first
-            try:
-                potential_user = User.objects.get(username=username)
-                logger.info(f"Found user with username: {username}")
-            except User.DoesNotExist:
-                logger.error(f"No user found with username: {username}")
-                raise serializers.ValidationError(
-                    'No account found with this username.',
-                    code='invalid_username'
-                )
-
-            user = authenticate(username=username, password=password)
-            
-            if not user:
-                logger.error(f"Authentication failed for existing user: {username}")
-                raise serializers.ValidationError(
-                    'Invalid credentials. Please check your username and password.',
-                    code='invalid_credentials'
-                )
-            
-            if not user.is_active:
-                raise serializers.ValidationError(
-                    'User account is disabled.',
-                    code='account_disabled'
-                )
-            
-            data['user'] = user
-            return data
-        else:
+        # Check if username or email is provided
+        if not username and not email:
             raise serializers.ValidationError(
-                'Both username and password are required.',
-                code='missing_credentials'
+                'Username or email is required.',
+                code='missing_username_or_email'
             )
+        
+        if not password:
+            raise serializers.ValidationError(
+                'Password is required.',
+                code='missing_password'
+            )
+        
+        # Try to authenticate with username first, then email
+        user = None
+        if username:
+            # Try username authentication
+            user = authenticate(username=username, password=password)
+            if not user:
+                # If username auth fails, try to find by email and authenticate with username
+                try:
+                    user_obj = User.objects.get(email=username)  # Try email as username
+                    user = authenticate(username=user_obj.username, password=password)
+                except User.DoesNotExist:
+                    pass
+        elif email:
+            # Try to find user by email, then authenticate with username
+            try:
+                user_obj = User.objects.get(email=email)
+                user = authenticate(username=user_obj.username, password=password)
+            except User.DoesNotExist:
+                logger.error(f"No user found with email: {email}")
+                raise serializers.ValidationError(
+                    'No account found with this email.',
+                    code='invalid_email'
+                )
+        
+        if not user:
+            logger.error(f"Authentication failed for: {username or email}")
+            raise serializers.ValidationError(
+                'Invalid credentials. Please check your username/email and password.',
+                code='invalid_credentials'
+            )
+        
+        if not user.is_active:
+            raise serializers.ValidationError(
+                'User account is disabled.',
+                code='account_disabled'
+            )
+        
+        data['user'] = user
+        return data
 
 
 class RegisterSerializer(serializers.ModelSerializer):

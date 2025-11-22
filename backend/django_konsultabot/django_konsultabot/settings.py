@@ -36,6 +36,18 @@ KONSULTABOT_SETTINGS = {
     }
 }
 
+# Default login user for mobile testing / offline mode
+DEFAULT_LOGIN_USER = {
+    'username': os.getenv('DEFAULT_LOGIN_USERNAME', 'ace@evsu.edu.ph').strip(),
+    'email': os.getenv('DEFAULT_LOGIN_EMAIL', 'ace@evsu.edu.ph').strip(),
+    'password': os.getenv('DEFAULT_LOGIN_PASSWORD', 'Calupas#1'),
+    'first_name': os.getenv('DEFAULT_LOGIN_FIRST_NAME', 'Ace'),
+    'last_name': os.getenv('DEFAULT_LOGIN_LAST_NAME', 'Ziegfred'),
+    'role': os.getenv('DEFAULT_LOGIN_ROLE', 'student'),
+    'department': os.getenv('DEFAULT_LOGIN_DEPARTMENT', 'College of ICT'),
+    'student_id': os.getenv('DEFAULT_LOGIN_STUDENT_ID', '2025-0001')
+}
+
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-konsultabot-dev-key-change-in-production')
 
@@ -58,6 +70,7 @@ ALLOWED_HOSTS = [
     '192.168.1.17',
     '192.168.0.17',
     '192.168.100.17',
+    '192.168.103.243',  # Current network IP
     '10.0.0.17',
     '172.20.10.2',  # Mobile hotspot
 ]

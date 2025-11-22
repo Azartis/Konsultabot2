@@ -5,11 +5,11 @@
 
 import { Platform } from 'react-native';
 import { localGeminiAI } from './localGeminiAI';
-import { callGeminiAPI } from './apiService';
-import { checkNetworkStatus } from './apiService';
+import { callGeminiAPI, checkNetworkStatus, apiService } from './apiService';
 
 export class IntelligentChatService {
   constructor() {
+    this.maxUnsatisfiedResponses = 10;
     this.conversationContext = {
       deviceType: null,      // 'laptop', 'desktop', 'phone', 'tablet', 'printer', etc.
       deviceBrand: null,     // 'HP', 'Dell', 'Lenovo', 'Apple', etc.
@@ -21,6 +21,9 @@ export class IntelligentChatService {
       lastQuestion: null,     // Remember the last question asked
       userEmotion: 'neutral', // Track user's emotional state
       successCount: 0,       // Track successful resolutions
+      kbAnswerCount: 0,      // Count KB-powered responses
+      geminiEscalated: false,// Track if Gemini already took over
+      unsatisfiedCount: 0,   // Track dissatisfaction statements
     };
     this.knowledgeBase = this.initializeKnowledgeBase();
     this.problemPatterns = this.initializeProblemPatterns();
@@ -650,6 +653,16 @@ export class IntelligentChatService {
   async chat(message, language = 'english') {
     // Detect user emotion from message
     this.detectUserEmotion(message);
+    const userDissatisfied = this.isUserDissatisfied(message);
+    if (userDissatisfied) {
+      this.conversationContext.unsatisfiedCount = Math.min(
+        this.maxUnsatisfiedResponses,
+        this.conversationContext.unsatisfiedCount + 1
+      );
+    }
+    const unsatisfiedLimitReached = this.conversationContext.unsatisfiedCount >= this.maxUnsatisfiedResponses;
+    const shouldEscalateToGemini = unsatisfiedLimitReached;
+    const escalationReason = unsatisfiedLimitReached ? 'USER_DISSATISFIED_LIMIT' : null;
     
     // Check for gratitude or success indicators
     if (this.isGratitude(message)) {
@@ -676,6 +689,11 @@ export class IntelligentChatService {
     
     // Analyze what we need
     const analysis = this.analyzeMessage(message);
+    const isGreetingOrGeneralChat = this.isGreetingOrGeneralInquiry(message, analysis);
+
+    if (isGreetingOrGeneralChat) {
+      return await this.respondWithGeminiGreeting(message, language);
+    }
     
     // Update conversation context
     if (analysis.problemCategory) {
@@ -711,7 +729,8 @@ export class IntelligentChatService {
     
     // If we have all context, try to get solution immediately
     // Try to get solution from knowledge base
-    if (this.conversationContext.problemCategory && 
+    if (!shouldEscalateToGemini &&
+        this.conversationContext.problemCategory && 
         this.conversationContext.deviceType && 
         this.conversationContext.specificIssue) {
       
@@ -737,6 +756,7 @@ export class IntelligentChatService {
             content: formattedResponse,
             timestamp: new Date()
           });
+          this.conversationContext.kbAnswerCount += 1;
           
           return {
             text: formattedResponse,
@@ -786,27 +806,64 @@ export class IntelligentChatService {
     }
     
     // Check if online and try Gemini as fallback (only if we don't have enough context)
-    const isOnline = await checkNetworkStatus();
-    if (isOnline && !this.conversationContext.specificIssue) {
+    // IMPORTANT: Only try online if we have internet AND backend is available
+    let isOnline = false;
+    let backendAvailable = false;
+    
+    try {
+      const networkStatus = await checkNetworkStatus();
+      isOnline = networkStatus;
+      
+      // Also check if backend is reachable (don't try Gemini if backend is down)
+      if (isOnline) {
+        try {
+          // Use apiService to check backend health
+          backendAvailable = await apiService.checkHealth();
+          if (!backendAvailable) {
+            console.log('📴 Backend health check failed, using offline mode only');
+          }
+        } catch (backendError) {
+          console.log('📴 Backend not available, using offline mode only');
+          backendAvailable = false;
+        }
+      }
+    } catch (networkError) {
+      console.log('📴 Network check failed, using offline mode');
+      isOnline = false;
+      backendAvailable = false;
+    }
+    
+    // Only try Gemini if online AND backend is available AND either
+    // we lack context or escalation is required
+    if (isOnline && backendAvailable && shouldEscalateToGemini) {
       try {
-        console.log('🌐 Online - trying Gemini as fallback for complex question...');
+        console.log('🌐 Online - escalating to Gemini...', escalationReason || 'context_missing');
         // Include conversation context in Gemini request
         const contextSummary = this.getConversationSummary();
+        const escalationIntro = escalationReason === 'USER_DISSATISFIED_LIMIT'
+          ? `The user indicated dissatisfaction with the previous assistance at least ${this.maxUnsatisfiedResponses} times. Provide a more advanced, comprehensive solution.\n\n`
+          : '';
         const enhancedMessage = contextSummary 
-          ? `${message}\n\nContext: ${contextSummary}`
-          : message;
+          ? `${escalationIntro}${message}\n\nContext: ${contextSummary}`
+          : `${escalationIntro}${message}`;
         
         const geminiResponse = await callGeminiAPI(enhancedMessage);
         if (geminiResponse && geminiResponse.text) {
+        const escalationNotice = escalationReason === 'USER_DISSATISFIED_LIMIT'
+          ? `You've let me know (at least ${this.maxUnsatisfiedResponses} times) that the previous steps didn't help, so I'll escalate this to Gemini for a more advanced solution.`
+          : 'Let me bring in Gemini for a more advanced solution so we can cover every angle.';
+          const combinedText = `${escalationNotice}\n\n${geminiResponse.text}`;
           // Add to conversation history
           this.conversationContext.conversationHistory.push({
             role: 'assistant',
-            content: geminiResponse.text,
+            content: combinedText,
             timestamp: new Date()
           });
+          this.conversationContext.geminiEscalated = true;
+          this.conversationContext.unsatisfiedCount = 0;
           
           return {
-            text: geminiResponse.text,
+            text: combinedText,
             source: 'gemini',
             mode: 'online',
             context: { ...this.conversationContext }
@@ -815,6 +872,31 @@ export class IntelligentChatService {
       } catch (error) {
         console.log('❌ Gemini failed, using local AI:', error.message);
       }
+    } else if (!isOnline || !backendAvailable) {
+      console.log('📴 Offline mode - using local knowledge base and AI');
+    }
+    
+    // If we were supposed to escalate but can't reach Gemini, explain to user
+    if (shouldEscalateToGemini && (!isOnline || !backendAvailable)) {
+      const reasonText = `You've mentioned multiple times that the earlier solutions didn't help.`;
+      const connectionText = !isOnline
+        ? ' I need an internet connection before I can ask Gemini for a deeper analysis.'
+        : ' I need to reach the backend server before I can ask Gemini for a deeper analysis.';
+      const promptText = ' Once you\'re back online, let me know and I\'ll bring Gemini in right away.';
+      const escalationMessage = `${reasonText}${connectionText}${promptText}`;
+      
+      this.conversationContext.conversationHistory.push({
+        role: 'assistant',
+        content: escalationMessage,
+        timestamp: new Date()
+      });
+      
+      return {
+        text: escalationMessage,
+        source: 'local',
+        mode: 'offline',
+        context: { ...this.conversationContext }
+      };
     }
     
     // Fallback to local AI
@@ -897,6 +979,11 @@ export class IntelligentChatService {
       askedQuestions: [],
       conversationHistory: [],
       lastQuestion: null,
+      userEmotion: 'neutral',
+      successCount: 0,
+      kbAnswerCount: 0,
+      geminiEscalated: false,
+      unsatisfiedCount: 0,
     };
   }
 
@@ -957,6 +1044,33 @@ export class IntelligentChatService {
     }
   }
 
+  // Detect if user is unhappy with previous answers
+  isUserDissatisfied(message) {
+    const lowerMessage = message.toLowerCase();
+    const dissatisfactionIndicators = [
+      'not satisfied',
+      'did not help',
+      'didn\'t help',
+      'still not working',
+      'still broken',
+      'still doesn\'t work',
+      'no help',
+      'no good',
+      'need better answer',
+      'need better solution',
+      'try something else',
+      'nothing changed',
+      'same issue',
+      'same problem',
+      'not fixed',
+      'can you escalate',
+      'talk to gemini',
+      'need gemini',
+      'ask gemini'
+    ];
+    return dissatisfactionIndicators.some(indicator => lowerMessage.includes(indicator));
+  }
+
   // Check if message expresses gratitude
   isGratitude(message) {
     const lowerMessage = message.toLowerCase();
@@ -967,6 +1081,7 @@ export class IntelligentChatService {
   // Handle gratitude responses with enhanced personality
   handleGratitude() {
     this.conversationContext.successCount++;
+    this.conversationContext.unsatisfiedCount = 0;
     const successCount = this.conversationContext.successCount;
     
     // Vary responses based on success count and emotion
@@ -1009,6 +1124,92 @@ export class IntelligentChatService {
       mode: 'offline',
       context: { ...this.conversationContext }
     };
+  }
+
+  isGreetingOrGeneralInquiry(message, analysis) {
+    const lowerMessage = message.toLowerCase().trim();
+    const greetingPhrases = [
+      'hello', 'hi', 'hey', 'good morning', 'good afternoon', 'good evening',
+      'how are you', 'how\'s it going', 'what\'s up', 'yo', 'sup'
+    ];
+    const generalChatIndicators = [
+      'tell me about yourself',
+      'what can you do',
+      'who are you',
+      'introduce yourself',
+      'chat with me',
+      'let\'s talk',
+      'talk to me',
+      'give me a summary',
+      'explain yourself'
+    ];
+
+    if (analysis?.problemCategory === 'general' && !analysis?.specificIssue) {
+      return true;
+    }
+
+    const isGreeting = greetingPhrases.some(phrase => lowerMessage.startsWith(phrase) || lowerMessage === phrase);
+    const isGeneralChat = generalChatIndicators.some(indicator => lowerMessage.includes(indicator));
+
+    return isGreeting || isGeneralChat;
+  }
+
+  async respondWithGeminiGreeting(message, language) {
+    try {
+      const isOnline = await checkNetworkStatus();
+      if (!isOnline) {
+        throw new Error('offline');
+      }
+      const backendAvailable = await apiService.checkHealth();
+      if (!backendAvailable) {
+        throw new Error('backend_unavailable');
+      }
+
+      const contextSummary = this.getConversationSummary();
+      const greetingPrompt = `The user is greeting or wants a general, comprehensive chat with KonsultaBot. Respond as a friendly, empathetic IT support assistant with emotional intelligence. Be warm, concise, and offer help if needed.\n\nUser message: ${message}`;
+      const enhancedMessage = contextSummary
+        ? `${greetingPrompt}\n\nConversation context: ${contextSummary}`
+        : greetingPrompt;
+
+      const geminiResponse = await callGeminiAPI(enhancedMessage);
+      if (geminiResponse && geminiResponse.text) {
+        const text = geminiResponse.text;
+        this.conversationContext.conversationHistory.push({
+          role: 'assistant',
+          content: text,
+          timestamp: new Date()
+        });
+        return {
+          text,
+          source: 'gemini',
+          mode: 'online',
+          context: { ...this.conversationContext }
+        };
+      }
+    } catch (error) {
+      console.log('Gemini greeting handling failed:', error.message);
+    }
+
+    const fallbackText = this.generateGreetingFallbackResponse(message);
+    this.conversationContext.conversationHistory.push({
+      role: 'assistant',
+      content: fallbackText,
+      timestamp: new Date()
+    });
+    return {
+      text: fallbackText,
+      source: 'local',
+      mode: 'offline',
+      context: { ...this.conversationContext }
+    };
+  }
+
+  generateGreetingFallbackResponse(message) {
+    const lowerMessage = message.toLowerCase();
+    if (lowerMessage.includes('how are you')) {
+      return "I'm doing great, thanks for asking! 😊 I'm KonsultaBot, your friendly IT support assistant. How can I help you today?";
+    }
+    return "Hi there! 👋 I'm KonsultaBot, your friendly IT support assistant. I'm ready to help with any tech issues you have. What would you like to talk about today?";
   }
 }
 

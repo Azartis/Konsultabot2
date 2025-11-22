@@ -2,7 +2,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 
-const BASE_URL = 'http://localhost:8000';
+const BASE_URL = 'http://192.168.103.243:8000';
 const MOBILE_API_KEY = Constants.expoConfig?.extra?.apiKey || null;
 
 class ApiService {

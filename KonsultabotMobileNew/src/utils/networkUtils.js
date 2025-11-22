@@ -23,7 +23,7 @@ export const checkInternetConnection = async () => {
 };
 
 // Check backend API connectivity
-export const checkBackendConnection = async (baseURL = 'http://localhost:8000') => {
+export const checkBackendConnection = async (baseURL = 'http://192.168.103.243:8000') => {
   try {
     const response = await axios.get(`${baseURL}/api/health/`, { 
       timeout: 3000 

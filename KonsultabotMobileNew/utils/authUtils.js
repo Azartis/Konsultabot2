@@ -6,7 +6,7 @@ import axios from 'axios';
 
 // API Configuration - Django Authentication Server
 const API_BASE_URL = __DEV__ 
-  ? 'http://localhost:8000/api/auth'
+  ? 'http://192.168.103.243:8000/api/auth'
   : 'https://your-production-domain.com/api/auth';
 
 /**

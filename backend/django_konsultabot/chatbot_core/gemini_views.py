@@ -14,26 +14,44 @@ import logging
 
 logger = logging.getLogger('konsultabot.gemini')
 
-# Configure Gemini
-genai.configure(api_key=settings.GOOGLE_API_KEY)
+GOOGLE_API_KEY = getattr(settings, 'GOOGLE_API_KEY', None)
+GEMINI_ENABLED = False
+model = None
 
-# List available models
-logger.info("Available models:")
-for model_info in genai.list_models():
-    logger.info(f"Model: {model_info.name}")
-    logger.info(f"  Display name: {model_info.display_name}")
-    logger.info(f"  Description: {model_info.description}")
-    logger.info(f"  Version: {model_info.version}")
-    logger.info(f"  Supported methods: {model_info.supported_generation_methods}")
-    logger.info("---")
+if GOOGLE_API_KEY:
+    try:
+        genai.configure(api_key=GOOGLE_API_KEY)
+        logger.info("Gemini API key detected. Initializing Gemini client...")
+        try:
+            logger.info("Available models:")
+            for model_info in genai.list_models():
+                logger.info(f"Model: {model_info.name}")
+                logger.info(f"  Display name: {model_info.display_name}")
+                logger.info(f"  Description: {model_info.description}")
+                logger.info(f"  Version: {model_info.version}")
+                logger.info(f"  Supported methods: {model_info.supported_generation_methods}")
+                logger.info("---")
+        except Exception as list_error:
+            logger.warning(f"Unable to list Gemini models: {list_error}")
 
-# Use the latest pro model for chat
-model = genai.GenerativeModel('models/gemini-pro-latest')
+        model = genai.GenerativeModel('models/gemini-pro-latest')
+        GEMINI_ENABLED = True
+        logger.info("Gemini model initialized successfully.")
+    except Exception as config_error:
+        logger.error(f"Failed to initialize Gemini due to configuration error: {config_error}")
+else:
+    logger.warning("GOOGLE_API_KEY not set. Gemini endpoints will be disabled.")
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
 @throttle_classes([ChatRateThrottle])
 def gemini_chat(request):
+    if not GEMINI_ENABLED or model is None:
+        return Response({
+            'error': 'Gemini integration is currently disabled on the server. Please configure GOOGLE_API_KEY to enable AI responses.',
+            'mode': 'gemini',
+            'success': False
+        }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
     try:
         message = request.data.get('query')
         context = request.data.get('context', '')
@@ -81,6 +99,11 @@ def gemini_chat(request):
 @permission_classes([IsAuthenticatedOrReadOnly])
 @throttle_classes([ChatRateThrottle])
 def gemini_translate(request):
+    if not GEMINI_ENABLED or model is None:
+        return Response({
+            'error': 'Gemini integration is currently disabled on the server.',
+            'success': False
+        }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
     try:
         text = request.data.get('text')
         target_lang = request.data.get('target_lang', 'English')
