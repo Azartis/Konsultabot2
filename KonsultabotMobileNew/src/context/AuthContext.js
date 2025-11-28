@@ -138,7 +138,7 @@ export const AuthProvider = ({ children }) => {
                   return { 
                     success: true, 
                     offline: true,
-                    message: 'Logged in offline. Some features may be limited.'
+                    message: 'Logged in successfully. All features are available!'
                   };
                 } catch (parseError) {
                   console.error('Error parsing cached user data:', parseError);

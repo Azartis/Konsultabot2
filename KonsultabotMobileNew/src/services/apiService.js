@@ -86,7 +86,8 @@ const getPossibleBackendURLs = () => {
   if (Platform.OS === 'android') {
     // Try network IPs (physical device) - prioritize current IP first
     urls.push(
-      'http://192.168.103.243:8000/api',  // Current network IP (PRIORITY)
+      'http://192.168.110.57:8000/api',  // Current network IP (PRIORITY)
+      'http://192.168.103.243:8000/api',  // Previous network IP
       'http://10.143.17.242:8000/api',  // Previous WiFi IP
       'http://10.143.17.1:8000/api',      // Router IP variation
       'http://10.143.17.100:8000/api',    // Common range
@@ -100,14 +101,21 @@ const getPossibleBackendURLs = () => {
   } else if (Platform.OS === 'ios') {
     // iOS - try network IPs - prioritize current IP first
     urls.push(
-      'http://192.168.103.243:8000/api',  // Current network IP (PRIORITY)
+      'http://192.168.110.57:8000/api',  // Current network IP (PRIORITY)
+      'http://192.168.103.243:8000/api',  // Previous network IP
       'http://10.143.17.242:8000/api',
       'http://192.168.1.17:8000/api',
       'http://192.168.0.17:8000/api'
     );
   } else {
-    // Web - current IP
-    urls.push('http://192.168.103.243:8000/api');
+    // Web - use localhost first (same machine), then try network IPs
+    urls.push(
+      'http://localhost:8000/api',        // Localhost (same machine - BEST for web)
+      'http://127.0.0.1:8000/api',       // Localhost alternative
+      'http://192.168.110.57:8000/api',  // Current network IP
+      'http://192.168.103.243:8000/api', // Previous network IP
+      'http://10.143.17.242:8000/api'    // Previous WiFi IP
+    );
   }
   
   // Remove duplicates
@@ -216,10 +224,10 @@ const discoverBackendURL = async () => {
   // Fallback based on platform
   let fallbackURL;
   if (Platform.OS === 'web') {
-    fallbackURL = 'http://192.168.103.243:8000/api';
+    fallbackURL = 'http://localhost:8000/api';  // Localhost for web
   } else if (Platform.OS === 'android') {
-    // For Android, try emulator IP as last resort
-    fallbackURL = 'http://192.168.103.243:8000/api';
+    // For Android, try current IP as last resort
+    fallbackURL = 'http://192.168.110.57:8000/api';
   } else {
     // iOS or other
     fallbackURL = 'http://192.168.103.243:8000/api';
@@ -387,16 +395,24 @@ const SERVER_IP_KEY = '@konsulta_server_ip';
 const checkNetworkStatus = async () => {
   try {
     if (Platform.OS === 'web') {
-      // For web, we'll assume network is available if we can access the window object
-      return navigator.onLine !== false;
+      // For web, be more lenient - assume online if navigator exists
+      // Free WiFi might report offline even when connected
+      if (typeof navigator !== 'undefined') {
+        // If navigator.onLine is available, use it, but don't trust it completely
+        // Free WiFi often reports false even when connected
+        return navigator.onLine !== false || typeof window !== 'undefined';
+      }
+      return true; // Assume online if we can't check
     } else {
       // For React Native
       const state = await NetInfo.fetch();
-      return state.isConnected && state.isInternetReachable !== false;
+      // Be more lenient - if connected, assume internet is reachable
+      // Free WiFi might not report isInternetReachable correctly
+      return state.isConnected === true;
     }
   } catch (error) {
-    console.warn('Network status check failed:', error);
-    return false;
+    // If check fails, assume online (optimistic) - chatbot can still work offline
+    return true;
   }
 };
 
@@ -447,6 +463,9 @@ let API_BASE_URL = 'http://192.168.103.243:8000/api';
 class ApiService {
   constructor() {
     this.offlineMode = false;
+    this.healthCheckFailures = 0;
+    this.maxHealthCheckFailures = 3; // Stop checking after 3 failures
+    this.skipHealthChecks = false;
     this.api = axios.create({
       baseURL: API_BASE_URL,
       timeout: 60000, // 60 seconds for AI processing
@@ -457,13 +476,19 @@ class ApiService {
 
     // Initialize network listeners
     this.initializeNetworkListeners();
-    // Initial connection check
-    this.checkAndUpdateConnection();
+    // Initial connection check (completely silent, non-blocking)
+    // Don't wait for it, don't log errors - offline mode is expected
+    this.checkAndUpdateConnection().catch(() => {
+      // Completely silent - offline mode is OK
+    });
 
     // Request interceptor
     this.api.interceptors.request.use(
       (config) => {
-        console.log('Making API request to:', config.baseURL + config.url);
+        // Only log non-health-check requests
+        if (!config.url?.includes('health')) {
+          console.log('Making API request to:', config.baseURL + config.url);
+        }
         return config;
       },
       (error) => {
@@ -474,16 +499,22 @@ class ApiService {
     // Response interceptor
     this.api.interceptors.response.use(
       (response) => {
-        console.log('API response received:', response.status);
+        // Only log non-health-check requests
+        if (!response.config?.url?.includes('health')) {
+          console.log('API response received:', response.status);
+        }
         return response;
       },
       (error) => {
-        console.log('API error:', {
-          method: error.config?.method,
-          status: error.response?.status,
-          message: error.message,
-          data: error.response?.data
-        });
+        // Don't log health check errors - they're expected in offline mode
+        if (!error.config?.url?.includes('health')) {
+          console.log('API error:', {
+            method: error.config?.method,
+            status: error.response?.status,
+            message: error.message,
+            data: error.response?.data
+          });
+        }
         if (error.response?.status === 401) {
           // Handle unauthorized access
           this.authToken = null;
@@ -503,24 +534,27 @@ class ApiService {
 
   async checkHealth() {
     try {
-      // Try /api/health/ endpoint (full path)
+      // Try /api/health/ endpoint (full path) with shorter timeout
       const healthUrl = this.api.defaults.baseURL.replace('/api', '') + '/api/health/';
       const response = await axios.get(healthUrl, {
-        timeout: 5000,
-        validateStatus: (status) => status < 500 // Accept 200-499 as valid responses
+        timeout: 2000, // Shorter timeout for faster failure
+        validateStatus: (status) => status < 500,
+        headers: { 'Accept': 'application/json' }
       });
       console.log('✅ Backend health check successful:', healthUrl, response.status);
       return response.status === 200;
     } catch (error) {
-      console.log('❌ Backend health check failed:', error.message);
+      // Silently fail - offline mode is OK, don't log errors
       // Also try the /health endpoint without /api prefix
       try {
         const altHealthUrl = this.api.defaults.baseURL.replace('/api', '') + '/health/';
-        const altResponse = await axios.get(altHealthUrl, { timeout: 5000 });
-        console.log('✅ Backend health check successful (alt endpoint):', altHealthUrl);
+        const altResponse = await axios.get(altHealthUrl, { 
+          timeout: 2000, // Shorter timeout
+          headers: { 'Accept': 'application/json' }
+        });
         return altResponse.status === 200;
       } catch (altError) {
-        console.log('❌ Backend health check failed (alt endpoint):', altError.message);
+        // Silently return false - offline mode is expected
         return false;
       }
     }
@@ -579,12 +613,26 @@ class ApiService {
       });
       
       // Provide user-friendly error messages
-      if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND' || error.message?.includes('Network Error')) {
-        throw new Error('Cannot connect to server. Please make sure the backend is running on port 8000.');
+      if (error.code === 'ECONNREFUSED' || 
+          error.code === 'ENOTFOUND' || 
+          error.code === 'ERR_NETWORK' ||
+          error.code === 'ERR_CONNECTION_TIMED_OUT' ||
+          error.message?.includes('Network Error') ||
+          error.message?.includes('ERR_CONNECTION_TIMED_OUT')) {
+        const backendURL = this.api.defaults.baseURL || 'http://192.168.103.243:8000/api';
+        throw new Error(
+          `Cannot connect to backend server at ${backendURL}.\n\n` +
+          `Please check:\n` +
+          `• Backend is running: python manage.py runserver 0.0.0.0:8000\n` +
+          `• Device and computer are on the same WiFi network\n` +
+          `• Windows Firewall allows port 8000\n` +
+          `• Try accessing http://192.168.103.243:8000/api/health/ in your browser\n\n` +
+          `You can still use offline mode if you've logged in before.`
+        );
       }
       
       if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
-        throw new Error('Connection timeout. Please check your network connection.');
+        throw new Error('Connection timeout. The server may be slow or unreachable. Please check your network connection and try again.');
       }
       
       if (error.response?.status === 401) {
@@ -791,8 +839,8 @@ class ApiService {
     const offlineResponses = {
       english: {
         greeting: isWebDemo 
-          ? "Hello! I'm KonsultaBot, your intelligent IT support assistant. I can help you with computer problems, software issues, network troubleshooting, and answer any tech questions you have!"
-          : "Hello! I'm KonsultaBot. I'm currently offline, but I can still help with basic campus information.",
+          ? "Hello! I'm your intelligent IT support assistant. I can help you with computer problems, software issues, network troubleshooting, and answer any tech questions you have!"
+          : "Hello! I'm currently offline, but I can still help with basic campus information.",
         courses: "EVSU Dulag offers undergraduate programs in Education, Business Administration, and Computer Science. Each program has specific requirements and duration.",
         library: "The EVSU Dulag library is located on the main campus building. It provides study areas, books, and computer access for students.",
         facilities: "EVSU Dulag has various facilities including classrooms, library, computer lab, gymnasium, and cafeteria.",
@@ -802,7 +850,7 @@ class ApiService {
           : "I'm currently offline. Here's some basic EVSU Dulag information: We offer programs in Education, Business, and Computer Science. The campus has a library, computer lab, and gymnasium. For more details, please try again when you're online."
       },
       bisaya: {
-        greeting: "Kumusta! Ako si KonsultaBot. Offline ko karon, pero makatabang gihapon ko sa basic campus information.",
+        greeting: "Kumusta! Offline ko karon, pero makatabang gihapon ko sa basic campus information.",
         courses: "Ang EVSU Dulag nag-offer og undergraduate programs sa Education, Business Administration, ug Computer Science.",
         library: "Ang library sa EVSU Dulag naa sa main campus building. Naa'y study areas, books, ug computer access.",
         facilities: "Ang EVSU Dulag naa'y mga facilities sama sa classrooms, library, computer lab, gymnasium, ug cafeteria.",
@@ -810,7 +858,7 @@ class ApiService {
         fallback: "Offline ko karon. Ania ang basic info sa EVSU Dulag: Naa'y programs sa Education, Business, ug Computer Science. Ang campus naa'y library, computer lab, ug gymnasium."
       },
       waray: {
-        greeting: "Maupay nga adlaw! Ako si KonsultaBot. Offline ako karon, pero makakabulig pa ako han basic campus information.",
+        greeting: "Maupay nga adlaw! Offline ako karon, pero makakabulig pa ako han basic campus information.",
         courses: "An EVSU Dulag nag-offer hin undergraduate programs ha Education, Business Administration, ngan Computer Science.",
         library: "An library han EVSU Dulag naa ha main campus building. Mayda study areas, books, ngan computer access.",
         facilities: "An EVSU Dulag mayda mga facilities pareho han classrooms, library, computer lab, gymnasium, ngan cafeteria.",
@@ -818,7 +866,7 @@ class ApiService {
         fallback: "Offline ako karon. Ire an basic info han EVSU Dulag: Mayda programs ha Education, Business, ngan Computer Science. An campus mayda library, computer lab, ngan gymnasium."
       },
       tagalog: {
-        greeting: "Kumusta! Ako si KonsultaBot. Offline ako ngayon, pero makakatulong pa rin ako sa basic campus information.",
+        greeting: "Kumusta! Offline ako ngayon, pero makakatulong pa rin ako sa basic campus information.",
         courses: "Ang EVSU Dulag ay nag-offer ng undergraduate programs sa Education, Business Administration, at Computer Science.",
         library: "Ang library ng EVSU Dulag ay nasa main campus building. May study areas, books, at computer access.",
         facilities: "Ang EVSU Dulag ay may mga facilities tulad ng classrooms, library, computer lab, gymnasium, at cafeteria.",
@@ -970,13 +1018,18 @@ class ApiService {
   // Ensure backend URL is discovered and set
   async ensureBackendURL() {
     try {
-      // Check if we already have a working URL
+      // Check if we already have a working URL (quick check with short timeout)
       if (this.api.defaults.baseURL) {
         try {
-          const healthCheck = await axios.get(`${this.api.defaults.baseURL.replace('/api', '')}/api/health/`, {
-            timeout: 5000,
-            headers: { 'Accept': 'application/json' }
-          });
+          const healthCheck = await Promise.race([
+            axios.get(`${this.api.defaults.baseURL.replace('/api', '')}/api/health/`, {
+              timeout: 3000, // Shorter timeout for quick check
+              headers: { 'Accept': 'application/json' }
+            }),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Health check timeout')), 3000)
+            )
+          ]);
           if (healthCheck.status === 200) {
             console.log('✅ Current backend URL is working:', this.api.defaults.baseURL);
             return;
@@ -986,58 +1039,115 @@ class ApiService {
         }
       }
       
-      // Discover and set new URL
+      // Discover and set new URL (with timeout to prevent blocking)
       console.log('🔍 Discovering backend URL...');
-      const newUrl = await discoverBackendURL();
-      if (newUrl && newUrl !== this.api.defaults.baseURL) {
-        this.api.defaults.baseURL = newUrl;
-        API_BASE_URL = newUrl;
-        console.log('✅ Backend URL set to:', newUrl);
+      try {
+        const discoveryPromise = discoverBackendURL();
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Backend discovery timeout')), 10000) // 10 second max
+        );
         
-        // Cache the working URL
-        try {
-          await AsyncStorage.setItem('backend_url', newUrl);
-        } catch (e) {
-          console.warn('Failed to cache backend URL:', e);
+        const newUrl = await Promise.race([discoveryPromise, timeoutPromise]);
+        
+        if (newUrl && newUrl !== this.api.defaults.baseURL) {
+          this.api.defaults.baseURL = newUrl;
+          API_BASE_URL = newUrl;
+          console.log('✅ Backend URL set to:', newUrl);
+          
+          // Cache the working URL
+          try {
+            await AsyncStorage.setItem('backend_url', newUrl);
+          } catch (e) {
+            console.warn('Failed to cache backend URL:', e);
+          }
+        } else if (newUrl) {
+          console.log('✅ Using existing backend URL:', newUrl);
         }
-      } else if (newUrl) {
-        console.log('✅ Using existing backend URL:', newUrl);
+      } catch (discoveryError) {
+        console.log('⚠️ Backend discovery timed out or failed, using fallback');
+        // Continue with fallback URL
       }
     } catch (error) {
       console.error('❌ Error ensuring backend URL:', error);
       // Don't throw - use fallback URL
-    const fallbackURL = 'http://192.168.103.243:8000/api';
+    }
+    
+    // Always ensure we have a baseURL set (fallback)
+    if (!this.api.defaults.baseURL) {
+      const fallbackURL = 'http://192.168.103.243:8000/api';
       this.api.defaults.baseURL = fallbackURL;
       console.log('⚠️ Using fallback URL:', fallbackURL);
     }
   }
 
-  // Check and update connection status
+  // Check and update connection status (silent, non-blocking)
   async checkAndUpdateConnection() {
+    // Skip health checks if we've failed too many times
+    if (this.skipHealthChecks) {
+      return false;
+    }
+    
     try {
       const isConnected = await checkNetworkStatus();
       if (!isConnected) {
-        console.warn('No network connection available');
         return false;
       }
 
       // Try to update the base URL
       const newUrl = await getApiUrl();
       if (newUrl !== this.api.defaults.baseURL) {
-        console.log(`Updating API base URL to: ${newUrl}`);
         this.api.defaults.baseURL = newUrl;
-        API_BASE_URL = newUrl; // Update the global constant
+        API_BASE_URL = newUrl;
       }
 
-      // Verify the connection
-      const response = await axios.get(`${newUrl}/health`, { timeout: 5000 });
-      if (response.status === 200) {
-        console.log('✅ Server is reachable');
-        return true;
+      // Verify the connection - try multiple health endpoints
+      // Use a separate silent axios instance to avoid interceptors and browser console errors
+      const silentAxios = axios.create({
+        timeout: 1500, // Very short timeout
+        validateStatus: () => true // Accept all status codes
+      });
+      
+      // Remove any default interceptors
+      silentAxios.interceptors.request.use(config => config);
+      silentAxios.interceptors.response.use(response => response, error => Promise.reject(error));
+      
+      const healthEndpoints = [
+        `${newUrl.replace('/api', '')}/api/health/`,
+        `${newUrl.replace('/api', '')}/health/`,
+        `${newUrl.replace('/api', '')}/health`,
+        `${newUrl}/health`
+      ];
+      
+      // Try endpoints in parallel with race condition - first success wins
+      const healthChecks = healthEndpoints.map(endpoint => 
+        silentAxios.get(endpoint).catch(() => null)
+      );
+      
+      const results = await Promise.allSettled(healthChecks);
+      for (const result of results) {
+        if (result.status === 'fulfilled' && result.value?.status === 200) {
+          // Success! Reset failure counter
+          this.healthCheckFailures = 0;
+          this.skipHealthChecks = false;
+          return true;
+        }
       }
+      
+      // All health checks failed
+      this.healthCheckFailures++;
+      if (this.healthCheckFailures >= this.maxHealthCheckFailures) {
+        this.skipHealthChecks = true;
+        this.offlineMode = true;
+      }
+      
       return false;
     } catch (error) {
-      console.warn('Connection check failed:', error.message);
+      // Completely silent - offline mode is expected
+      this.healthCheckFailures++;
+      if (this.healthCheckFailures >= this.maxHealthCheckFailures) {
+        this.skipHealthChecks = true;
+        this.offlineMode = true;
+      }
       return false;
     }
   }
@@ -1047,8 +1157,13 @@ class ApiService {
     // Only initialize on web platform
     if (Platform.OS === 'web' && typeof window !== 'undefined' && window.addEventListener) {
       try {
-        window.addEventListener('online', () => this.checkAndUpdateConnection());
-        window.addEventListener('offline', () => console.warn('Network connection lost'));
+        window.addEventListener('online', () => {
+          // Silently try to reconnect
+          this.checkAndUpdateConnection().catch(() => {});
+        });
+        window.addEventListener('offline', () => {
+          // Silently handle offline - expected behavior
+        });
       } catch (error) {
         console.warn('Failed to initialize web network listeners:', error);
       }
@@ -1057,10 +1172,10 @@ class ApiService {
       try {
         NetInfo.addEventListener(state => {
           if (state.isConnected) {
-            this.checkAndUpdateConnection();
-          } else {
-            console.warn('Network connection lost');
+            // Silently try to reconnect
+            this.checkAndUpdateConnection().catch(() => {});
           }
+          // Silently handle offline - expected behavior
         });
       } catch (error) {
         console.warn('Failed to initialize React Native network listeners:', error);

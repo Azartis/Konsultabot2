@@ -82,6 +82,7 @@ class LoginSerializer(serializers.Serializer):
                     code='invalid_email'
                 )
         
+        # Validate authentication result (applies to both username and email cases)
         if not user:
             logger.error(f"Authentication failed for: {username or email}")
             raise serializers.ValidationError(

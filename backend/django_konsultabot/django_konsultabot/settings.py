@@ -119,12 +119,18 @@ CORS_ALLOW_HEADERS = [
     'user-agent',
     'x-csrftoken',
     'x-requested-with',
+    'cache-control',
+    'pragma',
+    'x-client-version',
+    'x-client-platform',
 ]
 CSRF_TRUSTED_ORIGINS = [
     'http://127.0.0.1:8000',
     'http://localhost:8000',
     'http://0.0.0.0:8000',
     'http://10.0.2.2:8000',  # Android emulator
+    'http://localhost:8081',  # Expo web dev server
+    'http://127.0.0.1:8081',  # Expo web dev server
 ]
 USE_X_FORWARDED_HOST = False
 SECURE_PROXY_SSL_HEADER = None

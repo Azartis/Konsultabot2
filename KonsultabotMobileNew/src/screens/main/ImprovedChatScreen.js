@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   ScrollView,
@@ -34,7 +34,7 @@ import { searchKnowledgeBase, getRandomTip } from '../../utils/offlineKnowledgeB
 const { width, height } = Dimensions.get('window');
 
 export default function ImprovedChatScreen({ navigation }) {
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const { 
     currentChatId, 
     getCurrentChat, 
@@ -64,12 +64,35 @@ export default function ImprovedChatScreen({ navigation }) {
   const scrollViewRef = useRef();
   const carouselRef = useRef();
 
+  const buildFullName = (profile) => {
+    if (!profile) return null;
+    const parts = [
+      profile.first_name,
+      profile.middle_name || profile.middle_initial || profile.middleInitial,
+      profile.last_name,
+    ].filter(part => typeof part === 'string' && part.trim().length > 0);
+    if (parts.length) {
+      return parts.join(' ').replace(/\s+/g, ' ').trim();
+    }
+    return profile.username || profile.email || null;
+  };
+
+  const userFormalName = useMemo(() => {
+    return buildFullName(user || userData);
+  }, [user, userData]);
+
   // Initialize chat on mount
   useEffect(() => {
     initializeChat();
     initializeSpeechRecognition();
     initializeWakeWordDetection();
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      intelligentChatService.setUserProfile(user);
+    }
+  }, [user]);
 
   // Cleanup wake word listener on unmount
   useEffect(() => {
@@ -369,7 +392,10 @@ export default function ImprovedChatScreen({ navigation }) {
         console.log('❌ Intelligent Chat failed:', intelligentError.message);
         
         // Fallback to knowledge base
-        const kbResponse = searchKnowledgeBase(text.trim());
+        const kbResponse = await searchKnowledgeBase(
+          text.trim(),
+          intelligentChatService.getUserProfile()
+        );
         botMessage = {
           id: Date.now() + 1,
           text: kbResponse.answer + (isOnline ? '\n\n📶 **Online Mode** - Using local knowledge base.' : '\n\n📴 **Offline Mode** - Using local knowledge base.'),
@@ -430,78 +456,69 @@ export default function ImprovedChatScreen({ navigation }) {
     }
   };
 
-  const renderMessage = (item) => (
-    <View
-      key={item.id}
-      style={[
-        styles.messageContainer,
-        item.sender === 'user' ? styles.userMessageContainer : styles.botMessageContainer,
-      ]}
-    >
-      {/* Bot Avatar/Icon */}
-      {item.sender === 'bot' && (
-        <View style={styles.botAvatar}>
-          <MaterialIcons name="smart-toy" size={24} color="#9333EA" />
+  const formatTimestamp = (value) => {
+    if (!value) return '';
+    const parsed = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(parsed.getTime())) return '';
+    return parsed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const renderMessage = (item) => {
+    const isUser = item.sender === 'user';
+    const authorName = isUser ? (userFormalName || 'You') : 'KonsultaBot';
+    return (
+      <View key={item.id} style={[styles.messageRow, isUser ? styles.userRow : styles.botRow]}>
+        <View
+          style={[
+            styles.messageBlock,
+            isUser ? styles.userBlock : styles.botBlock,
+            item.type === 'welcome' && styles.noticeBlock,
+            item.type === 'starter' && styles.tipBlock,
+          ]}
+        >
+          <Text
+            style={[
+              styles.senderLabel,
+              !isUser && styles.botSenderLabel,
+              isUser && styles.userSenderLabel,
+            ]}
+          >
+            {authorName}
+          </Text>
+          <Text
+            style={[
+              styles.messageText,
+              isUser && styles.userMessageText,
+            ]}
+          >
+            {item.text}
+          </Text>
+          {item.confidence && (
+            <Text style={styles.confidenceNote}>
+              AI Confidence: {Math.round(item.confidence * 100)}%
+            </Text>
+          )}
+          <Text
+            style={[
+              styles.messageTimestamp,
+              isUser && styles.userTimestamp,
+            ]}
+          >
+            {formatTimestamp(item.timestamp)}
+          </Text>
         </View>
-      )}
-      
-      <View
-        style={[
-          styles.messageBubble,
-          item.sender === 'user' ? styles.userMessage : styles.botMessage,
-        ]}
-      >
-        {/* Message Header for Bot */}
-        {item.sender === 'bot' && (
-          <View style={styles.messageHeader}>
-            <Text style={styles.botName}>KonsultaBot</Text>
-            {item.source && (
-              <View style={styles.sourcebadge}>
-                <MaterialIcons 
-                  name={
-                    item.source === 'online_api' || item.source === 'gemini' ? 'cloud-done' :
-                    item.source.includes('knowledge_base') ? 'menu-book' :
-                    item.source === 'offline_fallback' ? 'cloud-off' :
-                    'info'
-                  }
-                  size={12}
-                  color="#9333EA"
-                  style={{ marginRight: 4 }}
-                />
-                <Text style={styles.sourceTextEnhanced}>
-                  {item.source === 'online_api' || item.source === 'gemini' ? 'AI' :
-                   item.source.includes('knowledge_base') ? 'KB' :
-                   item.source === 'offline_fallback' ? 'Offline' : 'Local'}
-                </Text>
-              </View>
-            )}
-          </View>
-        )}
-        
-        <Text style={item.sender === 'user' ? styles.userMessageText : styles.botMessageText}>
-          {item.text}
-        </Text>
-        
-        {/* Timestamp */}
-        <Text style={styles.timestampText}>
-          {item.timestamp ? new Date(item.timestamp).toLocaleTimeString('en-US', {
-            hour: '2-digit',
-            minute: '2-digit'
-          }) : ''}
-        </Text>
       </View>
-      
-      {/* User Avatar/Icon */}
-      {item.sender === 'user' && (
-        <View style={styles.userAvatar}>
-          <MaterialIcons name="person" size={24} color="white" />
-        </View>
-      )}
-    </View>
-  );
+    );
+  };
 
   // Voice Recording Functions - with Speech-to-Text support
   const startRecording = async () => {
+    // Prevent starting if already recording or transcribing
+    if (isRecording || isTranscribing) {
+      console.warn('⚠️ Already recording or transcribing');
+      return;
+    }
+
     try {
       // Web Speech API for web platform
       if (Platform.OS === 'web') {
@@ -518,9 +535,12 @@ export default function ImprovedChatScreen({ navigation }) {
         try {
           speechRecognition.start();
           setIsRecording(true);
+          setIsVoiceInput(true);
           console.log('✅ Speech recognition started - speak now!');
         } catch (error) {
           console.error('❌ Failed to start speech recognition:', error);
+          setIsRecording(false);
+          setIsVoiceInput(false);
           Alert.alert(
             'Microphone Error',
             'Could not access microphone. Please allow microphone permissions in your browser.',
@@ -555,9 +575,13 @@ export default function ImprovedChatScreen({ navigation }) {
       
       setRecording(newRecording);
       setIsRecording(true);
+      setIsVoiceInput(true);
       console.log('✅ Recording started');
     } catch (error) {
       console.error('❌ Failed to start recording:', error);
+      setIsRecording(false);
+      setIsVoiceInput(false);
+      setRecording(null);
       Alert.alert(
         'Recording Error',
         `Could not start recording: ${error.message}`,
@@ -575,26 +599,47 @@ export default function ImprovedChatScreen({ navigation }) {
         speechRecognition.abort();
         setIsRecording(false);
         setIsTranscribing(false);
+        setIsVoiceInput(false);
         console.log('✅ Recording canceled');
       } catch (error) {
         console.error('❌ Error canceling speech recognition:', error);
         setIsRecording(false);
         setIsTranscribing(false);
+        setIsVoiceInput(false);
       }
       return;
     }
     
     // Mobile - stop and discard recording
-    if (recording) {
-      try {
-        await recording.stopAndUnloadAsync();
+    try {
+      if (recording) {
+        try {
+          await recording.stopAndUnloadAsync();
+        } catch (stopError) {
+          console.warn('Warning: Error stopping recording:', stopError);
+        }
         setRecording(null);
-        setIsRecording(false);
-        console.log('✅ Recording canceled');
-      } catch (error) {
-        console.error('❌ Error canceling recording:', error);
-        setIsRecording(false);
       }
+      
+      // Reset audio mode
+      try {
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: false,
+        });
+      } catch (audioError) {
+        console.warn('Warning: Error resetting audio mode:', audioError);
+      }
+      
+      setIsRecording(false);
+      setIsTranscribing(false);
+      setIsVoiceInput(false);
+      console.log('✅ Recording canceled');
+    } catch (error) {
+      console.error('❌ Error canceling recording:', error);
+      setIsRecording(false);
+      setIsTranscribing(false);
+      setIsVoiceInput(false);
+      setRecording(null);
     }
   };
 
@@ -606,11 +651,13 @@ export default function ImprovedChatScreen({ navigation }) {
       try {
         speechRecognition.stop();
         setIsTranscribing(true);
+        setIsRecording(false);
         console.log('🎤 Transcribing speech...');
       } catch (error) {
         console.error('❌ Error stopping speech recognition:', error);
         setIsRecording(false);
         setIsTranscribing(false);
+        setIsVoiceInput(false);
       }
       return;
     }
@@ -619,6 +666,10 @@ export default function ImprovedChatScreen({ navigation }) {
     setIsRecording(false);
     
     if (!recording) {
+      console.warn('⚠️ No recording to stop');
+      setIsRecording(false);
+      setIsTranscribing(false);
+      setIsVoiceInput(false);
       return;
     }
 
@@ -631,6 +682,8 @@ export default function ImprovedChatScreen({ navigation }) {
       const uri = recording.getURI();
       console.log('✅ Recording stopped, URI:', uri);
       setRecording(null);
+      setIsTranscribing(false);
+      setIsVoiceInput(false);
       
       // For mobile, show helper message
       Alert.alert(
@@ -640,6 +693,10 @@ export default function ImprovedChatScreen({ navigation }) {
       );
     } catch (error) {
       console.error('❌ Error stopping recording:', error);
+      setIsRecording(false);
+      setIsTranscribing(false);
+      setIsVoiceInput(false);
+      setRecording(null);
       Alert.alert(
         'Error',
         `Failed to stop recording: ${error.message}`,
@@ -707,7 +764,7 @@ export default function ImprovedChatScreen({ navigation }) {
           />
           <SpeechWaves isActive={isRecording} />
           {(isRecording || isTranscribing) && (
-            <View style={styles.recordingOverlay}>
+            <View style={styles.recordingOverlay} pointerEvents="box-none">
               <Text style={styles.recordingText}>
                 {isRecording ? '🎤 Listening...' : '✨ Transcribing...'}
               </Text>
@@ -715,6 +772,7 @@ export default function ImprovedChatScreen({ navigation }) {
                 <TouchableOpacity 
                   style={styles.cancelButton}
                   onPress={cancelRecording}
+                  activeOpacity={0.7}
                 >
                   <MaterialIcons name="close" size={20} color="#EF4444" />
                   <Text style={styles.cancelButtonText}>Cancel</Text>
@@ -758,14 +816,14 @@ export default function ImprovedChatScreen({ navigation }) {
                 />
                 <Text style={styles.statusBadgeText}>
                   {isOnline && isBackendOnline ? 'ONLINE' :
-                   isOnline ? 'LIMITED' : 'OFFLINE'}
+                   isOnline ? 'READY' : 'READY'}
                 </Text>
               </View>
             </View>
             <Text style={styles.headerSubtitle}>
               {wakeWordListening && Platform.OS === 'web' && '👂 Listening for "Help"... '}
-              {!isOnline && 'Working offline with local knowledge'}
-              {isOnline && !isBackendOnline && 'Using fallback responses'}
+              {!isOnline && 'Using local knowledge base and AI'}
+              {isOnline && !isBackendOnline && 'Using local AI (backend unavailable)'}
               {isOnline && isBackendOnline && 'Connected to AI backend'}
             </Text>
           </View>
@@ -1082,115 +1140,79 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   messagesContent: {
-    paddingHorizontal: width > 768 ? 32 : 16,
-    paddingTop: width > 768 ? 24 : 16,
-    paddingBottom: width > 768 ? 24 : 16,
+    paddingVertical: 0,
   },
-  messageContainer: {
-    marginVertical: width > 768 ? 12 : 8,
-    maxWidth: width > 768 ? '70%' : '80%',
-    flexDirection: 'row',
+  messageRow: {
+    width: '100%',
+    paddingHorizontal: width > 768 ? 32 : 16,
+    paddingVertical: width > 768 ? 12 : 10,
+  },
+  botRow: {
+    alignItems: 'flex-start',
+  },
+  userRow: {
     alignItems: 'flex-end',
   },
-  userMessageContainer: {
-    alignSelf: 'flex-end',
-    flexDirection: 'row-reverse',
+  messageBlock: {
+    width: '100%',
+    maxWidth: width > 768 ? 780 : 600,
+    paddingHorizontal: width > 768 ? 24 : 16,
+    paddingVertical: width > 768 ? 24 : 18,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+    backgroundColor: 'transparent',
   },
-  botMessageContainer: {
+  botBlock: {
     alignSelf: 'flex-start',
   },
-  botAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(147, 51, 234, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 8,
-    borderWidth: 2,
-    borderColor: '#9333EA',
+  userBlock: {
+    alignSelf: 'flex-end',
   },
-  userAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: lumaTheme.colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 8,
-    ...lumaTheme.shadows.medium,
+  noticeBlock: {
+    borderBottomColor: '#C7D2FE',
   },
-  messageBubble: {
-    padding: width > 768 ? 18 : 14,
-    borderRadius: width > 768 ? 24 : 18,
-    maxWidth: '100%',
-    ...lumaTheme.shadows.medium,
+  tipBlock: {
+    borderBottomColor: '#FDE68A',
   },
-  messageHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  botName: {
+  senderLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#9333EA',
-    letterSpacing: 0.5,
-  },
-  sourcebadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(147, 51, 234, 0.1)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 12,
-  },
-  sourceTextEnhanced: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#9333EA',
+    color: 'rgba(248, 250, 252, 0.6)',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 1,
+    marginBottom: 12,
   },
-  userMessage: {
-    backgroundColor: lumaTheme.colors.primary,
-    shadowColor: lumaTheme.colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 3,
+  botSenderLabel: {
+    color: 'rgba(167, 139, 250, 0.9)',
   },
-  botMessage: {
-    backgroundColor: 'rgba(30, 30, 40, 0.98)',
-    borderWidth: 1,
-    borderColor: 'rgba(147, 51, 234, 0.4)',
-    shadowColor: '#9333EA',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  userMessageText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  botMessageText: {
-    color: lumaTheme.colors.text,
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  timestampText: {
-    fontSize: 10,
-    color: 'rgba(255, 255, 255, 0.4)',
-    marginTop: 6,
+  userSenderLabel: {
+    color: 'rgba(248, 250, 252, 0.85)',
     textAlign: 'right',
   },
-  sourceText: {
-    fontSize: 10,
-    color: lumaTheme.colors.textMuted,
-    marginTop: 4,
+  messageTimestamp: {
+    marginTop: 14,
+    fontSize: 11,
+    color: 'rgba(226, 232, 240, 0.5)',
+    letterSpacing: 0.8,
+  },
+  messageText: {
+    fontSize: 16,
+    lineHeight: 24,
+    color: 'rgba(248, 250, 252, 0.92)',
+  },
+  userMessageText: {
+    textAlign: 'right',
+    color: 'rgba(248, 250, 252, 0.95)',
+  },
+  confidenceNote: {
+    marginTop: 10,
+    fontSize: 11,
+    color: 'rgba(226, 232, 240, 0.55)',
+    fontStyle: 'italic',
+    textAlign: 'left',
+  },
+  userTimestamp: {
+    textAlign: 'right',
   },
   loadingContainer: {
     flexDirection: 'row',

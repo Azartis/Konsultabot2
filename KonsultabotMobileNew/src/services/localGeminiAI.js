@@ -286,16 +286,16 @@ export class LocalGeminiAI {
     
     if (isCasual) {
       const casualGreetings = [
-        `Hey! I'm KonsultaBot, your friendly tech assistant. ${timeOfDay.greeting} What can I help you with today?`,
+        `Hey! I'm your friendly tech assistant. ${timeOfDay.greeting} What can I help you with today?`,
         `Hi there! ${timeOfDay.greeting} I'm here to help with any tech questions or problems. What's on your mind?`,
         `Hey! ${timeOfDay.greeting} Need help with something tech-related? I've got you covered!`
       ];
       return casualGreetings[Math.floor(Math.random() * casualGreetings.length)];
     } else if (isFormal) {
-      return `Hello! ${timeOfDay.greeting} I'm KonsultaBot, your IT support assistant. I'm here to help with any technology questions or issues. How may I assist you today?`;
+      return `Hello! ${timeOfDay.greeting} I'm your IT support assistant. I'm here to help with any technology questions or issues. How may I assist you today?`;
     } else {
       const neutralGreetings = [
-        `Hi! ${timeOfDay.greeting} I'm KonsultaBot. I can help with tech questions, troubleshooting, and IT support. What do you need help with?`,
+        `Hi! ${timeOfDay.greeting} I can help with tech questions, troubleshooting, and IT support. What do you need help with?`,
         `Hello! ${timeOfDay.greeting} How can I help you today?`,
         `Hi there! ${timeOfDay.greeting} What can I assist you with?`
       ];
@@ -586,7 +586,7 @@ What specific network issue are you experiencing?`;
   }
 
   generateGeneralResponse(context, language) {
-    return `🤖 **KonsultaBot AI Assistant**
+    return `🤖 **AI Assistant**
 
 I'm here to help you with a wide range of technology questions and issues!
 

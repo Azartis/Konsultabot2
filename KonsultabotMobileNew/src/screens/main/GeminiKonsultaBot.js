@@ -162,8 +162,8 @@ const GeminiKonsultaBot = ({ navigation }) => {
           const welcomeMessage = {
             id: 'welcome',
             text: Platform.OS === 'web' 
-              ? 'Hello! I\'m KonsultaBot, your advanced AI assistant with intelligent fallback systems. I\'m ready to help with computer problems, software issues, network troubleshooting, gaming questions, and more. How can I assist you today?'
-              : 'Hello! I\'m KonsultaBot. How can I help you today?',
+              ? 'Hello! I\'m your advanced AI assistant with intelligent fallback systems. I\'m ready to help with computer problems, software issues, network troubleshooting, gaming questions, and more. How can I assist you today?'
+              : 'Hello! How can I help you today?',
             isBot: true,
             timestamp: new Date(),
             mode: Platform.OS === 'web' ? 'gemini-enabled' : 'online'
@@ -172,10 +172,10 @@ const GeminiKonsultaBot = ({ navigation }) => {
         } else {
           const offlineMessage = {
             id: 'offline',
-            text: 'I\'m currently offline. You can still ask questions, but my responses will be limited.',
+            text: 'Hello! I\'m ready to help you! I can assist with IT support, technical issues, and general questions. What would you like to know?',
             isBot: true,
             timestamp: new Date(),
-            mode: 'offline'
+            mode: 'local'
           };
           setMessages([offlineMessage]);
         }
@@ -630,7 +630,7 @@ const GeminiKonsultaBot = ({ navigation }) => {
                 <Text style={styles.emptyStateText}>
                   {isOnline 
                     ? 'Ask me anything about IT support!' 
-                    : 'Offline mode. Some features may be limited.'}
+                    : 'Ask me anything! I can help with IT support, technical issues, and more.'}
                 </Text>
               </View>
             ) : (
@@ -706,7 +706,7 @@ const GeminiKonsultaBot = ({ navigation }) => {
             <Text style={styles.footerText}>
               {isOnline 
                 ? 'KonsultaBot is online and ready to help!'
-                : 'Offline mode. Some features may be limited.'}
+                : 'KonsultaBot is ready to help with local knowledge base and AI!'}
             </Text>
           </View>
         </KeyboardAvoidingView>

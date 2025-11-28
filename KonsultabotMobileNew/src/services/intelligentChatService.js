@@ -1,39 +1,119 @@
-// Intelligent Chat Service
-// Provides contextual, specific answers with follow-up questions
-// Works offline with local knowledge base
-// Only uses Gemini as last resort
+// Intelligent Chat Service - IT Support Assistant
+// Simplified flow: Intent Detection → Gemini Flash → Response
 
 import { Platform } from 'react-native';
 import { localGeminiAI } from './localGeminiAI';
 import { callGeminiAPI, checkNetworkStatus, apiService } from './apiService';
+import {
+  matchKnowledgeBaseIssue,
+  formatIssueResponse,
+  shouldEscalateIssue,
+  incrementIssueUsage,
+  recordKnowledgeInteraction
+} from '../utils/offlineKnowledgeBase';
+
+// Intent categories
+const INTENTS = {
+  IT_ISSUE: 'IT_ISSUE',
+  NO_PROBLEM: 'NO_PROBLEM',
+  GENERAL_QUERY: 'GENERAL_QUERY',
+  GREETINGS: 'GREETINGS',
+  GOODBYE: 'GOODBYE',
+  OUT_OF_SCOPE: 'OUT_OF_SCOPE',
+  UNKNOWN: 'UNKNOWN'
+};
 
 export class IntelligentChatService {
   constructor() {
     this.maxUnsatisfiedResponses = 10;
     this.conversationContext = {
-      deviceType: null,      // 'laptop', 'desktop', 'phone', 'tablet', 'printer', etc.
-      deviceBrand: null,     // 'HP', 'Dell', 'Lenovo', 'Apple', etc.
-      problemCategory: null, // 'hardware', 'software', 'network', 'performance', etc.
-      osType: null,          // 'Windows', 'macOS', 'Android', 'iOS', 'Linux'
-      specificIssue: null,   // Detailed problem description
-      askedQuestions: [],     // Track what we've asked
-      conversationHistory: [], // Remember previous messages for context
-      lastQuestion: null,     // Remember the last question asked
-      userEmotion: 'neutral', // Track user's emotional state
-      successCount: 0,       // Track successful resolutions
-      kbAnswerCount: 0,      // Count KB-powered responses
-      geminiEscalated: false,// Track if Gemini already took over
-      unsatisfiedCount: 0,   // Track dissatisfaction statements
+      deviceType: null,
+      deviceBrand: null,
+      problemCategory: null,
+      osType: null,
+      specificIssue: null,
+      askedQuestions: [],
+      conversationHistory: [],
+      lastQuestion: null,
+      unsatisfiedCount: 0,
+      pendingTopic: null, // Store topic when user asks "do you know about X"
     };
-    this.knowledgeBase = this.initializeKnowledgeBase();
+    this.developerProfile = {
+      name: 'Ace Ziegfred Culapas',
+      title: 'Lead Developer & Project Maintainer'
+    };
+    this.userProfile = {
+      id: 'anonymous',
+      displayName: null
+    };
     this.problemPatterns = this.initializeProblemPatterns();
-    this.personalityTraits = {
-      friendly: true,
-      encouraging: true,
-      empathetic: true,
-      patient: true,
-      supportive: true
+  }
+
+  setUserProfile(user = {}) {
+    if (!user) return;
+    const id =
+      user.id ||
+      user.user_id ||
+      user.pk ||
+      user.username ||
+      'anonymous';
+    const displayName =
+      user.preferred_name ||
+      user.first_name ||
+      user.username ||
+      user.email ||
+      this.userProfile.displayName;
+
+    const derivedMiddleName = user.middle_name ||
+      user.middle_initial ||
+      user.middle ||
+      (user.profile && (user.profile.middle_name || user.profile.middleInitial)) ||
+      this.userProfile.middle_name;
+
+    this.userProfile = {
+      ...this.userProfile,
+      id: id.toString(),
+      displayName,
+      first_name: user.first_name || this.userProfile.first_name,
+      middle_name: derivedMiddleName,
+      last_name: user.last_name || this.userProfile.last_name,
+      username: user.username || this.userProfile.username,
+      email: user.email || this.userProfile.email,
+      preferredName: user.preferred_name || this.userProfile.preferredName
     };
+  }
+
+  getUserProfile() {
+    return this.userProfile;
+  }
+
+  getFullUserName() {
+    const parts = [
+      this.userProfile.first_name,
+      this.userProfile.middle_name,
+      this.userProfile.last_name
+    ]
+      .filter(part => typeof part === 'string' && part.trim().length > 0);
+    if (parts.length > 0) {
+      return parts.join(' ').replace(/\s+/g, ' ').trim();
+    }
+    return this.userProfile.displayName || this.userProfile.username || null;
+  }
+
+  async logConversationEntry(userMessage, response) {
+    if (!response?.text) return;
+    try {
+      await recordKnowledgeInteraction({
+        userId: this.userProfile?.id || 'anonymous',
+        userName: this.userProfile?.displayName || this.userProfile?.first_name || null,
+        userMessage,
+        botMessage: response.text,
+        issueKey: response.issueKey || this.conversationContext?.specificIssue || null,
+        source: response.source || 'intelligent_chat'
+      });
+    } catch (error) {
+      console.log('Conversation logging failed:', error.message);
+    }
   }
 
   // Enhanced problem pattern matching
@@ -88,240 +168,195 @@ export class IntelligentChatService {
     };
   }
 
-  initializeKnowledgeBase() {
-    return {
-      // Hardware troubleshooting
-      hardware: {
-        laptop: {
-          'wont turn on': {
-            questions: ['brand', 'age', 'last_working'],
-            solutions: {
-              hp: [
-                'Check if power LED lights up when charger is connected',
-                'Try holding power button for 30 seconds (hard reset)',
-                'Remove battery if removable, then try powering on',
-                'Check charger connection and try different outlet',
-                'If LED blinks, note the pattern - it indicates specific error codes'
-              ],
-              dell: [
-                'Press and hold power button for 15-20 seconds',
-                'Disconnect charger, remove battery (if removable), hold power 30 seconds',
-                'Reconnect charger and try again',
-                'Check for orange/white LED indicators on charger',
-                'Try different charger if available'
-              ],
-              lenovo: [
-                'Press Novo button (small button near power) for 10 seconds',
-                'Try power button + volume down for 30 seconds',
-                'Check if charging LED appears when plugged in',
-                'Remove all external devices and try again'
-              ],
-              asus: [
-                'Hold power button for 40 seconds (EC reset)',
-                'Unplug charger, remove battery, hold power 30 seconds',
-                'Check for any LED indicators',
-                'Try different power adapter'
-              ],
-              default: [
-                'Check power connection and charger',
-                'Try hard reset (hold power 30 seconds)',
-                'Remove battery if removable',
-                'Check for any LED indicators',
-                'Try different charger or outlet'
-              ]
-            }
-          },
-          'slow performance': {
-            questions: ['brand', 'ram', 'storage_used', 'age'],
-            solutions: {
-              default: [
-                'Check Task Manager for high CPU/RAM usage',
-                'Free up disk space (need at least 15% free)',
-                'Disable startup programs',
-                'Run disk cleanup and defragmentation',
-                'Check for malware with antivirus scan',
-                'Update drivers and Windows',
-                'Consider adding more RAM if less than 8GB'
-              ]
-            }
-          },
-          'overheating': {
-            questions: ['brand', 'age', 'usage'],
-            solutions: {
-              default: [
-                'Clean dust from vents and fans',
-                'Check if fan is spinning (listen for noise)',
-                'Use laptop on hard surface (not bed/couch)',
-                'Close unnecessary programs',
-                'Check thermal paste if laptop is old',
-                'Use cooling pad if available'
-              ]
-            }
-          },
-          'battery not charging': {
-            questions: ['brand', 'battery_age'],
-            solutions: {
-              default: [
-                'Check charger connection and LED indicator',
-                'Try different charger if available',
-                'Remove and reinsert battery if removable',
-                'Check battery health in system settings',
-                'Update BIOS/UEFI firmware',
-                'Battery may need replacement if old'
-              ]
-            }
-          }
-        },
-        printer: {
-          'wont print': {
-            questions: ['brand', 'connection_type', 'error_message'],
-            solutions: {
-              hp: [
-                'Check if printer is online and has paper/ink',
-                'Run HP Print and Scan Doctor',
-                'Check for error messages on printer display',
-                'Reinstall printer driver',
-                'Try USB connection if using network'
-              ],
-              canon: [
-                'Check printer status lights',
-                'Run Canon printer utility',
-                'Check for paper jams',
-                'Reset printer (hold power 10 seconds)',
-                'Reinstall Canon drivers'
-              ],
-              epson: [
-                'Run Epson Print Utility',
-                'Check ink levels and replace if low',
-                'Clean print head through utility',
-                'Check for error codes on display',
-                'Reset network settings if wireless'
-              ],
-              default: [
-                'Check printer is powered on and online',
-                'Verify paper and ink/toner levels',
-                'Check for paper jams',
-                'Reinstall printer driver',
-                'Try different connection method'
-              ]
-            }
-          },
-          'poor print quality': {
-            questions: ['brand', 'ink_level', 'paper_type'],
-            solutions: {
-              default: [
-                'Run print head cleaning utility',
-                'Check ink/toner levels',
-                'Use correct paper type settings',
-                'Align print heads',
-                'Check for clogged nozzles',
-                'Replace ink/toner if old'
-              ]
-            }
-          }
-        },
-        phone: {
-          'wont charge': {
-            questions: ['brand', 'age', 'charging_port'],
-            solutions: {
-              default: [
-                'Try different charger and cable',
-                'Clean charging port with soft brush',
-                'Check for bent/damaged port',
-                'Try wireless charging if supported',
-                'Restart phone',
-                'Check battery health in settings'
-              ]
-            }
-          },
-          'slow performance': {
-            questions: ['brand', 'storage_used', 'age'],
-            solutions: {
-              default: [
-                'Free up storage space (keep 20% free)',
-                'Close background apps',
-                'Clear app cache',
-                'Restart phone',
-                'Update operating system',
-                'Check for malware',
-                'Factory reset as last resort'
-              ]
-            }
-          }
-        }
-      },
-      // Software troubleshooting
-      software: {
-        windows: {
-          'blue screen': {
-            questions: ['error_code', 'when_occurs'],
-            solutions: [
-              'Note the error code (STOP code)',
-              'Restart in Safe Mode',
-              'Update drivers, especially graphics',
-              'Run Windows Memory Diagnostic',
-              'Check for overheating',
-              'Scan for malware',
-              'System restore to before issue started'
-            ]
-          },
-          'wont start': {
-            questions: ['last_working', 'recent_changes'],
-            solutions: [
-              'Try Safe Mode (F8 during boot)',
-              'Use System Recovery Options',
-              'Run Startup Repair',
-              'Check hard drive health',
-              'Boot from recovery media',
-              'System restore if possible'
-            ]
-          }
-        },
-        macos: {
-          'app crashes': {
-            questions: ['app_name', 'when_occurs'],
-            solutions: [
-              'Force quit app (Cmd+Option+Esc)',
-              'Restart app',
-              'Update app and macOS',
-              'Reset app preferences',
-              'Clear app cache',
-              'Reinstall app'
-            ]
-          }
-        }
-      },
-      // Network troubleshooting
-      network: {
-        wifi: {
-          'cant connect': {
-            questions: ['device_type', 'error_message'],
-            solutions: [
-              'Forget network and reconnect',
-              'Restart router and device',
-              'Check password is correct',
-              'Move closer to router',
-              'Check router is broadcasting',
-              'Update network drivers',
-              'Reset network settings'
-            ]
-          },
-          'slow speed': {
-            questions: ['device_type', 'distance'],
-            solutions: [
-              'Move closer to router',
-              'Check for interference (other devices)',
-              'Change WiFi channel in router settings',
-              'Update router firmware',
-              'Check internet plan speed',
-              'Restart router',
-              'Use 5GHz band if available'
-            ]
-          }
-        }
+  // Removed: Knowledge Base - Now using Gemini Flash only
+
+  // STRICT INTENT DETECTION - Classify every message into best matching category
+  detectIntent(message) {
+    const lowerMessage = message.toLowerCase().trim();
+    
+    // 1. NO_PROBLEM - User says they have no issue (highest priority)
+    const noProblemPatterns = [
+      "don't have problem", "do not have problem", "don't have any problem",
+      "don't have issue", "do not have issue", "don't have any issue",
+      "no problem", "no issue", "no problems", "no issues",
+      "not a problem", "not an issue",
+      "nothing wrong", "nothing's wrong", "nothing is wrong",
+      "all good", "all fine", "everything is fine", "everything's fine",
+      "everything is good", "everything's good",
+      "no concerns", "no worries",
+      "i'm fine", "i am fine", "im fine",
+      "i'm good", "i am good", "im good",
+      "i don't have problem", "i do not have problem",
+      "i don't have issue", "i do not have issue",
+      "i have no problem", "i have no issue"
+    ];
+    if (noProblemPatterns.some(pattern => lowerMessage.includes(pattern))) {
+      return INTENTS.NO_PROBLEM;
+    }
+    
+    // 2. GOODBYE - Thank you, bye, etc.
+    const goodbyePatterns = [
+      'thank you', 'thanks', 'thank', 'bye', 'goodbye', 'see you', 'see ya',
+      'appreciate', 'grateful', 'helped', 'worked', 'fixed', 'solved'
+    ];
+    if (goodbyePatterns.some(pattern => lowerMessage.includes(pattern))) {
+      return INTENTS.GOODBYE;
+    }
+    
+    // 3. GREETINGS - Hi, hello, etc.
+    const greetingRegex = /^(hello|hi|hey|good morning|good afternoon|good evening|greetings|good day|morning|afternoon|evening)([\s!,.?]|$)/i;
+    if (greetingRegex.test(lowerMessage.trim())) {
+      return INTENTS.GREETINGS;
+    }
+    
+    // 4. KNOWLEDGE_CHECK - "Do you know about X" type questions
+    const knowledgeCheckPatterns = [
+      /^(do you know|have you heard|are you familiar).*(about|with)/i,
+      /^(do you know|have you heard|are you familiar)\s+(about|with)\s+/i,
+      /^what\s+(is|are)\s+(a|an|the)?\s+/i,
+      /^tell me about\s+/i,
+    ];
+    if (knowledgeCheckPatterns.some(pattern => pattern.test(lowerMessage))) {
+      return INTENTS.GENERAL_QUERY; // Treat as general query for acknowledgment
+    }
+    
+    // 4b. GENERAL_QUERY - Questions about the bot itself
+    const generalQueryPatterns = [
+      /^(who|what)\s+(are|is)\s+(you|this)[\s\?\.]*$/i,
+      /^(tell me about yourself|introduce yourself)[\s\?\.]*$/i,
+      /^(who|what)\s+(made|developed|created|built)\s+(you|this)[\s\?\.]*$/i,
+      /^(who|what)\s+(is|are)\s+(your|the)\s+(developer|creator|maker)[\s\?\.]*$/i
+    ];
+    if (generalQueryPatterns.some(pattern => pattern.test(lowerMessage))) {
+      return INTENTS.GENERAL_QUERY;
+    }
+    
+    const words = lowerMessage
+      .replace(/[\s]+/g, ' ')
+      .replace(/[!?.,"']/g, '')
+      .trim()
+      .split(' ')
+      .filter(Boolean);
+    
+    // 5. IT_ISSUE - Technical problems (check for problem indicators)
+    // Also check if user is asking for help after acknowledging a topic
+    const helpRequestPatterns = [
+      'can you help', 'help me', 'how to', 'how do i', 'how can i',
+      'resolve', 'fix', 'solve', 'troubleshoot', 'repair'
+    ];
+    const isHelpRequest = helpRequestPatterns.some(pattern => lowerMessage.includes(pattern));
+    
+    const problemIndicators = [
+      'problem', 'issue', 'error', 'broken', 'not working', 'trouble',
+      'wont', "won't", "doesn't", "don't", 'slow', 'crash', 'freeze',
+      'lag', 'overheating', 'battery', 'printer', 'wifi', 'network',
+      'screen', 'keyboard', 'audio', 'storage', 'update', 'install',
+      'device', 'computer', 'laptop', 'phone', 'tablet'
+    ];
+    
+    const containsProblemWord = problemIndicators.some(indicator => lowerMessage.includes(indicator));
+    const isLikelySmallTalk = words.length > 0 && words.length <= 4 && !isHelpRequest && !containsProblemWord;
+    if (isLikelySmallTalk) {
+      return INTENTS.GENERAL_QUERY;
+    }
+    
+    // If there's a pending topic and user is asking for help, treat as IT_ISSUE
+    if (this.conversationContext.pendingTopic && isHelpRequest) {
+      return INTENTS.IT_ISSUE;
+    }
+    
+    const hasProblemIndicator = problemIndicators.some(indicator => {
+      if (lowerMessage.includes(indicator)) {
+        // Check if it's negated (e.g., "no problem")
+        const indicatorIndex = lowerMessage.indexOf(indicator);
+        const beforeIndicator = lowerMessage.substring(Math.max(0, indicatorIndex - 20), indicatorIndex);
+        const negationWords = ['no', 'not', "don't", "doesn't", "won't", "can't"];
+        return !negationWords.some(word => beforeIndicator.includes(word));
       }
-    };
+      return false;
+    });
+    
+    if (hasProblemIndicator) {
+      return INTENTS.IT_ISSUE;
+    }
+    
+    // 6. OUT_OF_SCOPE - Non-IT questions
+    const outOfScopePatterns = [
+      'weather', 'temperature', 'what time', 'what date', 'what day',
+      'who is', 'where is', 'when did', 'why did',
+      'what color', 'what food', 'what movie', 'what song',
+      'calculate', 'solve this equation', 'math',
+      'recommend a movie', 'best game', 'favorite',
+      'what is the meaning of life'
+    ];
+    // Only if NO tech context
+    const techContextWords = ['device', 'computer', 'laptop', 'phone', 'printer', 
+                              'router', 'network', 'software', 'hardware', 'tech',
+                              'app', 'program', 'system', 'internet', 'wifi'];
+    const hasTechContext = techContextWords.some(word => lowerMessage.includes(word));
+    
+    if (!hasTechContext && outOfScopePatterns.some(pattern => lowerMessage.includes(pattern))) {
+      return INTENTS.OUT_OF_SCOPE;
+    }
+    
+    // 7. UNKNOWN - Unclear or incomplete input
+    if (lowerMessage.length < 3 || lowerMessage.match(/^[^a-z]*$/)) {
+      return INTENTS.UNKNOWN;
+    }
+    
+    // Default: If we can't classify clearly, assume IT_ISSUE (most common)
+    return INTENTS.IT_ISSUE;
   }
+
+  // Check if message is irrelevant to tech support
+  isIrrelevantQuestion(message) {
+    const lowerMessage = message.toLowerCase().trim();
+    
+    // Irrelevant topics that should go to Gemini/local AI
+    const irrelevantPatterns = [
+      // Weather, time, date
+      'weather', 'temperature', 'what time', 'what date', 'what day',
+      // General knowledge
+      'who is', 'what is', 'where is', 'when did', 'why did',
+      // Personal questions
+      'how old are you', 'where do you live', 'what do you like',
+      // Random questions
+      'what color', 'what food', 'what movie', 'what song',
+      // Math, science (unless tech-related)
+      'calculate', 'solve this equation', 'what is the answer to',
+      // History, geography
+      'who invented', 'when was', 'where is located',
+      // Entertainment
+      'recommend a movie', 'best game', 'favorite',
+      // Philosophical
+      'what is the meaning of life', 'why do we exist'
+    ];
+    
+    // Check if message is primarily about irrelevant topics
+    // Only match if the message is clearly not tech-related
+    const hasIrrelevantTopic = irrelevantPatterns.some(pattern => {
+      // Check if pattern appears as a standalone question or main topic
+      const patternIndex = lowerMessage.indexOf(pattern);
+      if (patternIndex === -1) return false;
+      
+      // Check if it's part of a tech question (e.g., "what is a router" is tech-related)
+      const techContextWords = ['device', 'computer', 'laptop', 'phone', 'printer', 'router', 'network', 
+                                'software', 'hardware', 'tech', 'technology', 'app', 'program', 'system',
+                                'internet', 'wifi', 'browser', 'email', 'password', 'account', 'update',
+                                'install', 'download', 'error', 'bug', 'crash', 'slow', 'broken'];
+      const hasTechContext = techContextWords.some(word => lowerMessage.includes(word));
+      
+      // If it has tech context, it's not irrelevant
+      if (hasTechContext) return false;
+      
+      // Check if the pattern is the main question (appears early in the message)
+      return patternIndex < 50; // Within first 50 characters
+    });
+    
+    return hasIrrelevantTopic;
+  }
+
+  // Removed: checkPredefinedChatTriggers - All responses now handled by Gemini
 
   // Enhanced message analysis with pattern matching
   analyzeMessage(message) {
@@ -334,58 +369,94 @@ export class IntelligentChatService {
       problemCategory: null,
       specificIssue: null,
       confidence: 0,
+      isNoProblem: false,
     };
 
-    // Use pattern matching for better detection
+    // FIRST: Check if user explicitly says they DON'T have a problem
+    if (this.isNoProblemStatement(message)) {
+      analysis.isNoProblem = true;
+      analysis.problemCategory = 'general';
+      analysis.confidence = 1.0;
+      return analysis; // Return early - don't analyze for problems
+    }
+
+    // SECOND: Check if message is irrelevant to tech support
+    if (this.isIrrelevantQuestion(message)) {
+      analysis.problemCategory = 'irrelevant';
+      analysis.confidence = 0.9;
+      analysis.isIrrelevant = true;
+      return analysis; // Return early - will be handled by Gemini/local AI
+    }
+
+    // Use pattern matching for problem detection (only if not a "no problem" statement)
     for (const [issue, patterns] of Object.entries(this.problemPatterns)) {
       for (const pattern of patterns) {
+        // Skip if pattern is part of a negation
         if (lowerMessage.includes(pattern)) {
-          analysis.specificIssue = issue;
-          analysis.confidence = 0.9;
+          // Check if this pattern is negated
+          const patternIndex = lowerMessage.indexOf(pattern);
+          const beforePattern = lowerMessage.substring(Math.max(0, patternIndex - 50), patternIndex);
+          const negationWords = ['no', 'not', "don't", "doesn't", "won't", "can't", "without"];
+          const isNegated = negationWords.some(word => beforePattern.includes(word));
           
-          // Determine category based on issue
-          if (issue === 'wont turn on' || issue === 'overheating' || issue === 'battery not charging' || issue === 'printer issue') {
-            analysis.problemCategory = 'hardware';
-            analysis.needsDeviceType = true;
-            if (issue !== 'network issue') {
+          if (!isNegated) {
+            analysis.specificIssue = issue;
+            analysis.confidence = 0.9;
+            
+            // Determine category based on issue
+            if (issue === 'wont turn on' || issue === 'overheating' || issue === 'battery not charging' || issue === 'printer issue') {
+              analysis.problemCategory = 'hardware';
+              analysis.needsDeviceType = true;
+              if (issue !== 'network issue') {
+                analysis.needsBrand = true;
+              }
+            } else if (issue === 'slow performance') {
+              analysis.problemCategory = 'performance';
+              analysis.needsDeviceType = true;
               analysis.needsBrand = true;
-            }
-          } else if (issue === 'slow performance') {
-            analysis.problemCategory = 'performance';
-            analysis.needsDeviceType = true;
-            analysis.needsBrand = true;
-          } else if (issue === 'network issue') {
-            analysis.problemCategory = 'network';
-            analysis.needsDeviceType = true;
-          } else if (issue === 'blue screen' || issue === 'app crashes') {
-            analysis.problemCategory = 'software';
-            analysis.needsOS = true;
-            if (issue === 'app crashes') {
+            } else if (issue === 'network issue') {
+              analysis.problemCategory = 'network';
+              analysis.needsDeviceType = true;
+            } else if (issue === 'blue screen' || issue === 'app crashes') {
+              analysis.problemCategory = 'software';
+              analysis.needsOS = true;
+              if (issue === 'app crashes') {
+                analysis.needsDeviceType = true;
+              }
+            } else if (issue === 'screen issue' || issue === 'keyboard issue' || issue === 'audio issue') {
+              analysis.problemCategory = 'hardware';
+              analysis.needsDeviceType = true;
+              analysis.needsBrand = true;
+            } else if (issue === 'storage issue') {
+              analysis.problemCategory = 'performance';
+              analysis.needsDeviceType = true;
+            } else if (issue === 'update issue') {
+              analysis.problemCategory = 'software';
+              analysis.needsOS = true;
               analysis.needsDeviceType = true;
             }
-          } else if (issue === 'screen issue' || issue === 'keyboard issue' || issue === 'audio issue') {
-            analysis.problemCategory = 'hardware';
-            analysis.needsDeviceType = true;
-            analysis.needsBrand = true;
-          } else if (issue === 'storage issue') {
-            analysis.problemCategory = 'performance';
-            analysis.needsDeviceType = true;
-          } else if (issue === 'update issue') {
-            analysis.problemCategory = 'software';
-            analysis.needsOS = true;
-            analysis.needsDeviceType = true;
+            
+            break;
           }
-          
-          break;
         }
       }
       if (analysis.specificIssue) break;
     }
 
     // If no specific issue found, check for general problem indicators
+    // BUT: Skip if message contains negation words before problem indicators
     if (!analysis.specificIssue) {
-      const problemIndicators = ['problem', 'issue', 'error', 'broken', 'not working', 'help', 'trouble'];
-      const hasProblemIndicator = problemIndicators.some(indicator => lowerMessage.includes(indicator));
+      const problemIndicators = ['problem', 'issue', 'error', 'broken', 'not working', 'trouble'];
+      const hasProblemIndicator = problemIndicators.some(indicator => {
+        if (lowerMessage.includes(indicator)) {
+          // Check if it's negated
+          const indicatorIndex = lowerMessage.indexOf(indicator);
+          const beforeIndicator = lowerMessage.substring(Math.max(0, indicatorIndex - 30), indicatorIndex);
+          const negationWords = ['no', 'not', "don't", "doesn't", "won't", "can't", "without", "haven't", "hasn't"];
+          return !negationWords.some(word => beforeIndicator.includes(word));
+        }
+        return false;
+      });
       
       if (hasProblemIndicator) {
         analysis.needsMoreDetails = true;
@@ -517,250 +588,276 @@ export class IntelligentChatService {
     }
   }
 
-  // Get solution from knowledge base with fuzzy matching
-  getSolutionFromKB(problemCategory, deviceType, specificIssue, brand = null) {
-    try {
-      // Try exact match first
-      let category = this.knowledgeBase[problemCategory];
-      if (!category) {
-        // Try fuzzy category matching
-        if (problemCategory === 'performance') {
-          category = this.knowledgeBase.hardware; // Performance issues often hardware-related
-        }
-        if (!category) return null;
-      }
-      
-      let device = category[deviceType];
-      if (!device) {
-        // Try fuzzy device matching
-        if (deviceType === 'computer' || deviceType === 'pc') {
-          device = category.desktop || category.laptop;
-        }
-        if (!device) return null;
-      }
-      
-      let issue = device[specificIssue];
-      if (!issue) {
-        // Try fuzzy issue matching
-        const issueVariations = {
-          'wont turn on': ['not starting', 'wont boot', 'not powering'],
-          'slow performance': ['slow', 'lagging', 'freezing'],
-          'printer issue': ['wont print', 'printing problem']
-        };
-        
-        for (const [key, variations] of Object.entries(issueVariations)) {
-          if (variations.some(v => specificIssue.includes(v))) {
-            issue = device[key];
-            if (issue) break;
-          }
-        }
-      }
-      
-      if (!issue) return null;
-      
-      // Get solutions based on brand if available
-      if (brand && issue.solutions && issue.solutions[brand]) {
-        return issue.solutions[brand];
-      } else if (issue.solutions && issue.solutions.default) {
-        return issue.solutions.default;
-      } else if (Array.isArray(issue.solutions)) {
-        return issue.solutions;
-      }
-      
-      return null;
-    } catch (error) {
-      console.error('Error getting solution from KB:', error);
-      return null;
-    }
-  }
+  // Removed: getSolutionFromKB and formatSolution - Now using Gemini Flash only
 
-  // Format solution as response with emotion-aware personality
-  formatSolution(solutions, deviceType, brand, specificIssue) {
-    if (!solutions || solutions.length === 0) return null;
-    
-    const deviceName = brand ? `${brand} ${deviceType}` : deviceType;
-    const issueName = specificIssue.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-    const userEmotion = this.conversationContext.userEmotion || 'neutral';
-    
-    // Emotion-aware introduction
-    let encouragingOpenings;
-    if (userEmotion === 'frustrated') {
-      encouragingOpenings = [
-        `I know this has been frustrating, but I've got a solution for the ${issueName} on your ${deviceName}. Let's get this fixed together:\n\n`,
-        `I understand how annoying this must be. Here's how to fix the ${issueName} on your ${deviceName}:\n\n`,
-        `Let's solve this together! Here's a step-by-step guide to fix the ${issueName} on your ${deviceName}:\n\n`
-      ];
-    } else if (userEmotion === 'worried' || userEmotion === 'sad') {
-      encouragingOpenings = [
-        `Don't worry, I've got you covered! Here's how to fix the ${issueName} on your ${deviceName}:\n\n`,
-        `I'm here to help you through this. Here's a solution for the ${issueName} on your ${deviceName}:\n\n`,
-        `We'll get this sorted out together. Here's how to fix the ${issueName} on your ${deviceName}:\n\n`
-      ];
-    } else if (userEmotion === 'confused') {
-      encouragingOpenings = [
-        `No problem! Let me break this down simply. Here's how to fix the ${issueName} on your ${deviceName}:\n\n`,
-        `I'll make this easy to understand. Here's a simple guide to fix the ${issueName} on your ${deviceName}:\n\n`,
-        `Let me explain this clearly. Here's how to fix the ${issueName} on your ${deviceName}:\n\n`
-      ];
-    } else {
-      encouragingOpenings = [
-        `Great! I've got a solution for the ${issueName} issue on your ${deviceName}. Let's fix this together:\n\n`,
-        `Perfect! Here's how to fix the ${issueName} on your ${deviceName}:\n\n`,
-        `I can help with that! Here's a step-by-step guide to fix the ${issueName} on your ${deviceName}:\n\n`
-      ];
-    }
-    
-    let response = encouragingOpenings[Math.floor(Math.random() * encouragingOpenings.length)];
-    
-    solutions.forEach((solution, index) => {
-      response += `${index + 1}. ${solution}\n`;
-    });
-    
-    // Emotion-aware closing
-    let encouragingClosings;
-    if (userEmotion === 'frustrated') {
-      encouragingClosings = [
-        `\nI know this might seem like a lot, but most issues get resolved in the first few steps. Take it one step at a time - you've got this! If one step doesn't work, just move to the next. If you're still stuck after trying these, let me know and we'll figure out the next approach together. I'm here to help! 💪`,
-        `\nWork through these steps at your own pace. I'm confident we can solve this together! If something doesn't work, don't get discouraged - just try the next step. If the problem persists, tell me what's happening and I'll help you find another solution.`,
-        `\nTake a deep breath and tackle these one by one. Most problems are solved within the first few steps, so don't worry! If you hit a snag, just move forward. If you're still having trouble after all of these, let me know what's happening and we'll work through it together.`
-      ];
-    } else if (userEmotion === 'worried' || userEmotion === 'sad') {
-      encouragingClosings = [
-        `\nTry these steps in order - they're designed to be safe and straightforward. Most issues get resolved quickly, so don't worry! If one step doesn't work, that's okay - just move to the next. If you need help at any point, I'm right here. You're doing great! 🌟`,
-        `\nThese steps are here to help you feel better about the situation. Take your time with each one. If something doesn't work, don't stress - just continue to the next step. If you're still having trouble, let me know and we'll find another way together.`,
-        `\nI've laid these out to be as simple as possible. Work through them one at a time, and remember - most issues are fixed in the first few steps! If you need clarification on anything, just ask. I'm here to support you through this.`
-      ];
-    } else if (userEmotion === 'confused') {
-      encouragingClosings = [
-        `\nI've kept these steps simple and clear. Work through them one at a time, and don't hesitate to ask if anything is unclear. Most issues get resolved in the first few steps! If one doesn't work, just move to the next. If you're still confused, let me know and I'll explain things differently.`,
-        `\nThese steps are designed to be easy to follow. Take them one at a time, and feel free to ask questions if anything is unclear. If a step doesn't work, that's totally fine - just continue to the next one. If you need more help, I'm here!`,
-        `\nI've made these steps as straightforward as possible. Go through them one by one, and if anything is confusing, just ask me to clarify. Most problems are solved in the first few steps! If you're still stuck, let me know what's happening and I'll help you understand better.`
-      ];
-    } else {
-      encouragingClosings = [
-        `\nTry these steps in order. Most issues get resolved within the first few steps, so don't worry if it seems like a lot! If one step doesn't work, just move to the next. If the problem persists after trying all of these, let me know what happens and I'll help you troubleshoot further. You've got this! 💪`,
-        `\nWork through these steps one at a time. I'm confident we can get this sorted out! If you run into any issues or the problem persists, just let me know what happens and I'll help you figure out the next steps.`,
-        `\nTake your time with these steps. If something doesn't work, that's okay - just move to the next step. If you're still having trouble after trying all of these, tell me what's happening and we'll find another solution together.`
-      ];
-    }
-    
-    response += encouragingClosings[Math.floor(Math.random() * encouragingClosings.length)];
-    
-    return response;
-  }
-
-  // Main chat function with conversation memory and personality
+  // MAIN CHAT FUNCTION - Strict behavior flow
   async chat(message, language = 'english') {
-    // Detect user emotion from message
-    this.detectUserEmotion(message);
-    const userDissatisfied = this.isUserDissatisfied(message);
-    if (userDissatisfied) {
-      this.conversationContext.unsatisfiedCount = Math.min(
-        this.maxUnsatisfiedResponses,
-        this.conversationContext.unsatisfiedCount + 1
-      );
-    }
-    const unsatisfiedLimitReached = this.conversationContext.unsatisfiedCount >= this.maxUnsatisfiedResponses;
-    const shouldEscalateToGemini = unsatisfiedLimitReached;
-    const escalationReason = unsatisfiedLimitReached ? 'USER_DISSATISFIED_LIMIT' : null;
-    
-    // Check for gratitude or success indicators
-    if (this.isGratitude(message)) {
-      return this.handleGratitude();
-    }
-    
     // Add to conversation history
     this.conversationContext.conversationHistory.push({
       role: 'user',
       content: message,
-      timestamp: new Date(),
-      emotion: this.conversationContext.userEmotion
+      timestamp: new Date()
     });
     
     // Check if this is a direct answer to our last question
     if (this.conversationContext.lastQuestion) {
-      // User is answering our question
       this.handleFollowUpAnswer(message, this.conversationContext.lastQuestion.contextKey);
-      this.conversationContext.lastQuestion = null; // Clear the question
+      this.conversationContext.lastQuestion = null;
     }
     
-    // Extract context from message
-    this.extractContext(message);
+    // STEP 1: INTENT DETECTION
+    const intent = this.detectIntent(message);
+    console.log('🎯 Detected intent:', intent);
     
-    // Analyze what we need
-    const analysis = this.analyzeMessage(message);
-    const isGreetingOrGeneralChat = this.isGreetingOrGeneralInquiry(message, analysis);
-
-    if (isGreetingOrGeneralChat) {
-      return await this.respondWithGeminiGreeting(message, language);
-    }
+    // STEP 2: RESPONSE LOGIC based on intent
+    let response;
     
-    // Update conversation context
-    if (analysis.problemCategory) {
-      this.conversationContext.problemCategory = analysis.problemCategory;
-    }
-    if (analysis.specificIssue) {
-      this.conversationContext.specificIssue = analysis.specificIssue;
-    }
-    
-    // Check if we need more information
-    const followUp = this.generateFollowUpQuestion(analysis);
-    if (followUp) {
-      // Remember the question we're asking
-      this.conversationContext.lastQuestion = followUp;
-      
-      const response = {
-        text: followUp.question,
-        needsFollowUp: true,
-        contextKey: followUp.contextKey,
-        source: 'local',
-        mode: 'question'
-      };
-      
-      // Add to conversation history
-      this.conversationContext.conversationHistory.push({
-        role: 'assistant',
-        content: followUp.question,
-        timestamp: new Date()
-      });
-      
-      return response;
-    }
-    
-    // If we have all context, try to get solution immediately
-    // Try to get solution from knowledge base
-    if (!shouldEscalateToGemini &&
-        this.conversationContext.problemCategory && 
-        this.conversationContext.deviceType && 
-        this.conversationContext.specificIssue) {
-      
-      const solutions = this.getSolutionFromKB(
-        this.conversationContext.problemCategory,
-        this.conversationContext.deviceType,
-        this.conversationContext.specificIssue,
-        this.conversationContext.deviceBrand
-      );
-      
-      if (solutions) {
-        const formattedResponse = this.formatSolution(
-          solutions,
-          this.conversationContext.deviceType,
-          this.conversationContext.deviceBrand,
-          this.conversationContext.specificIssue
-        );
+    switch (intent) {
+      case INTENTS.NO_PROBLEM:
+        response = await this.handleNoProblem(message, language);
+        break;
         
-        if (formattedResponse) {
-          // Add to conversation history
-          this.conversationContext.conversationHistory.push({
-            role: 'assistant',
-            content: formattedResponse,
-            timestamp: new Date()
-          });
-          this.conversationContext.kbAnswerCount += 1;
-          
+      case INTENTS.GOODBYE:
+        response = await this.handleGoodbye(message, language);
+        break;
+        
+      case INTENTS.GREETINGS:
+        response = await this.handleGreetings(message, language);
+        break;
+        
+      case INTENTS.GENERAL_QUERY:
+        response = await this.handleGeneralQuery(message, language);
+        break;
+        
+      case INTENTS.OUT_OF_SCOPE:
+        response = await this.handleOutOfScope(message, language);
+        break;
+        
+      case INTENTS.UNKNOWN:
+        response = await this.handleUnknown(message, language);
+        break;
+        
+      case INTENTS.IT_ISSUE:
+      default:
+        response = await this.handleITIssue(message, language);
+        break;
+    }
+    
+    // Add response to history
+    this.conversationContext.conversationHistory.push({
+      role: 'assistant',
+      content: response.text,
+      timestamp: new Date()
+    });
+
+    await this.logConversationEntry(message, response);
+    
+    return response;
+  }
+  
+  // Response handlers for each intent
+  async handleNoProblem(message, language) {
+    this.resetContext();
+    // Use Gemini to handle the response
+    try {
+      const aiResponse = await this.getAIResponse(
+        `User: "${message}" - Keep response SHORT (1-2 sentences max). Be warm but brief.`,
+        language,
+        true // Always use Gemini Flash
+      );
+      return {
+        text: aiResponse.text || aiResponse,
+        source: aiResponse.source || 'gemini',
+        mode: aiResponse.mode || 'online',
+        context: { ...this.conversationContext }
+      };
+    } catch (error) {
+      // Try local AI as fallback
+      try {
+        const localResponse = await this.getAIResponse(
+          `User: "${message}" - Keep response SHORT (1-2 sentences). Be brief.`,
+          language,
+          false // Use local AI
+        );
+        return {
+          text: localResponse.text || localResponse,
+          source: localResponse.source || 'local_ai',
+          mode: localResponse.mode || 'offline',
+          context: { ...this.conversationContext }
+        };
+      } catch (localError) {
+        return {
+          text: "I understand. Let me know if you need any help!",
+          source: 'error',
+          mode: 'offline',
+          context: { ...this.conversationContext }
+        };
+      }
+    }
+  }
+  
+  async handleGoodbye(message, language) {
+    // Check if user is thanking for a solution (learning opportunity)
+    const lastBotMessage = this.conversationContext.conversationHistory
+      .filter(m => m.role === 'assistant')
+      .slice(-1)[0];
+    const lastUserMessage = this.conversationContext.conversationHistory
+      .filter(m => m.role === 'user')
+      .slice(-2, -1)[0];
+    
+    // If last interaction was IT_ISSUE and user is thanking, mark as successful
+    if (lastBotMessage && lastUserMessage && 
+        lastBotMessage.content.includes('Did this solve')) {
+      await this.learnFromFeedback(
+        lastUserMessage.content,
+        lastBotMessage.content,
+        true // Assume success if user is thanking
+      );
+    }
+    
+    // Use Gemini to handle the response
+    try {
+      const aiResponse = await this.getAIResponse(
+        `User: "${message}" - Keep response SHORT (1 sentence). Be warm but brief.`,
+        language,
+        true // Always use Gemini Flash
+      );
+      return {
+        text: aiResponse.text || aiResponse,
+        source: aiResponse.source || 'gemini',
+        mode: aiResponse.mode || 'online',
+        context: { ...this.conversationContext }
+      };
+    } catch (error) {
+      // Try local AI as fallback
+      try {
+        const localResponse = await this.getAIResponse(
+          `User: "${message}" - Keep response SHORT (1 sentence). Be brief.`,
+          language,
+          false // Use local AI
+        );
+        return {
+          text: localResponse.text || localResponse,
+          source: localResponse.source || 'local_ai',
+          mode: localResponse.mode || 'offline',
+          context: { ...this.conversationContext }
+        };
+      } catch (localError) {
+        return {
+          text: "You're welcome! Feel free to ask if you need anything else.",
+          source: 'error',
+          mode: 'offline',
+          context: { ...this.conversationContext }
+        };
+      }
+    }
+  }
+  
+  async handleGreetings(message, language) {
+    // Use Gemini Flash to handle greetings
+    try {
+      const aiResponse = await this.getAIResponse(
+        `User: "${message}" - Keep response SHORT (1-2 sentences). Be friendly and brief.`,
+        language,
+        true // Always use Gemini Flash
+      );
+      return {
+        text: aiResponse.text || aiResponse,
+        source: aiResponse.source || 'gemini',
+        mode: aiResponse.mode || 'online',
+        context: { ...this.conversationContext }
+      };
+    } catch (error) {
+      // Try local AI as fallback
+      try {
+        const localResponse = await this.getAIResponse(
+          `User: "${message}" - Keep response SHORT (1-2 sentences). Be brief.`,
+          language,
+          false // Use local AI
+        );
+        return {
+          text: localResponse.text || localResponse,
+          source: localResponse.source || 'local_ai',
+          mode: localResponse.mode || 'offline',
+          context: { ...this.conversationContext }
+        };
+      } catch (localError) {
+        return {
+          text: "Hello! How can I assist you today?",
+          source: 'error',
+          mode: 'offline',
+          context: { ...this.conversationContext }
+        };
+      }
+    }
+  }
+  
+  async handleGeneralQuery(message, language) {
+    // Track tone for warmer acknowledgments
+    this.detectUserEmotion(message);
+    const userEmotion = this.conversationContext.userEmotion || 'neutral';
+    const emotionHint = userEmotion !== 'neutral'
+      ? `Match the user's ${userEmotion} tone with empathy.`
+      : 'Keep the tone light and approachable.';
+
+    // Check if this is a "do you know about X" type question
+    const lowerMessage = message.toLowerCase();
+    const knowledgePatterns = [
+      /(do you know|have you heard|are you familiar).*(about|with)\s+(.+)/i,
+      /what\s+(is|are)\s+(a|an|the)?\s+(.+)/i,
+      /tell me about\s+(.+)/i,
+    ];
+    
+    let extractedTopic = null;
+    for (const pattern of knowledgePatterns) {
+      const match = message.match(pattern);
+      if (match) {
+        extractedTopic = match[match.length - 1].trim();
+        break;
+      }
+    }
+    
+    // If it's a knowledge question, acknowledge briefly and store topic
+    if (extractedTopic || lowerMessage.includes('do you know') || lowerMessage.includes('what is')) {
+      // Store the topic for potential follow-up
+      this.conversationContext.pendingTopic = extractedTopic || message;
+      
+      // Acknowledge warmly - no troubleshooting yet
+      try {
+        const aiResponse = await this.getAIResponse(
+          `User asked: "${message}". ${emotionHint} Provide 1-2 friendly sentences that: 
+1) Confirm you are familiar with "${extractedTopic || 'that topic'}".
+2) Include a touch of small talk or curiosity (e.g., ask what interests them about it).
+Do NOT explain the topic or give troubleshooting yet. Invite them to say if they'd like help.`,
+          language,
+          true // Always use Gemini Flash
+        );
+        return {
+          text: aiResponse.text || aiResponse,
+          source: aiResponse.source || 'gemini',
+          mode: aiResponse.mode || 'online',
+          context: { ...this.conversationContext }
+        };
+      } catch (error) {
+        // Try local AI as fallback
+        try {
+          const localResponse = await this.getAIResponse(
+            `User: "${message}". ${emotionHint} Give 1-2 friendly sentences acknowledging the topic and offering help later. No troubleshooting or detailed explanation yet.`,
+            language,
+            false // Use local AI
+          );
           return {
-            text: formattedResponse,
-            source: 'local_kb',
+            text: localResponse.text || localResponse,
+            source: localResponse.source || 'local_ai',
+            mode: localResponse.mode || 'offline',
+            context: { ...this.conversationContext }
+          };
+        } catch (localError) {
+          // Simple fallback acknowledgment
+          const topic = extractedTopic || 'that';
+          return {
+            text: `Yes, I know about ${topic}.`,
+            source: 'error',
             mode: 'offline',
             context: { ...this.conversationContext }
           };
@@ -768,185 +865,329 @@ export class IntelligentChatService {
       }
     }
     
-    // If we have partial context, provide helpful guidance (more conversational)
-    if (this.conversationContext.problemCategory || this.conversationContext.deviceType) {
-      const summary = this.getConversationSummary();
-      if (summary) {
-        let guidance = '';
-        let nextStep = '';
-        
-        if (!this.conversationContext.deviceType) {
-          guidance = "I can help with that. ";
-          nextStep = 'What device are you having trouble with?';
-        } else if (!this.conversationContext.deviceBrand && this.conversationContext.problemCategory === 'hardware') {
-          guidance = `Got it, you're having issues with your ${this.conversationContext.deviceType}. `;
-          nextStep = `What brand is it?`;
-        } else if (!this.conversationContext.specificIssue) {
-          guidance = "I understand. ";
-          nextStep = 'Can you describe the specific problem in more detail?';
-        }
-        
-        if (nextStep) {
-          // Add to conversation history
-          this.conversationContext.conversationHistory.push({
-            role: 'assistant',
-            content: guidance + nextStep,
-            timestamp: new Date()
-          });
-          
-          return {
-            text: guidance + nextStep,
-            needsFollowUp: true,
-            source: 'local',
-            mode: 'question',
-            context: { ...this.conversationContext }
-          };
-        }
-      }
-    }
-    
-    // Check if online and try Gemini as fallback (only if we don't have enough context)
-    // IMPORTANT: Only try online if we have internet AND backend is available
-    let isOnline = false;
-    let backendAvailable = false;
-    
-    try {
-      const networkStatus = await checkNetworkStatus();
-      isOnline = networkStatus;
-      
-      // Also check if backend is reachable (don't try Gemini if backend is down)
-      if (isOnline) {
-        try {
-          // Use apiService to check backend health
-          backendAvailable = await apiService.checkHealth();
-          if (!backendAvailable) {
-            console.log('📴 Backend health check failed, using offline mode only');
-          }
-        } catch (backendError) {
-          console.log('📴 Backend not available, using offline mode only');
-          backendAvailable = false;
-        }
-      }
-    } catch (networkError) {
-      console.log('📴 Network check failed, using offline mode');
-      isOnline = false;
-      backendAvailable = false;
-    }
-    
-    // Only try Gemini if online AND backend is available AND either
-    // we lack context or escalation is required
-    if (isOnline && backendAvailable && shouldEscalateToGemini) {
-      try {
-        console.log('🌐 Online - escalating to Gemini...', escalationReason || 'context_missing');
-        // Include conversation context in Gemini request
-        const contextSummary = this.getConversationSummary();
-        const escalationIntro = escalationReason === 'USER_DISSATISFIED_LIMIT'
-          ? `The user indicated dissatisfaction with the previous assistance at least ${this.maxUnsatisfiedResponses} times. Provide a more advanced, comprehensive solution.\n\n`
-          : '';
-        const enhancedMessage = contextSummary 
-          ? `${escalationIntro}${message}\n\nContext: ${contextSummary}`
-          : `${escalationIntro}${message}`;
-        
-        const geminiResponse = await callGeminiAPI(enhancedMessage);
-        if (geminiResponse && geminiResponse.text) {
-        const escalationNotice = escalationReason === 'USER_DISSATISFIED_LIMIT'
-          ? `You've let me know (at least ${this.maxUnsatisfiedResponses} times) that the previous steps didn't help, so I'll escalate this to Gemini for a more advanced solution.`
-          : 'Let me bring in Gemini for a more advanced solution so we can cover every angle.';
-          const combinedText = `${escalationNotice}\n\n${geminiResponse.text}`;
-          // Add to conversation history
-          this.conversationContext.conversationHistory.push({
-            role: 'assistant',
-            content: combinedText,
-            timestamp: new Date()
-          });
-          this.conversationContext.geminiEscalated = true;
-          this.conversationContext.unsatisfiedCount = 0;
-          
-          return {
-            text: combinedText,
-            source: 'gemini',
-            mode: 'online',
-            context: { ...this.conversationContext }
-          };
-        }
-      } catch (error) {
-        console.log('❌ Gemini failed, using local AI:', error.message);
-      }
-    } else if (!isOnline || !backendAvailable) {
-      console.log('📴 Offline mode - using local knowledge base and AI');
-    }
-    
-    // If we were supposed to escalate but can't reach Gemini, explain to user
-    if (shouldEscalateToGemini && (!isOnline || !backendAvailable)) {
-      const reasonText = `You've mentioned multiple times that the earlier solutions didn't help.`;
-      const connectionText = !isOnline
-        ? ' I need an internet connection before I can ask Gemini for a deeper analysis.'
-        : ' I need to reach the backend server before I can ask Gemini for a deeper analysis.';
-      const promptText = ' Once you\'re back online, let me know and I\'ll bring Gemini in right away.';
-      const escalationMessage = `${reasonText}${connectionText}${promptText}`;
-      
-      this.conversationContext.conversationHistory.push({
-        role: 'assistant',
-        content: escalationMessage,
-        timestamp: new Date()
-      });
-      
+    // Developer identity questions
+    const developerPatterns = /(who (built|made|created|developed)\s+(you|this)|who\s+is\s+(your\s+)?developer|who\s+is\s+(your\s+)?creator|who\s+designed\s+(you|this))/i;
+    if (developerPatterns.test(lowerMessage)) {
+      const userName = this.getFullUserName();
+      const acknowledgement = userName
+        ? `I'm always glad to help you, ${userName}.`
+        : 'I’m always glad to help.';
       return {
-        text: escalationMessage,
-        source: 'local',
-        mode: 'offline',
+        text: `KonsultaBot was engineered by ${this.developerProfile.name}, ${this.developerProfile.title}. ${acknowledgement} How can I assist you further?`,
+        source: 'system',
+        mode: 'online',
         context: { ...this.conversationContext }
       };
     }
     
-    // Fallback to local AI
+    // Regular general query
+    const wordCount = message.trim().split(/\s+/).filter(Boolean).length;
+    const questionOrHelpPattern = /(problem|issue|fix|resolve|repair|troubleshoot|explain|why|what|how|when|where|who|help|guide|steps)/i;
+    const isSmallTalk = wordCount <= 6 && !questionOrHelpPattern.test(lowerMessage);
+    const generalPrompt = isSmallTalk
+      ? `User said: "${message}". ${emotionHint}
+Respond with 2 light, friendly sentences.
+- Acknowledge what they said.
+- Add a bit of small talk or a gentle follow-up question.
+Do NOT jump into technical solutions unless they explicitly ask for help.`
+      : `User said: "${message}". ${emotionHint}
+Respond in 2 concise sentences.
+- Provide a helpful, easy-to-digest answer or clarification.
+- If the user hasn't asked for troubleshooting, invite them to share more details instead of giving steps.`;
+
     try {
-      const contextSummary = this.getConversationSummary();
-      const enhancedMessage = contextSummary 
-        ? `${message}\n\nContext: ${contextSummary}`
-        : message;
-      
-      const localResponse = await localGeminiAI.generateResponse(enhancedMessage, language);
-      const responseText = localResponse.data?.response || localResponse.response || 
-        'I understand your issue. Let me help you troubleshoot this step by step.';
-      
-      // Add to conversation history
-      this.conversationContext.conversationHistory.push({
-        role: 'assistant',
-        content: responseText,
-        timestamp: new Date()
-      });
-      
+      const aiResponse = await this.getAIResponse(
+        generalPrompt,
+        language,
+        true // Always use Gemini Flash
+      );
       return {
-        text: responseText,
-        source: 'local_ai',
-        mode: 'offline',
+        text: aiResponse.text || aiResponse,
+        source: aiResponse.source || 'gemini',
+        mode: aiResponse.mode || 'online',
         context: { ...this.conversationContext }
       };
     } catch (error) {
-      // Final fallback (more conversational)
-      let fallbackText;
-      
-      if (this.conversationContext.deviceType) {
-        fallbackText = `I can help with your ${this.conversationContext.deviceType} issue. Can you tell me more about what's happening?`;
-      } else {
-        fallbackText = "I'm here to help! To give you the best solution, I need a bit more info:\n\n• What device are you having trouble with?\n• What brand is it?\n• What's the problem you're experiencing?";
+      // Try local AI as fallback
+      try {
+        const localResponse = await this.getAIResponse(
+          generalPrompt,
+          language,
+          false // Use local AI
+        );
+        return {
+          text: localResponse.text || localResponse,
+          source: localResponse.source || 'local_ai',
+          mode: localResponse.mode || 'offline',
+          context: { ...this.conversationContext }
+        };
+      } catch (localError) {
+        return {
+          text: "I'm here to help. Could you please rephrase your question?",
+          source: 'error',
+          mode: 'offline',
+          context: { ...this.conversationContext }
+        };
       }
-      
-      // Add to conversation history
-      this.conversationContext.conversationHistory.push({
-        role: 'assistant',
-        content: fallbackText,
-        timestamp: new Date()
-      });
-      
+    }
+  }
+  
+  async handleOutOfScope(message, language) {
+    // Use Gemini to handle out of scope responses
+    try {
+      const aiResponse = await this.getAIResponse(
+        `User: "${message}" - Keep response SHORT (1-2 sentences). Politely redirect to IT topics briefly.`,
+        language,
+        true // Always use Gemini Flash
+      );
       return {
-        text: fallbackText,
-        source: 'local',
-        mode: 'offline',
+        text: aiResponse.text || aiResponse,
+        source: aiResponse.source || 'gemini',
+        mode: aiResponse.mode || 'online',
         context: { ...this.conversationContext }
       };
+    } catch (error) {
+      // Try local AI as fallback
+      try {
+        const localResponse = await this.getAIResponse(
+          `User: "${message}" - Keep response SHORT (1-2 sentences). Redirect briefly.`,
+          language,
+          false // Use local AI
+        );
+        return {
+          text: localResponse.text || localResponse,
+          source: localResponse.source || 'local_ai',
+          mode: localResponse.mode || 'offline',
+          context: { ...this.conversationContext }
+        };
+      } catch (localError) {
+        return {
+          text: "I specialize in IT support. Do you have a technical question I can help with?",
+          source: 'error',
+          mode: 'offline',
+          context: { ...this.conversationContext }
+        };
+      }
     }
+  }
+  
+  async handleUnknown(message, language) {
+    // Use Gemini to handle unclear messages
+    try {
+      const aiResponse = await this.getAIResponse(
+        `User: "${message}" - Keep response SHORT (1 sentence). Ask for clarification briefly.`,
+        language,
+        true // Always use Gemini Flash
+      );
+      return {
+        text: aiResponse.text || aiResponse,
+        source: aiResponse.source || 'gemini',
+        mode: aiResponse.mode || 'online',
+        context: { ...this.conversationContext }
+      };
+    } catch (error) {
+      // Try local AI as fallback
+      try {
+        const localResponse = await this.getAIResponse(
+          `User: "${message}" - Keep response SHORT (1 sentence). Ask briefly.`,
+          language,
+          false // Use local AI
+        );
+        return {
+          text: localResponse.text || localResponse,
+          source: localResponse.source || 'local_ai',
+          mode: localResponse.mode || 'offline',
+          context: { ...this.conversationContext }
+        };
+      } catch (localError) {
+        return {
+          text: "I didn't fully understand. Could you please rephrase your question?",
+          source: 'error',
+          mode: 'offline',
+          context: { ...this.conversationContext }
+        };
+      }
+    }
+  }
+  
+  // Removed: learnFromFeedback - No longer using memory/KB system
+  async learnFromFeedback(userMessage, botResponse, wasSuccessful = false, userCorrection = null) {
+    // Memory/KB system removed - all responses come from Gemini Flash
+  }
+
+  async handleITIssue(message, language) {
+    this.extractContext(message);
+    
+    const userId = this.userProfile?.id || 'anonymous';
+    const kbCandidate = matchKnowledgeBaseIssue(message);
+    let escalateForGemini = false;
+    
+    if (kbCandidate) {
+      const reachedLimit = await shouldEscalateIssue(userId, kbCandidate.issue.key);
+      if (!reachedLimit) {
+        await incrementIssueUsage(userId, kbCandidate.issue.key);
+        const kbText = formatIssueResponse(
+          kbCandidate.issue,
+          { ...this.userProfile, displayName: this.getFullUserName() || this.userProfile.displayName }
+        );
+        return {
+          text: kbText,
+          source: 'offline_kb',
+          mode: 'offline',
+          issueKey: kbCandidate.issue.key,
+          context: { ...this.conversationContext }
+        };
+      }
+      escalateForGemini = true;
+    }
+    
+    let prompt;
+    if (this.conversationContext.pendingTopic) {
+      prompt = `User wants help resolving an issue with: "${this.conversationContext.pendingTopic}". 
+User's request: "${message}"
+Keep response SHORT. Provide 3-5 quick troubleshooting steps only. Number them. Be direct and actionable.`;
+      this.conversationContext.pendingTopic = null;
+    } else if (escalateForGemini && kbCandidate) {
+      prompt = `User has asked about "${kbCandidate.issue.title}" at least 10 times. Provide an advanced, deeper troubleshooting plan that goes beyond basic tips.
+User's latest description: "${message}"
+Keep response SHORT. Provide 3-5 numbered steps with clear next actions.`;
+    } else {
+      const contextSummary = this.getConversationSummary();
+      prompt = `IT issue: "${message}". 
+Context: ${contextSummary || 'None'}
+Keep response SHORT. Provide 3-5 quick troubleshooting steps only. Number them. Be direct and actionable.`;
+    }
+    
+    try {
+      const aiResponse = await this.getAIResponse(prompt, language, true);
+      const responseText = typeof aiResponse === 'string' ? aiResponse : (aiResponse?.text || aiResponse);
+      const source = (typeof aiResponse === 'object' && aiResponse.source) ? aiResponse.source : 'gemini';
+      const mode = (typeof aiResponse === 'object' && aiResponse.mode) ? aiResponse.mode : 'online';
+      const issueKey = kbCandidate?.issue.key || this.conversationContext.specificIssue || null;
+      
+      const prefixed = (escalateForGemini && kbCandidate)
+        ? `You've asked me about ${kbCandidate.issue.title} multiple times, so here are deeper steps:\n\n${responseText}`
+        : responseText;
+      
+      return {
+        text: prefixed + "\n\nDid this solve the issue, or do you want more help?",
+        source,
+        mode,
+        issueKey,
+        context: { ...this.conversationContext }
+      };
+    } catch (error) {
+      try {
+        const localResponse = await this.getAIResponse(
+          `IT issue: "${message}". Keep SHORT. Provide 3-5 quick steps only.`,
+          language,
+          false
+        );
+        const localText = typeof localResponse === 'string' ? localResponse : (localResponse?.text || localResponse);
+        const issueKey = kbCandidate?.issue.key || this.conversationContext.specificIssue || null;
+        const prefixed = (escalateForGemini && kbCandidate)
+          ? `You've asked several times about ${kbCandidate.issue.title}. Here's everything I can offer offline:\n\n${localText}`
+          : localText;
+        
+        return {
+          text: prefixed + "\n\nDid this solve the issue, or do you want more help?",
+          source: 'local_ai',
+          mode: 'offline',
+          issueKey,
+          context: { ...this.conversationContext }
+        };
+      } catch (_localError) {
+        return {
+          text: "I'm having trouble processing that right now. Could you please provide more details about the issue?",
+          source: 'error',
+          mode: 'offline',
+          issueKey: kbCandidate?.issue.key || null,
+          context: { ...this.conversationContext }
+        };
+      }
+    }
+  }
+  
+  // Helper to get AI response - Always use Gemini Flash
+  async getAIResponse(prompt, language, prioritizeGemini = true) {
+    const formalName = this.getFullUserName();
+    const preferredName = this.userProfile?.displayName && this.userProfile.displayName !== formalName
+      ? this.userProfile.displayName
+      : null;
+    let finalPrompt = prompt;
+    if (formalName || preferredName) {
+      const contextParts = [];
+      if (formalName) {
+        contextParts.push(`The user's full name is ${formalName}.`);
+      }
+      if (preferredName) {
+        contextParts.push(`When using a friendlier tone, you may address them as "${preferredName}".`);
+      }
+      finalPrompt = `${contextParts.join(' ')} ${prompt}`;
+    }
+    
+    // Always try Gemini Flash first
+    if (prioritizeGemini) {
+      try {
+        const isOnline = await checkNetworkStatus();
+        if (isOnline) {
+          console.log('🌐 Using Gemini Flash');
+          const geminiResponse = await Promise.race([
+            callGeminiAPI(finalPrompt),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 30000))
+          ]);
+          
+          if (geminiResponse && geminiResponse.text) {
+            return {
+              text: geminiResponse.text,
+              source: 'gemini',
+              mode: 'online'
+            };
+          }
+        }
+      } catch (error) {
+        console.log('Gemini Flash unavailable, falling back to local AI:', error.message);
+      }
+    }
+    
+    // Fallback to local AI (works offline)
+    try {
+      console.log('📱 Using local AI (fallback)');
+      const localResponse = await localGeminiAI.generateResponse(finalPrompt, language);
+      const localText = localResponse.data?.response || localResponse.response;
+      
+      if (localText) {
+        return {
+          text: localText,
+          source: 'local_ai',
+          mode: 'offline'
+        };
+      }
+    } catch (error) {
+      console.log('Local AI also failed:', error);
+    }
+    
+    // Final fallback - try one more time with local AI
+    try {
+      const finalResponse = await localGeminiAI.generateResponse(finalPrompt, language);
+      const finalText = finalResponse.data?.response || finalResponse.response;
+      if (finalText) {
+        return {
+          text: finalText,
+          source: 'local_ai',
+          mode: 'offline'
+        };
+      }
+    } catch (finalError) {
+      console.log('All AI systems failed:', finalError);
+    }
+    
+    // Absolute last resort - minimal error message
+    return {
+      text: 'I apologize, but I\'m having trouble processing that right now. Please try again.',
+      source: 'error',
+      mode: 'offline'
+    };
   }
 
   // Handle follow-up answer
@@ -979,11 +1220,8 @@ export class IntelligentChatService {
       askedQuestions: [],
       conversationHistory: [],
       lastQuestion: null,
-      userEmotion: 'neutral',
-      successCount: 0,
-      kbAnswerCount: 0,
-      geminiEscalated: false,
       unsatisfiedCount: 0,
+      pendingTopic: null,
     };
   }
 
@@ -1047,6 +1285,36 @@ export class IntelligentChatService {
   // Detect if user is unhappy with previous answers
   isUserDissatisfied(message) {
     const lowerMessage = message.toLowerCase();
+    
+    // First, check for negation patterns that indicate NO problem/issue
+    // These should NOT be treated as dissatisfaction
+    const negationPatterns = [
+      'don\'t have problem',
+      'do not have problem',
+      'don\'t have issue',
+      'do not have issue',
+      'no problem',
+      'no issue',
+      'not a problem',
+      'not an issue',
+      'not my problem',
+      'not my issue',
+      'doesn\'t have problem',
+      'does not have problem',
+      'doesn\'t have issue',
+      'does not have issue',
+      'haven\'t got problem',
+      'have not got problem',
+      'haven\'t got issue',
+      'have not got issue'
+    ];
+    
+    // If message contains negation patterns, it's NOT dissatisfaction
+    if (negationPatterns.some(pattern => lowerMessage.includes(pattern))) {
+      return false;
+    }
+    
+    // Now check for actual dissatisfaction indicators
     const dissatisfactionIndicators = [
       'not satisfied',
       'did not help',
@@ -1130,7 +1398,8 @@ export class IntelligentChatService {
     const lowerMessage = message.toLowerCase().trim();
     const greetingPhrases = [
       'hello', 'hi', 'hey', 'good morning', 'good afternoon', 'good evening',
-      'how are you', 'how\'s it going', 'what\'s up', 'yo', 'sup'
+      'how are you', 'how\'s it going', 'what\'s up', 'yo', 'sup', 'greetings',
+      'good day', 'good night', 'morning', 'afternoon', 'evening'
     ];
     const generalChatIndicators = [
       'tell me about yourself',
@@ -1141,14 +1410,34 @@ export class IntelligentChatService {
       'let\'s talk',
       'talk to me',
       'give me a summary',
-      'explain yourself'
+      'explain yourself',
+      'how are things',
+      'what\'s new',
+      'how\'s everything',
+      'what\'s happening',
+      'what\'s going on',
+      'just chatting',
+      'just talking',
+      'having a conversation',
+      'general conversation'
     ];
 
-    if (analysis?.problemCategory === 'general' && !analysis?.specificIssue) {
+    // Irrelevant questions should go to Gemini
+    if (analysis?.isIrrelevant || analysis?.problemCategory === 'irrelevant') {
       return true;
     }
 
-    const isGreeting = greetingPhrases.some(phrase => lowerMessage.startsWith(phrase) || lowerMessage === phrase);
+    if (analysis?.problemCategory === 'general' && !analysis?.specificIssue && !analysis?.isNoProblem) {
+      return true;
+    }
+
+    const isGreeting = greetingPhrases.some(phrase => 
+      lowerMessage.startsWith(phrase) || 
+      lowerMessage === phrase ||
+      lowerMessage.includes(` ${phrase} `) ||
+      lowerMessage.includes(` ${phrase}.`) ||
+      lowerMessage.includes(` ${phrase}!`)
+    );
     const isGeneralChat = generalChatIndicators.some(indicator => lowerMessage.includes(indicator));
 
     return isGreeting || isGeneralChat;
@@ -1166,7 +1455,7 @@ export class IntelligentChatService {
       }
 
       const contextSummary = this.getConversationSummary();
-      const greetingPrompt = `The user is greeting or wants a general, comprehensive chat with KonsultaBot. Respond as a friendly, empathetic IT support assistant with emotional intelligence. Be warm, concise, and offer help if needed.\n\nUser message: ${message}`;
+      const greetingPrompt = `User: ${message} - Keep response SHORT (1-2 sentences). Be friendly and brief.`;
       const enhancedMessage = contextSummary
         ? `${greetingPrompt}\n\nConversation context: ${contextSummary}`
         : greetingPrompt;
@@ -1190,28 +1479,46 @@ export class IntelligentChatService {
       console.log('Gemini greeting handling failed:', error.message);
     }
 
-    const fallbackText = this.generateGreetingFallbackResponse(message);
-    this.conversationContext.conversationHistory.push({
-      role: 'assistant',
-      content: fallbackText,
-      timestamp: new Date()
-    });
-    return {
-      text: fallbackText,
-      source: 'local',
-      mode: 'offline',
-      context: { ...this.conversationContext }
-    };
-  }
-
-  generateGreetingFallbackResponse(message) {
-    const lowerMessage = message.toLowerCase();
-    if (lowerMessage.includes('how are you')) {
-      return "I'm doing great, thanks for asking! 😊 I'm KonsultaBot, your friendly IT support assistant. How can I help you today?";
+    // Try local AI as final fallback
+    try {
+      const localResponse = await this.getAIResponse(
+        `User: "${message}" - Keep response SHORT (1-2 sentences). Be brief.`,
+        'english',
+        false // Use local AI
+      );
+      const fallbackText = localResponse.text || localResponse;
+      this.conversationContext.conversationHistory.push({
+        role: 'assistant',
+        content: fallbackText,
+        timestamp: new Date()
+      });
+      return {
+        text: fallbackText,
+        source: localResponse.source || 'local_ai',
+        mode: localResponse.mode || 'offline',
+        context: { ...this.conversationContext }
+      };
+    } catch (error) {
+      // Absolute last resort
+      const fallbackText = "Hello! How can I help you today?";
+      this.conversationContext.conversationHistory.push({
+        role: 'assistant',
+        content: fallbackText,
+        timestamp: new Date()
+      });
+      return {
+        text: fallbackText,
+        source: 'error',
+        mode: 'offline',
+        context: { ...this.conversationContext }
+      };
     }
-    return "Hi there! 👋 I'm KonsultaBot, your friendly IT support assistant. I'm ready to help with any tech issues you have. What would you like to talk about today?";
   }
 }
 
+// Create service instance
 export const intelligentChatService = new IntelligentChatService();
+
+// Initialize KB and Memory systems (async, non-blocking)
+// Removed: KB/Memory initialization - Now using Gemini Flash only
 
