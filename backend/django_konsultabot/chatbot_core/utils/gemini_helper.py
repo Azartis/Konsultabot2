@@ -79,7 +79,7 @@ class GeminiModelManager:
             genai.configure(api_key=api_key)
             
             # Get model name from settings with better fallback handling
-            self.model_name = 'gemini-pro'  # Default to most stable model
+            self.model_name = 'gemini-2.5-flash'  # Default to stable Flash model
             if hasattr(settings, 'KONSULTABOT_SETTINGS'):
                 self.model_name = settings.KONSULTABOT_SETTINGS.get('AI_MODEL', self.model_name)
             
@@ -88,11 +88,11 @@ class GeminiModelManager:
                 self.model = genai.GenerativeModel(self.model_name)
                 logger.info(f"Successfully initialized primary model: {self.model_name}")
             except Exception as model_error:
-                logger.warning(f"Could not initialize model {self.model_name}: {model_error}. Falling back to gemini-pro.")
-                self.model_name = 'gemini-pro'
+                logger.warning(f"Could not initialize model {self.model_name}: {model_error}. Falling back to gemini-2.0-flash.")
+                self.model_name = 'gemini-2.0-flash'
                 try:
                     self.model = genai.GenerativeModel(self.model_name)
-                    logger.info("Successfully initialized fallback model: gemini-pro")
+                    logger.info("Successfully initialized fallback model: gemini-2.0-flash")
                 except Exception as fallback_error:
                     logger.error(f"Failed to initialize fallback model: {fallback_error}")
                     self.model = None
@@ -127,23 +127,19 @@ class GeminiModelManager:
 
             # Build the prompt template with language support
             prompt_template = """
-            You are KonsultaBot, a helpful IT support assistant for EVSU Dulag Campus.
-            Your role is to provide clear, accurate technical assistance in {language}.
+            You are KonsultaBot, a helpful AI assistant.
+            Your role is to provide clear, accurate assistance in {language}.
 
             Important Guidelines:
-            - Focus on EVSU Dulag Campus context for location/service questions
             - Keep responses concise but informative
-            - Use simple technical terms when possible
+            - Use simple language when possible
             - If asked in local language, respond in the same language
-            - Always maintain a helpful and professional tone
+            - Always maintain a helpful and friendly tone
 
             Previous Context: {context}
             User Query: {query}
 
-            Provide a helpful response in this format:
-            1. Direct answer/solution
-            2. Any necessary steps or instructions
-            3. Additional context or tips if relevant
+            Provide a helpful response.
 
             Remember to respond in {language}.
             """
@@ -238,26 +234,22 @@ class GeminiModelManager:
             'english': """I apologize, but I'm having trouble generating a specific response right now. 
             Please try rephrasing your question, or if this issue persists:
             1. Check your internet connection
-            2. Try again in a few moments
-            3. Contact IT support if the problem continues""",
+            2. Try again in a few moments""",
             
             'tagalog': """Paumanhin, ngunit may problema ako sa pagbibigay ng tiyak na sagot ngayon.
             Subukan mong i-rephrase ang iyong tanong, o kung magpatuloy ang problemang ito:
             1. Suriin ang iyong internet connection
-            2. Subukan muli sa ilang sandali
-            3. Makipag-ugnayan sa IT support kung magpatuloy ang problema""",
+            2. Subukan muli sa ilang sandali""",
             
             'bisaya': """Pasayloa ko, pero naglisod ko sa paghatag og tubag karon.
             Palihog sulayi pag-usab ang imong pangutana, o kung magpadayon ang problema:
             1. Susiha ang imong internet connection
-            2. Sulayi pag-usab sa pipila ka gutlo
-            3. Kontaka ang IT support kung magpadayon ang problema""",
+            2. Sulayi pag-usab sa pipila ka gutlo""",
             
             'waray': """Pasayloa ako, may problema ako ha paghatag hin specific nga response yana.
             Paki-try liwat it imo pangutana, o kun padayon ini nga problema:
             1. I-check an imo internet connection
-            2. Paki-try liwat ha pira ka minuto
-            3. Kontak-a an IT support kun padayon an problema"""
+            2. Paki-try liwat ha pira ka minuto"""
         }
         
         return fallback_responses.get(language.lower(), fallback_responses['english'])
@@ -311,7 +303,7 @@ class GeminiModelManager:
         """Internal method to generate responses"""
         # Build the prompt with context
         if context:
-            prompt = f"{context}\n\nUser Query: {prompt}\n\nProvide a helpful response focusing on IT support and technical assistance:"
+            prompt = f"{context}\n\nUser Query: {prompt}\n\nProvide a helpful response:"
 
         # Apply generation parameters 
         generation_config = {

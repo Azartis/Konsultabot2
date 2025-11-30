@@ -1,23 +1,21 @@
-// Gemini API Configuration
-// To get your API key:
-// 1. Go to https://makersuite.google.com/app/apikey
-// 2. Create a new API key
-// 3. Replace the placeholder below with your actual key
+import Constants from 'expo-constants';
+
+/**
+ * Gemini configuration.
+ * Provide your key via environment variable:
+ *   EXPO_PUBLIC_GEMINI_API_KEY=your-key-here
+ * (Add to a .env file or pass when running `expo start`.)
+ */
+const resolvedApiKey =
+  process.env.EXPO_PUBLIC_GEMINI_API_KEY ||
+  Constants.expoConfig?.extra?.geminiApiKey ||
+  '';
 
 export const GEMINI_CONFIG = {
-  // Replace this with your actual Gemini API key
-  API_KEY: 'AIzaSyDrDbp5ihtgWMAPMNswH2qr-pSzzwG7BKY',
-  
-  // Model configuration
+  API_KEY: resolvedApiKey,
   MODEL: 'gemini-flash-latest',
-  
-  // API endpoint  
   API_URL: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent',
-  
-  // Request timeout (in milliseconds)
   TIMEOUT: 30000,
-  
-  // System prompt for agile, concise AI assistant
   SYSTEM_PROMPT: `You are an agile AI assistant. Keep responses SHORT, DIRECT, and TO THE POINT.
 
 Response guidelines:
@@ -30,17 +28,17 @@ Response guidelines:
 - Use emojis sparingly (1-2 max)
 - If more detail is needed, the user will ask
 
-Remember: SHORT, AGILE, DIRECT responses. Get to the answer quickly.`
+Remember: SHORT, AGILE, DIRECT responses. Get to the answer quickly.`,
 };
 
-// Validation function
 export const validateGeminiConfig = () => {
-  if (!GEMINI_CONFIG.API_KEY || GEMINI_CONFIG.API_KEY.includes('XXXXX')) {
-    console.warn('⚠️ Gemini API key not configured. Please update src/config/gemini.js with your actual API key.');
+  if (!GEMINI_CONFIG.API_KEY) {
+    console.warn(
+      '⚠️ Gemini API key not configured. Set EXPO_PUBLIC_GEMINI_API_KEY in your environment or app config.'
+    );
     return false;
   }
-  
-  // Note: API key exists but may return 404 errors - fallback system will handle this
+
   console.log('🤖 Gemini API configured - will attempt connection with fallback support');
   return true;
 };

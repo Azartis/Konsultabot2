@@ -23,8 +23,9 @@ urlpatterns = [
     path('api/v1/chat/', include('chatbot_core.urls')),
     path('api/v1/knowledge/', include('knowledgebase.urls')),
     path('api/v1/analytics/', include('analytics.urls')),
+    path('api/v1/admin/', include('admin_panel.urls')),
     
-    # Admin dashboard
+    # Admin dashboard (legacy)
     path('dashboard/', include('adminpanel.urls')),
     
     # Root redirect to admin dashboard

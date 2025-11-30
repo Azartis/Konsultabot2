@@ -108,13 +108,19 @@ const getPossibleBackendURLs = () => {
       'http://192.168.0.17:8000/api'
     );
   } else {
-    // Web - use localhost first (same machine), then try network IPs
+    // Web - try current host first (Expo web often runs on same machine)
+    const webHost =
+      typeof window !== 'undefined' && window.location?.hostname
+        ? window.location.hostname
+        : 'localhost';
+
     urls.push(
-      'http://localhost:8000/api',        // Localhost (same machine - BEST for web)
-      'http://127.0.0.1:8000/api',       // Localhost alternative
-      'http://192.168.110.57:8000/api',  // Current network IP
-      'http://192.168.103.243:8000/api', // Previous network IP
-      'http://10.143.17.242:8000/api'    // Previous WiFi IP
+      `http://${webHost}:8000/api`,      // Current host → backend port 8000
+      'http://localhost:8000/api',       // Explicit localhost
+      'http://127.0.0.1:8000/api',       // Loopback alternative
+      'http://192.168.110.57:8000/api',  // Recent LAN IPs
+      'http://192.168.103.243:8000/api',
+      'http://10.143.17.242:8000/api'
     );
   }
   
@@ -248,10 +254,11 @@ const discoverBackendURL = async () => {
 };
 
 // Get initial baseURL - will be updated by discovery
-// For mobile, we'll discover the correct URL, so start with a placeholder
+// For web, talk to backend on the same machine (localhost:8000)
+// For mobile, this is just a placeholder; discoverBackendURL will override it.
 let initialBaseURL = Platform.OS === 'web' 
-  ? 'http://192.168.103.243:8000/api' 
-  : 'http://192.168.103.243:8000/api'; // Temporary - will be discovered
+  ? 'http://localhost:8000/api'
+  : 'http://192.168.103.243:8000/api'; // Mobile placeholder - will be discovered
 
 // Create Axios instance with longer timeout and retries
 const api = axios.create({
@@ -826,6 +833,45 @@ class ApiService {
       if (error.code === 'ECONNABORTED' || error.message.includes('timeout') || error.message.includes('Network Error')) {
         console.log('🔌 Network unavailable, providing offline response');
         return this.getOfflineResponse(message, language);
+      }
+      throw error;
+    }
+  }
+
+  // Direct Django V1 chat endpoint (uses backend 3-mode router)
+  async sendV1ChatMessage(query, language = 'english', sessionId = null) {
+    const payload = {
+      query,
+      language,
+    };
+    if (sessionId) {
+      payload.session_id = sessionId;
+    }
+    try {
+      // For web, always talk to backend on localhost:8000 to avoid stale LAN IPs
+      if (Platform.OS === 'web') {
+        this.api.defaults.baseURL = 'http://localhost:8000/api';
+      }
+      return await this.api.post('/v1/chat/', payload);
+    } catch (error) {
+      // If the cached backend URL is dead, clear it and attempt rediscovery once
+      if (error?.code === 'ERR_NETWORK') {
+        try {
+          await AsyncStorage.removeItem('backend_url');
+        } catch (cacheErr) {
+          console.warn('Failed to clear cached backend url:', cacheErr);
+        }
+
+        try {
+          const newUrl = await discoverBackendURL();
+          if (newUrl) {
+            this.api.defaults.baseURL = newUrl;
+            console.log('🔁 Retrying chat request using discovered backend:', newUrl);
+            return await this.api.post('/v1/chat/', payload);
+          }
+        } catch (discoverErr) {
+          console.warn('Backend discovery failed after network error:', discoverErr?.message || discoverErr);
+        }
       }
       throw error;
     }

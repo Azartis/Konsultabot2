@@ -19,17 +19,15 @@ import { MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Audio } from 'expo-av';
 import * as Speech from 'expo-speech';
-import { apiService, callGeminiAPI } from '../../services/apiService';
-import { intelligentChatService } from '../../services/intelligentChatService';
+import { apiService } from '../../services/apiService';
 import { lumaTheme } from '../../theme/lumaTheme';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
 import { useChatHistory } from '../../context/ChatHistoryContext';
-import HolographicOrb from '../../components/HolographicOrb';
-import StarryBackground from '../../components/StarryBackground';
 import SpeechWaves from '../../components/SpeechWaves';
 import { useNetworkStatus } from '../../utils/networkUtils';
-import { searchKnowledgeBase, getRandomTip } from '../../utils/offlineKnowledgeBase';
+import HolographicOrb from '../../components/HolographicOrb';
+import GlitchText from '../../components/GlitchText';
 
 const { width, height } = Dimensions.get('window');
 
@@ -42,7 +40,8 @@ export default function ImprovedChatScreen({ navigation }) {
     updateChatMessages,
     chats,
     setCurrentChatId,
-    getChatById 
+    getChatById,
+    removeTemporaryChats
   } = useChatHistory();
   
   // Network status detection
@@ -56,6 +55,9 @@ export default function ImprovedChatScreen({ navigation }) {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [userData, setUserData] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [showSideMenu, setShowSideMenu] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [responseSpeed, setResponseSpeed] = useState('Fast');
   const [speechRecognition, setSpeechRecognition] = useState(null);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isVoiceInput, setIsVoiceInput] = useState(false);
@@ -63,6 +65,7 @@ export default function ImprovedChatScreen({ navigation }) {
   const [wakeWordRecognition, setWakeWordRecognition] = useState(null);
   const scrollViewRef = useRef();
   const carouselRef = useRef();
+  const prevUserRef = useRef(user);
 
   const buildFullName = (profile) => {
     if (!profile) return null;
@@ -88,11 +91,35 @@ export default function ImprovedChatScreen({ navigation }) {
     initializeWakeWordDetection();
   }, []);
 
+  // Detect login: when user changes from null/undefined to a user object
   useEffect(() => {
-    if (user) {
-      intelligentChatService.setUserProfile(user);
+    const prevUser = prevUserRef.current;
+    const currentUser = user;
+    
+    // User just logged in (was null/undefined, now has a user)
+    if (!prevUser && currentUser) {
+      console.log('🆕 User logged in, creating new temporary chat...');
+      // Remove any temporary chats that don't have user messages
+      if (removeTemporaryChats) {
+        removeTemporaryChats();
+      }
+      // Create a new temporary chat only if there's no current chat
+      if (createNewChat && !currentChatId) {
+        const newChatId = createNewChat(true); // true = temporary
+        // Initialize with welcome message
+        const welcomeMsg = {
+          id: Date.now(),
+          text: `Hello! I'm KonsultaBot, your AI assistant! 🤖✨\n\n🌐 Online Mode:\n• Advanced AI-powered responses\n• Real-time information\n• Comprehensive knowledge base\n\n📴 Offline Mode:\n• Basic IT troubleshooting\n• Study tips and academic advice\n• EVSU campus information\n• Common questions answered locally\n\nI automatically detect your connection and adapt! What would you like to know?`,
+          sender: 'bot',
+          timestamp: new Date(),
+        };
+        setMessages([welcomeMsg]);
+      }
     }
-  }, [user]);
+    
+    // Update ref for next comparison
+    prevUserRef.current = currentUser;
+  }, [user, createNewChat, removeTemporaryChats, currentChatId]);
 
   // Cleanup wake word listener on unmount
   useEffect(() => {
@@ -266,11 +293,9 @@ export default function ImprovedChatScreen({ navigation }) {
       if (currentChat && currentChat.messages && currentChat.messages.length > 0) {
         setMessages(currentChat.messages);
       } else {
+        // No existing chat - show welcome message
+        // Chat creation will be handled by login detection useEffect if user is logged in
         setMessages([welcomeMsg]);
-        // Create a new chat if needed
-        if (!currentChatId && createNewChat) {
-          createNewChat();
-        }
       }
     } catch (error) {
       console.log('Error loading chat, using welcome message:', error);
@@ -279,20 +304,28 @@ export default function ImprovedChatScreen({ navigation }) {
   };
 
   // Save messages whenever they change
+  // Only save if there are user messages (not just bot welcome messages)
   useEffect(() => {
     if (currentChatId && messages.length > 0 && updateChatMessages) {
-      try {
-        updateChatMessages(currentChatId, messages);
-      } catch (error) {
-        console.log('Error saving messages:', error);
+      // Check if there are any user messages
+      const hasUserMessages = messages.some(m => m.sender === 'user');
+      
+      // Only save if there are user messages
+      if (hasUserMessages) {
+        try {
+          updateChatMessages(currentChatId, messages);
+        } catch (error) {
+          console.log('Error saving messages:', error);
+        }
       }
     }
-  }, [messages, currentChatId]);
+  }, [messages, currentChatId, updateChatMessages]);
 
   const handleNewChat = () => {
     try {
       if (createNewChat) {
-        const newChatId = createNewChat();
+        // User manually created a new chat, so it's not temporary
+        const newChatId = createNewChat(false); // false = permanent
         setMessages([]);
         setShowHistory(false);
       }
@@ -353,59 +386,21 @@ export default function ImprovedChatScreen({ navigation }) {
 
       let botMessage;
 
-      // Step 2: Use Intelligent Chat Service (asks follow-up questions, uses local KB first, Gemini as fallback)
-      console.log('🧠 Using Intelligent Chat Service...');
-      try {
-        const response = await intelligentChatService.chat(text.trim(), 'english');
-        
-        // Handle follow-up questions
-        if (response.needsFollowUp) {
-          // Store the context key for the next message
-          intelligentChatService.handleFollowUpAnswer(text.trim(), response.contextKey);
-          
-          botMessage = {
-            id: Date.now() + 1,
-            text: response.text,
-            sender: 'bot',
-            timestamp: new Date(),
-            confidence: 0.9,
-            source: response.source || 'intelligent_chat',
-            mode: response.mode || 'offline',
-            isQuestion: true,
-            contextKey: response.contextKey
-          };
-        } else {
-          // Regular response
-          botMessage = {
-            id: Date.now() + 1,
-            text: response.text,
-            sender: 'bot',
-            timestamp: new Date(),
-            confidence: 0.9,
-            source: response.source || 'intelligent_chat',
-            mode: response.mode || 'offline'
-          };
-        }
-        
-        console.log(`✅ Intelligent Chat response (${response.source}, ${response.mode})`);
-      } catch (intelligentError) {
-        console.log('❌ Intelligent Chat failed:', intelligentError.message);
-        
-        // Fallback to knowledge base
-        const kbResponse = await searchKnowledgeBase(
-          text.trim(),
-          intelligentChatService.getUserProfile()
-        );
-        botMessage = {
-          id: Date.now() + 1,
-          text: kbResponse.answer + (isOnline ? '\n\n📶 **Online Mode** - Using local knowledge base.' : '\n\n📴 **Offline Mode** - Using local knowledge base.'),
-          sender: 'bot',
-          timestamp: new Date(),
-          confidence: kbResponse.confidence,
-          source: 'knowledge_base',
-          mode: isOnline ? 'online' : 'offline'
-        };
-      }
+      // Step 2: Always use backend 3-mode chatbot (no offline fallback)
+      console.log('🌐 Calling backend /api/v1/chat/ via apiService...');
+      const backendResponse = await apiService.sendV1ChatMessage(text.trim(), 'english');
+      const data = backendResponse.data || backendResponse; // Axios wraps in .data
+
+      const answerText = data.text || data.message || '';
+      botMessage = {
+        id: Date.now() + 1,
+        text: answerText,
+        sender: 'bot',
+        timestamp: new Date(),
+        confidence: data.confidence ?? 0.9,
+        source: data.source || 'backend',
+        mode: data.mode || data.metadata?.mode || 'normal',
+      };
 
       setMessages(prev => [...prev, botMessage]);
       
@@ -442,10 +437,10 @@ export default function ImprovedChatScreen({ navigation }) {
       
     } catch (error) {
       console.error('❌ Error in sendMessage:', error);
-      // Final fallback
+      // No offline fallback – surface error so user knows connection is required
       const errorMessage = {
         id: Date.now() + 1,
-        text: "I encountered an error processing your message. Please try again.\n\nIf you're offline, I'll use my local knowledge base to help you with common questions about IT support, academics, and EVSU information.",
+        text: "I couldn't reach the online assistant. Please check your internet connection or make sure the backend server is running, then try again.",
         sender: 'bot',
         timestamp: new Date(),
         source: 'error_fallback'
@@ -465,26 +460,19 @@ export default function ImprovedChatScreen({ navigation }) {
 
   const renderMessage = (item) => {
     const isUser = item.sender === 'user';
-    const authorName = isUser ? (userFormalName || 'You') : 'KonsultaBot';
     return (
       <View key={item.id} style={[styles.messageRow, isUser ? styles.userRow : styles.botRow]}>
+        {!isUser && (
+          <View style={styles.geminiIcon}>
+            <HolographicOrb size={32} animate={true} />
+          </View>
+        )}
         <View
           style={[
             styles.messageBlock,
             isUser ? styles.userBlock : styles.botBlock,
-            item.type === 'welcome' && styles.noticeBlock,
-            item.type === 'starter' && styles.tipBlock,
           ]}
         >
-          <Text
-            style={[
-              styles.senderLabel,
-              !isUser && styles.botSenderLabel,
-              isUser && styles.userSenderLabel,
-            ]}
-          >
-            {authorName}
-          </Text>
           <Text
             style={[
               styles.messageText,
@@ -493,20 +481,12 @@ export default function ImprovedChatScreen({ navigation }) {
           >
             {item.text}
           </Text>
-          {item.confidence && (
-            <Text style={styles.confidenceNote}>
-              AI Confidence: {Math.round(item.confidence * 100)}%
-            </Text>
-          )}
-          <Text
-            style={[
-              styles.messageTimestamp,
-              isUser && styles.userTimestamp,
-            ]}
-          >
-            {formatTimestamp(item.timestamp)}
-          </Text>
         </View>
+        {isUser && (
+          <View style={styles.messageMenu}>
+            <MaterialIcons name="more-vert" size={16} color="#9AA0A6" />
+          </View>
+        )}
       </View>
     );
   };
@@ -746,40 +726,25 @@ export default function ImprovedChatScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Starry Background */}
-      <StarryBackground />
-
-      {/* Large Orb in Center - Shows on welcome or when recording */}
-      {(messages.length <= 1 || isRecording || isTranscribing) && (
-        <View 
-          style={[
-            styles.centerOrbContainer,
-            (isRecording || isTranscribing) && styles.centerOrbContainerActive
-          ]} 
-          pointerEvents="none"
-        >
-          <HolographicOrb 
-            size={Math.min(width * 0.6, 300)} 
-            animate={true} 
-          />
-          <SpeechWaves isActive={isRecording} />
-          {(isRecording || isTranscribing) && (
-            <View style={styles.recordingOverlay} pointerEvents="box-none">
-              <Text style={styles.recordingText}>
-                {isRecording ? '🎤 Listening...' : '✨ Transcribing...'}
-              </Text>
-              {isRecording && (
-                <TouchableOpacity 
-                  style={styles.cancelButton}
-                  onPress={cancelRecording}
-                  activeOpacity={0.7}
-                >
-                  <MaterialIcons name="close" size={20} color="#EF4444" />
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
+      {/* Recording Overlay - Only show when actively recording */}
+      {(isRecording || isTranscribing) && (
+        <View style={styles.recordingOverlay} pointerEvents="box-none">
+          <View style={styles.recordingContainer}>
+            <SpeechWaves isActive={isRecording} />
+            <Text style={styles.recordingText}>
+              {isRecording ? '🎤 Listening...' : '✨ Transcribing...'}
+            </Text>
+            {isRecording && (
+              <TouchableOpacity 
+                style={styles.cancelButton}
+                onPress={cancelRecording}
+                activeOpacity={0.7}
+              >
+                <MaterialIcons name="close" size={20} color="#EF4444" />
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       )}
 
@@ -790,208 +755,259 @@ export default function ImprovedChatScreen({ navigation }) {
         ]}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.headerOrb}>
-            <HolographicOrb size={36} animate={true} />
+        {/* Gemini-Style Header */}
+        <View style={styles.geminiHeader}>
+          <TouchableOpacity 
+            style={styles.menuButton}
+            onPress={() => setShowSideMenu(true)}
+          >
+            <MaterialIcons name="menu" size={24} color="#5F6368" />
+          </TouchableOpacity>
+          
+          <View style={styles.geminiTitleContainer}>
+            <GlitchText style={styles.geminiTitle}>Konsultabot</GlitchText>
           </View>
           
-          <View style={styles.headerCenter}>
-            <View style={styles.headerTitleRow}>
-              <Text style={styles.headerTitle}>KonsultaBot</Text>
-              <View style={[
-                styles.statusBadge,
-                { marginLeft: 8 },
-                isOnline && isBackendOnline ? styles.statusOnline :
-                isOnline ? styles.statusWarning : styles.statusOffline
-              ]}>
-                <MaterialIcons 
-                  name={
-                    isOnline && isBackendOnline ? 'check-circle' :
-                    isOnline ? 'warning' : 'cloud-off'
-                  }
-                  size={10}
-                  color="white"
-                  style={{ marginRight: 4 }}
-                />
-                <Text style={styles.statusBadgeText}>
-                  {isOnline && isBackendOnline ? 'ONLINE' :
-                   isOnline ? 'READY' : 'READY'}
-                </Text>
-              </View>
+          <TouchableOpacity 
+            style={styles.profileButton}
+            onPress={() => setShowProfileMenu(!showProfileMenu)}
+          >
+            <View style={styles.profileIcon}>
+              <Text style={styles.profileInitial}>
+                {userFormalName ? userFormalName.charAt(0).toLowerCase() : 'a'}
+              </Text>
             </View>
-            <Text style={styles.headerSubtitle}>
-              {wakeWordListening && Platform.OS === 'web' && '👂 Listening for "Help"... '}
-              {!isOnline && 'Using local knowledge base and AI'}
-              {isOnline && !isBackendOnline && 'Using local AI (backend unavailable)'}
-              {isOnline && isBackendOnline && 'Connected to AI backend'}
-            </Text>
-          </View>
-
-          <TouchableOpacity 
-            style={styles.headerButton}
-            onPress={checkConnectivity}
-            disabled={isLoading}
-          >
-            <MaterialIcons 
-              name="refresh" 
-              size={22} 
-              color={isOnline && isBackendOnline ? '#10B981' : '#F59E0B'} 
-            />
-          </TouchableOpacity>
-
-          {Platform.OS === 'web' && (
-            <TouchableOpacity 
-              style={[
-                styles.headerButton,
-                wakeWordListening && styles.headerButtonActive
-              ]}
-              onPress={toggleWakeWordListening}
-            >
-              <MaterialIcons 
-                name={wakeWordListening ? 'hearing' : 'hearing-disabled'} 
-                size={22} 
-                color={wakeWordListening ? '#10B981' : lumaTheme.colors.textMuted} 
-              />
-            </TouchableOpacity>
-          )}
-
-          <TouchableOpacity 
-            style={styles.headerButton}
-            onPress={() => setShowHistory(!showHistory)}
-          >
-            <MaterialIcons name="history" size={22} color={lumaTheme.colors.text} />
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={styles.headerButton}
-            onPress={handleNewChat}
-          >
-            <MaterialIcons name="add" size={26} color={lumaTheme.colors.primary} />
           </TouchableOpacity>
         </View>
+        
+        {/* Profile Dropdown Menu */}
+        {showProfileMenu && (
+          <TouchableOpacity 
+            style={styles.profileMenuOverlay}
+            activeOpacity={1}
+            onPress={() => setShowProfileMenu(false)}
+          >
+            <View style={styles.profileMenu} onStartShouldSetResponder={() => true}>
+              <Text style={styles.profileMenuTitle}>Account</Text>
+              <Text style={styles.profileMenuName}>{userFormalName || 'User'}</Text>
+              <Text style={styles.profileMenuEmail}>{user?.email || userData?.email || 'user@example.com'}</Text>
+              
+              {/* Separator */}
+              <View style={styles.profileMenuSeparator} />
+              
+              {/* Logout Button */}
+              <TouchableOpacity
+                style={styles.profileMenuLogout}
+                onPress={() => {
+                  setShowProfileMenu(false);
+                  logout();
+                }}
+              >
+                <MaterialIcons name="logout" size={18} color="#EA4335" />
+                <Text style={styles.profileMenuLogoutText}>Log out</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        )}
 
-        {/* Chat History Modal */}
+        {/* Gemini-Style Side Menu */}
         <Modal
-          visible={showHistory}
+          visible={showSideMenu}
           transparent
           animationType="slide"
-          onRequestClose={() => setShowHistory(false)}
+          onRequestClose={() => setShowSideMenu(false)}
         >
-          <View style={styles.modalOverlay}>
-            <View style={styles.historyContainer}>
-              <View style={styles.historyHeader}>
-                <Text style={styles.historyTitle}>Chat History</Text>
-                <TouchableOpacity onPress={() => setShowHistory(false)}>
-                  <MaterialIcons name="close" size={24} color={lumaTheme.colors.text} />
-                </TouchableOpacity>
+          <View style={styles.sideMenuOverlay}>
+            <View style={styles.sideMenuContainer}>
+              {/* Search Bar */}
+              <View style={styles.sideMenuSearch}>
+                <MaterialIcons name="search" size={20} color="#5F6368" />
+                <TextInput
+                  style={styles.sideMenuSearchInput}
+                  placeholder="Search for chats"
+                  placeholderTextColor="#9AA0A6"
+                />
               </View>
               
-              <ScrollView style={styles.historyList}>
-                {Array.isArray(chats) && chats.map((chat) => (
-                  <TouchableOpacity
-                    key={chat.id}
-                    style={[
-                      styles.historyItem,
-                      chat.id === currentChatId && styles.activeHistoryItem
-                    ]}
-                    onPress={() => handleSelectChat(chat.id)}
-                  >
-                    <Text style={styles.historyItemTitle}>{chat.title || 'Untitled Chat'}</Text>
-                    <Text style={styles.historyItemDate}>
-                      {chat.updatedAt ? new Date(chat.updatedAt).toLocaleDateString() : 'Today'}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-                
-                {(!chats || chats.length === 0) && (
-                  <Text style={styles.emptyHistory}>No chat history yet</Text>
-                )}
-              </ScrollView>
+              {/* New Chat */}
+              <TouchableOpacity 
+                style={styles.sideMenuNewChat}
+                onPress={() => {
+                  handleNewChat();
+                  setShowSideMenu(false);
+                }}
+              >
+                <MaterialIcons name="edit" size={20} color="#5F6368" />
+                <Text style={styles.sideMenuNewChatText}>New chat</Text>
+                <View style={styles.sideMenuNewChatIcon}>
+                  <MaterialIcons name="more-vert" size={16} color="#5F6368" />
+                </View>
+              </TouchableOpacity>
+              
+              {/* Chats */}
+              <View style={styles.sideMenuSection}>
+                <Text style={styles.sideMenuSectionTitle}>Chats</Text>
+                <ScrollView style={styles.sideMenuChatsList}>
+                  {Array.isArray(chats) && chats.slice(0, 10).map((chat) => (
+                    <TouchableOpacity
+                      key={chat.id}
+                      style={[
+                        styles.sideMenuChatItem,
+                        chat.id === currentChatId && styles.sideMenuChatItemActive
+                      ]}
+                      onPress={() => {
+                        handleSelectChat(chat.id);
+                        setShowSideMenu(false);
+                      }}
+                    >
+                      <Text style={styles.sideMenuChatTitle} numberOfLines={1}>
+                        {chat.title || 'Untitled Chat'}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                  {(!chats || chats.length === 0) && (
+                    <Text style={styles.sideMenuEmptyChats}>No chats yet</Text>
+                  )}
+                </ScrollView>
+              </View>
+              
+              {/* Settings & Help */}
+              <TouchableOpacity style={styles.sideMenuSettings}>
+                <MaterialIcons name="settings" size={20} color="#5F6368" />
+                <Text style={styles.sideMenuSettingsText}>Settings & help</Text>
+              </TouchableOpacity>
             </View>
+            
+            {/* Overlay to close menu */}
+            <TouchableOpacity 
+              style={styles.sideMenuBackdrop}
+              onPress={() => setShowSideMenu(false)}
+              activeOpacity={1}
+            />
           </View>
         </Modal>
 
-        {/* Messages */}
+        {/* Main Content Area */}
         <ScrollView 
           ref={scrollViewRef}
-          style={styles.messagesContainer}
-          contentContainerStyle={styles.messagesContent}
+          style={styles.mainContent}
+          contentContainerStyle={styles.mainContentInner}
           onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
         >
-          {messages.map(renderMessage)}
+          {/* Greeting Section - Show when no messages or first message */}
+          {messages.length === 0 && (
+            <View style={styles.greetingSection}>
+              <Text style={styles.greetingText}>
+                Hello, {userFormalName ? userFormalName.split(' ')[0].toLowerCase() : 'there'}
+              </Text>
+            </View>
+          )}
           
-          {isLoading && (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color={lumaTheme.colors.primary} />
-              <Text style={styles.loadingText}>Thinking...</Text>
+          {/* Action Chips - Show when no messages */}
+          {messages.length === 0 && (
+            <View style={styles.actionChipsContainer}>
+              <TouchableOpacity 
+                style={styles.actionChip}
+                onPress={() => sendMessage("Create an image for me")}
+              >
+                <Text style={styles.actionChipEmoji}>🍌</Text>
+                <Text style={styles.actionChipText}>Create Image</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.actionChip}
+                onPress={() => sendMessage("Help me write something")}
+              >
+                <Text style={styles.actionChipText}>Write</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.actionChip}
+                onPress={() => sendMessage("Help me build or create something")}
+              >
+                <Text style={styles.actionChipText}>Build</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.actionChip}
+                onPress={() => sendMessage("Do deep research on a topic")}
+              >
+                <Text style={styles.actionChipText}>Deep Research</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.actionChip}
+                onPress={() => sendMessage("Help me learn something new")}
+              >
+                <Text style={styles.actionChipText}>Learn</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+          
+          {/* Messages */}
+          {messages.length > 0 && (
+            <View style={styles.messagesContainer}>
+              {messages.map(renderMessage)}
+              
+              {isLoading && (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="small" color="#4285F4" />
+                  <Text style={styles.loadingText}>Thinking...</Text>
+                </View>
+              )}
             </View>
           )}
         </ScrollView>
 
-        {/* Carousel Suggestions */}
-        {messages.length <= 1 && (
-          <FlatList
-            ref={carouselRef}
-            data={suggestions}
-            renderItem={renderSuggestion}
-            keyExtractor={item => item.id}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            snapToInterval={width * 0.7 + 12}
-            decelerationRate="fast"
-            contentContainerStyle={styles.carouselContainer}
-            style={styles.carousel}
-          />
-        )}
-
-        {/* Input Container */}
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.textInput}
-            value={inputText}
-            onChangeText={setInputText}
-            placeholder="Ask me anything! 🤖✨"
-            placeholderTextColor={lumaTheme.colors.textMuted}
-            multiline
-            maxLength={500}
-          />
-          
-          {/* Voice Button */}
-          <TouchableOpacity
-            style={[
-              styles.voiceButton, 
-              isRecording && styles.voiceButtonActive,
-              isTranscribing && styles.voiceButtonTranscribing
-            ]}
-            onPress={isRecording ? stopRecording : startRecording}
-            disabled={isLoading || isTranscribing}
-          >
-            {isTranscribing ? (
-              <ActivityIndicator size="small" color={lumaTheme.colors.primary} />
-            ) : (
-              <MaterialIcons 
-                name={isRecording ? "stop" : "mic"} 
-                size={22} 
-                color={isRecording ? '#EF4444' : lumaTheme.colors.primary} 
-              />
-            )}
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[
-              styles.sendButton,
-              (!inputText.trim() || isLoading) && styles.sendButtonDisabled
-            ]}
-            onPress={() => sendMessage()}
-            disabled={!inputText.trim() || isLoading}
-          >
-            <MaterialIcons 
-              name="send" 
-              size={20} 
-              color={(!inputText.trim() || isLoading) ? lumaTheme.colors.textMuted : 'white'} 
+        {/* Konsultabot-Style Input Container */}
+        <View style={styles.geminiInputContainer}>
+          <View style={styles.geminiInputField}>
+            <TextInput
+              style={styles.geminiTextInput}
+              value={inputText}
+              onChangeText={setInputText}
+              placeholder="Ask Konsultabot"
+              placeholderTextColor="#9AA0A6"
+              multiline
+              maxLength={500}
+              onSubmitEditing={() => {
+                if (inputText.trim() && !isLoading) {
+                  sendMessage();
+                }
+              }}
             />
-          </TouchableOpacity>
+            
+            {inputText.trim() ? (
+              <TouchableOpacity
+                style={styles.geminiSendButton}
+                onPress={() => sendMessage()}
+                disabled={isLoading}
+              >
+                <MaterialIcons 
+                  name="send" 
+                  size={20} 
+                  color="#4285F4" 
+                />
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={styles.geminiMicButton}
+                onPress={isRecording ? stopRecording : startRecording}
+                disabled={isLoading || isTranscribing}
+              >
+                {isTranscribing ? (
+                  <ActivityIndicator size="small" color="#4285F4" />
+                ) : (
+                  <MaterialIcons 
+                    name={isRecording ? "stop" : "mic"} 
+                    size={20} 
+                    color={isRecording ? '#EA4335' : '#5F6368'} 
+                  />
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
+          
+          {/* Disclaimer */}
+          <Text style={styles.geminiDisclaimer}>
+            Konsultabot can make mistakes, so double-check it
+          </Text>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -1001,41 +1017,179 @@ export default function ImprovedChatScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: lumaTheme.colors.background,
+    backgroundColor: '#F8F9FA',
   },
   contentContainer: {
     flex: 1,
-    alignItems: 'center',
   },
   contentContainerBlurred: {
     opacity: 0.1,
   },
-  centerOrbContainer: {
-    position: 'absolute',
-    top: '30%',
-    left: '50%',
-    marginLeft: -Math.min(width * 0.3, 150),
-    zIndex: 0,
+  // Gemini Header Styles
+  geminiHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 0,
+  },
+  menuButton: {
+    padding: 8,
+  },
+  geminiTitleContainer: {
+    flex: 1,
     alignItems: 'center',
   },
-  centerOrbContainerActive: {
-    zIndex: 9999,
+  geminiTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#202124',
+    letterSpacing: 0.5,
+  },
+  profileButton: {
+    padding: 4,
+  },
+  profileIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#34A853',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  profileInitial: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  profileMenuOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
+    backgroundColor: 'transparent',
+  },
+  profileMenu: {
+    position: 'absolute',
+    top: 60,
+    right: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    padding: 12,
+    minWidth: 200,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  profileMenuTitle: {
+    fontSize: 12,
+    color: '#5F6368',
+    marginBottom: 4,
+  },
+  profileMenuName: {
+    fontSize: 14,
+    color: '#202124',
+    fontWeight: '500',
+    marginBottom: 2,
+  },
+  profileMenuEmail: {
+    fontSize: 12,
+    color: '#5F6368',
+    marginBottom: 8,
+  },
+  profileMenuSeparator: {
+    height: 1,
+    backgroundColor: '#E8EAED',
+    marginVertical: 8,
+  },
+  profileMenuLogout: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: 8,
+  },
+  profileMenuLogoutText: {
+    fontSize: 14,
+    color: '#EA4335',
+    marginLeft: 8,
+    fontWeight: '500',
+  },
+  // Greeting Section
+  greetingSection: {
+    paddingHorizontal: 16,
+    paddingTop: 32,
+    paddingBottom: 24,
+  },
+  greetingText: {
+    fontSize: 32,
+    fontWeight: '400',
+    color: '#1A73E8',
+    letterSpacing: 0,
+  },
+  // Action Chips
+  actionChipsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 16,
+    paddingBottom: 24,
+    gap: 8,
+  },
+  actionChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F3F4',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  actionChipEmoji: {
+    fontSize: 16,
+    marginRight: 6,
+  },
+  actionChipText: {
+    fontSize: 14,
+    color: '#202124',
+    fontWeight: '400',
+  },
+  // Main Content
+  mainContent: {
+    flex: 1,
+    backgroundColor: '#F8F9FA',
   },
   recordingOverlay: {
-    marginTop: 20,
-    backgroundColor: 'rgba(147, 51, 234, 0.2)',
-    paddingHorizontal: 24,
-    paddingVertical: 16,
-    borderRadius: 24,
-    borderWidth: 2,
-    borderColor: 'rgba(147, 51, 234, 0.5)',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 10000,
+  },
+  recordingContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 32,
+    alignItems: 'center',
+    minWidth: 200,
+  },
+  mainContentInner: {
+    paddingBottom: 20,
   },
   recordingText: {
-    color: lumaTheme.colors.text,
-    fontSize: 18,
-    fontWeight: '600',
+    color: '#202124',
+    fontSize: 16,
+    fontWeight: '500',
     textAlign: 'center',
+    marginTop: 16,
     marginBottom: 12,
   },
   cancelButton: {
@@ -1056,22 +1210,131 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginLeft: 6,
   },
-  header: {
-    width: '100%',
-    maxWidth: width > 1024 ? 1200 : 768,
-    backgroundColor: 'rgba(20, 20, 30, 0.98)',
-    paddingTop: Platform.OS === 'ios' ? 10 : 10,
-    paddingBottom: width > 768 ? 16 : 12,
-    paddingHorizontal: width > 768 ? 24 : 16,
+  // Side Menu Styles
+  sideMenuOverlay: {
+    flex: 1,
+    flexDirection: 'row',
+  },
+  sideMenuContainer: {
+    width: width * 0.85,
+    maxWidth: 360,
+    backgroundColor: '#FFFFFF',
+    paddingTop: 16,
+    paddingBottom: 20,
+  },
+  sideMenuBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  sideMenuSearch: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(147, 51, 234, 0.3)',
-    shadowColor: '#9333EA',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 5,
+    backgroundColor: '#F1F3F4',
+    marginHorizontal: 16,
+    marginBottom: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 24,
+  },
+  sideMenuSearchInput: {
+    flex: 1,
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#202124',
+  },
+  sideMenuNewChat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 8,
+  },
+  sideMenuNewChatText: {
+    flex: 1,
+    marginLeft: 16,
+    fontSize: 14,
+    color: '#202124',
+    fontWeight: '400',
+  },
+  sideMenuNewChatIcon: {
+    padding: 4,
+  },
+  sideMenuSection: {
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  sideMenuSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  sideMenuSectionTitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#202124',
+  },
+  sideMenuChatsList: {
+    maxHeight: 300,
+  },
+  sideMenuChatItem: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  sideMenuChatItemActive: {
+    backgroundColor: '#E8F0FE',
+  },
+  sideMenuChatTitle: {
+    fontSize: 14,
+    color: '#5F6368',
+  },
+  sideMenuEmptyChats: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 14,
+    color: '#9AA0A6',
+    fontStyle: 'italic',
+  },
+  sideMenuSettings: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginTop: 'auto',
+    borderTopWidth: 1,
+    borderTopColor: '#E8EAED',
+  },
+  sideMenuSettingsText: {
+    marginLeft: 16,
+    fontSize: 14,
+    color: '#202124',
+  },
+  sideMenuUpgrade: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F3F4',
+    marginHorizontal: 16,
+    marginTop: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 8,
+  },
+  sideMenuUpgradeIcon: {
+    width: 24,
+    height: 24,
+    marginRight: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sideMenuUpgradeIconText: {
+    fontSize: 18,
+  },
+  sideMenuUpgradeText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#202124',
+    fontWeight: '500',
   },
   headerOrb: {
     marginRight: 12,
@@ -1134,39 +1397,48 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   messagesContainer: {
-    flex: 1,
-    width: '100%',
-    maxWidth: width > 1024 ? 1200 : 768,
-    alignSelf: 'center',
-  },
-  messagesContent: {
-    paddingVertical: 0,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 16,
   },
   messageRow: {
+    flexDirection: 'row',
     width: '100%',
-    paddingHorizontal: width > 768 ? 32 : 16,
-    paddingVertical: width > 768 ? 12 : 10,
-  },
-  botRow: {
+    marginBottom: 20,
     alignItems: 'flex-start',
   },
+  botRow: {
+    justifyContent: 'flex-start',
+  },
   userRow: {
-    alignItems: 'flex-end',
+    justifyContent: 'flex-end',
+  },
+  geminiIcon: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+    marginTop: 4,
   },
   messageBlock: {
-    width: '100%',
-    maxWidth: width > 768 ? 780 : 600,
-    paddingHorizontal: width > 768 ? 24 : 16,
-    paddingVertical: width > 768 ? 24 : 18,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-    backgroundColor: 'transparent',
+    maxWidth: '75%',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 18,
   },
   botBlock: {
-    alignSelf: 'flex-start',
+    backgroundColor: '#E8F0FE',
+    borderTopLeftRadius: 4,
   },
   userBlock: {
-    alignSelf: 'flex-end',
+    backgroundColor: '#F1F3F4',
+    borderTopRightRadius: 4,
+  },
+  messageMenu: {
+    padding: 8,
+    marginLeft: 4,
+    marginTop: 4,
   },
   noticeBlock: {
     borderBottomColor: '#C7D2FE',
@@ -1176,33 +1448,29 @@ const styles = StyleSheet.create({
   },
   senderLabel: {
     fontSize: 12,
-    fontWeight: '600',
-    color: 'rgba(248, 250, 252, 0.6)',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 12,
+    fontWeight: '500',
+    color: '#5F6368',
+    marginBottom: 6,
   },
   botSenderLabel: {
-    color: 'rgba(167, 139, 250, 0.9)',
+    color: '#5F6368',
   },
   userSenderLabel: {
-    color: 'rgba(248, 250, 252, 0.85)',
+    color: '#5F6368',
     textAlign: 'right',
   },
   messageTimestamp: {
-    marginTop: 14,
+    marginTop: 8,
     fontSize: 11,
-    color: 'rgba(226, 232, 240, 0.5)',
-    letterSpacing: 0.8,
+    color: '#9AA0A6',
   },
   messageText: {
-    fontSize: 16,
-    lineHeight: 24,
-    color: 'rgba(248, 250, 252, 0.92)',
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#202124',
   },
   userMessageText: {
-    textAlign: 'right',
-    color: 'rgba(248, 250, 252, 0.95)',
+    color: '#202124',
   },
   confidenceNote: {
     marginTop: 10,
@@ -1250,78 +1518,46 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
   },
-  inputContainer: {
-    width: '100%',
-    maxWidth: width > 1024 ? 1200 : 768,
+  // Gemini Input Styles
+  geminiInputContainer: {
+    backgroundColor: '#FFFFFF',
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 20 : 12,
+    borderTopWidth: 0,
+  },
+  geminiInputField: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: width > 768 ? 32 : 16,
-    paddingVertical: width > 768 ? 16 : 12,
-    paddingBottom: Platform.OS === 'ios' ? 24 : width > 768 ? 16 : 12,
-    backgroundColor: 'rgba(20, 20, 30, 0.98)',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(147, 51, 234, 0.3)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 5,
+    alignItems: 'flex-end',
+    backgroundColor: '#F1F3F4',
+    marginHorizontal: 16,
+    borderRadius: 24,
+    paddingHorizontal: 4,
+    paddingVertical: 8,
+    minHeight: 56,
+    maxHeight: 120,
   },
-  textInput: {
+  geminiTextInput: {
     flex: 1,
-    fontSize: width > 768 ? 16 : 15,
-    color: lumaTheme.colors.text,
-    backgroundColor: 'rgba(40, 40, 50, 0.95)',
-    borderRadius: width > 768 ? 28 : 24,
-    paddingHorizontal: width > 768 ? 24 : 18,
-    paddingVertical: width > 768 ? 14 : 12,
-    maxHeight: width > 768 ? 120 : 100,
-    marginRight: 8,
-    borderWidth: 2,
-    borderColor: 'rgba(147, 51, 234, 0.4)',
-    shadowColor: '#9333EA',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 2,
+    fontSize: 16,
+    color: '#202124',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    maxHeight: 120,
   },
-  voiceButton: {
-    width: width > 768 ? 52 : 46,
-    height: width > 768 ? 52 : 46,
-    borderRadius: width > 768 ? 26 : 23,
-    backgroundColor: 'rgba(147, 51, 234, 0.15)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 6,
-    borderWidth: 2,
-    borderColor: lumaTheme.colors.primary,
-    shadowColor: lumaTheme.colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 3,
+  geminiMicButton: {
+    padding: 10,
+    marginRight: 4,
   },
-  voiceButtonActive: {
-    backgroundColor: 'rgba(239, 68, 68, 0.2)',
-    borderColor: '#EF4444',
+  geminiSendButton: {
+    padding: 10,
+    marginRight: 4,
   },
-  voiceButtonTranscribing: {
-    backgroundColor: 'rgba(59, 130, 246, 0.2)',
-    borderColor: '#3B82F6',
-  },
-  sendButton: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: lumaTheme.colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 6,
-    ...lumaTheme.shadows.medium,
-  },
-  sendButtonDisabled: {
-    backgroundColor: 'rgba(107, 114, 128, 0.5)',
-    ...lumaTheme.shadows.small,
+  geminiDisclaimer: {
+    fontSize: 11,
+    color: '#9AA0A6',
+    textAlign: 'center',
+    marginTop: 8,
+    paddingHorizontal: 16,
   },
   modalOverlay: {
     flex: 1,

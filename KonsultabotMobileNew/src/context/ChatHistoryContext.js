@@ -33,11 +33,13 @@ export const ChatHistoryProvider = ({ children }) => {
       const storedChats = await AsyncStorage.getItem('chat_history');
       if (storedChats) {
         const parsedChats = JSON.parse(storedChats);
-        setChats(parsedChats);
+        // Filter out any temporary chats (shouldn't be in storage, but just in case)
+        const permanentChats = parsedChats.filter(chat => !chat.temporary);
+        setChats(permanentChats);
         
         // Set most recent chat as current if none selected
-        if (!currentChatId && parsedChats.length > 0) {
-          setCurrentChatId(parsedChats[0].id);
+        if (!currentChatId && permanentChats.length > 0) {
+          setCurrentChatId(permanentChats[0].id);
         }
       }
     } catch (error) {
@@ -47,19 +49,22 @@ export const ChatHistoryProvider = ({ children }) => {
 
   const saveChats = async () => {
     try {
-      await AsyncStorage.setItem('chat_history', JSON.stringify(chats));
+      // Only save chats that are not temporary (have user messages)
+      const chatsToSave = chats.filter(chat => !chat.temporary);
+      await AsyncStorage.setItem('chat_history', JSON.stringify(chatsToSave));
     } catch (error) {
       console.error('Error saving chats:', error);
     }
   };
 
-  const createNewChat = () => {
+  const createNewChat = (temporary = false) => {
     const newChat = {
       id: Date.now().toString(),
       title: 'New Chat',
       messages: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      temporary: temporary, // Mark as temporary if not saved yet
     };
     
     setChats(prevChats => [newChat, ...prevChats]);
@@ -71,6 +76,9 @@ export const ChatHistoryProvider = ({ children }) => {
     setChats(prevChats =>
       prevChats.map(chat => {
         if (chat.id === chatId) {
+          // Check if there are any user messages (not just bot welcome messages)
+          const hasUserMessages = messages.some(m => m.sender === 'user');
+          
           // Auto-generate title from first message if still "New Chat"
           let title = chat.title;
           if (title === 'New Chat' && messages.length > 0) {
@@ -80,11 +88,15 @@ export const ChatHistoryProvider = ({ children }) => {
             }
           }
           
+          // If chat was temporary and now has user messages, mark it as permanent
+          const isTemporary = chat.temporary && !hasUserMessages;
+          
           return {
             ...chat,
             messages,
             title,
             updatedAt: new Date().toISOString(),
+            temporary: isTemporary,
           };
         }
         return chat;
@@ -114,6 +126,17 @@ export const ChatHistoryProvider = ({ children }) => {
     await AsyncStorage.removeItem('chat_history');
   };
 
+  const removeTemporaryChats = () => {
+    setChats(prevChats => {
+      const permanentChats = prevChats.filter(chat => !chat.temporary);
+      // If current chat was temporary and removed, set to first permanent chat or null
+      if (currentChatId && prevChats.find(c => c.id === currentChatId && c.temporary)) {
+        setCurrentChatId(permanentChats.length > 0 ? permanentChats[0].id : null);
+      }
+      return permanentChats;
+    });
+  };
+
   return (
     <ChatHistoryContext.Provider
       value={{
@@ -128,6 +151,7 @@ export const ChatHistoryProvider = ({ children }) => {
         getCurrentChat,
         setCurrentChatId,
         clearAllChats,
+        removeTemporaryChats,
       }}
     >
       {children}

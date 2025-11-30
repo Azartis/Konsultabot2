@@ -1,4 +1,2 @@
-"""
-Admin Panel App for KonsultaBot
-"""
+default_app_config = 'admin_panel.apps.AdminPanelConfig'
 

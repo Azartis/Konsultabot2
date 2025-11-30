@@ -19,13 +19,15 @@ env_path = BASE_DIR.parent / '.env'
 if env_path.exists():
     load_dotenv(str(env_path))
 
-# KonsultaBot Settings
+# Consolidated Gemini/Google API key (preferred env var: GEMINI_API_KEY)
+_GEMINI_API_KEY = os.getenv('GEMINI_API_KEY') or os.getenv('GOOGLE_API_KEY') or ''
+
+# KonsultaBot Settings (single, canonical definition)
 KONSULTABOT_SETTINGS = {
-    'OFFLINE_MODE': os.getenv('KONSULTABOT_OFFLINE_MODE', 'false').lower() == 'true',
-    'ENABLE_VOICE': os.getenv('KONSULTABOT_ENABLE_VOICE', 'true').lower() == 'true',
-    'GOOGLE_API_KEY': os.getenv('GOOGLE_API_KEY', 'AIzaSyBRynLqVFbj1jZfAAzqIfLH6xL4rt6483U'),
-    'AI_MODEL': os.getenv('KONSULTABOT_AI_MODEL', 'gemini-1.5-flash'),
-    'SESSION_TIMEOUT_MINUTES': 30,
+    # AI / Gemini configuration
+    'GOOGLE_API_KEY': _GEMINI_API_KEY,  # Backwards-compatible key name
+    'GEMINI_API_KEY': _GEMINI_API_KEY,  # Explicit Gemini key alias
+    'AI_MODEL': os.getenv('KONSULTABOT_AI_MODEL', 'gemini-2.5-flash'),
     'GEMINI_CONFIG': {
         'HISTORY_ENABLED': True,
         'MAX_OUTPUT_TOKENS': 2048,
@@ -33,7 +35,18 @@ KONSULTABOT_SETTINGS = {
         'TOP_P': 0.8,
         'TOP_K': 40,
         'CANDIDATE_COUNT': 1,
-    }
+    },
+
+    # Conversation / platform behavior
+    'SESSION_TIMEOUT_MINUTES': int(os.getenv('KONSULTABOT_SESSION_TIMEOUT', '30')),
+    'MAX_CONVERSATION_HISTORY': int(os.getenv('KONSULTABOT_MAX_HISTORY', '10')),
+    'DEFAULT_LANGUAGE': 'english',
+    'SUPPORTED_LANGUAGES': ['english', 'bisaya', 'waray', 'tagalog'],
+
+    # Feature toggles
+    'OFFLINE_MODE': os.getenv('KONSULTABOT_OFFLINE_MODE', 'false').lower() == 'true',
+    'ENABLE_VOICE': os.getenv('KONSULTABOT_ENABLE_VOICE', 'true').lower() == 'true',
+    'ENABLE_ANALYTICS': os.getenv('KONSULTABOT_ENABLE_ANALYTICS', 'true').lower() == 'true',
 }
 
 # Default login user for mobile testing / offline mode
@@ -94,8 +107,8 @@ INSTALLED_APPS = [
     'chatbot_core',
     'knowledgebase',
     'analytics',
-    'adminpanel',
     'user_account',  # RBAC system
+    'admin_panel',  # Admin Panel system
 ]
 
 # Simplified settings for development
@@ -321,30 +334,6 @@ CORS_ALLOWED_ORIGINS = [
 
 # CORS is already set above, this is redundant but kept for compatibility
 # CORS_ALLOW_ALL_ORIGINS = True  # Already set above
-
-# KonsultaBot specific settings
-KONSULTABOT_SETTINGS = {
-    'GEMINI_API_KEY': os.getenv('GEMINI_API_KEY'),
-    'SESSION_TIMEOUT_MINUTES': int(os.getenv('KONSULTABOT_SESSION_TIMEOUT', '30')),
-    'MAX_CONVERSATION_HISTORY': int(os.getenv('KONSULTABOT_MAX_HISTORY', '10')),
-    'ENABLE_VOICE_FEATURES': os.getenv('KONSULTABOT_ENABLE_VOICE', 'true').lower() == 'true',
-    'ENABLE_ANALYTICS': os.getenv('KONSULTABOT_ENABLE_ANALYTICS', 'true').lower() == 'true',
-    'DEFAULT_LANGUAGE': 'english',
-    'SUPPORTED_LANGUAGES': ['english', 'bisaya', 'waray', 'tagalog'],
-    'OFFLINE_MODE': False,  # Set to True to disable online features
-    'AI_MODEL': os.getenv('KONSULTABOT_AI_MODEL', 'gemini-1.5-flash'),
-    'SYSTEM_PROMPT': """
-You are KonsultaBot — an AI assistant for EVSU Dulag IT students.
-Be friendly, concise, and technical when needed.
-Provide clear, step-by-step solutions to IT-related problems.
-Focus on campus-specific solutions when relevant.
-Be encouraging and supportive.
-Keep responses practical and actionable.
-Use simple language and numbered steps for complex procedures.
-Suggest when to contact IT support for advanced issues.
-Only provide IT-related assistance and academic guidance.
-"""
-}
 
 # Logging configuration
 LOGGING = {

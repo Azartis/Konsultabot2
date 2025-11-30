@@ -1,129 +1,169 @@
 """
 Admin Panel Models for KonsultaBot
-Manages knowledge base, intents, tickets, notifications, and system settings
+Comprehensive models for managing chatbot content, users, tickets, and system configuration
 """
 from django.db import models
 from django.conf import settings
-from django.utils import timezone
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from django.core.validators import MinValueValidator, MaxValueValidator
 import uuid
 
 User = get_user_model()
 
 
+def generate_ticket_id():
+    """Generate unique ticket ID"""
+    return f"TKT-{uuid.uuid4().hex[:8].upper()}"
+
+
+class Intent(models.Model):
+    """Intent classification for chatbot responses"""
+    
+    INTENT_TYPE_CHOICES = [
+        ('tech_support', 'Technical Support'),
+        ('general', 'General Query'),
+        ('chit_chat', 'Chit Chat'),
+        ('greeting', 'Greeting'),
+        ('goodbye', 'Goodbye'),
+        ('unknown', 'Unknown'),
+        ('out_of_scope', 'Out of Scope'),
+    ]
+    
+    name = models.CharField(max_length=100, unique=True)
+    intent_type = models.CharField(max_length=20, choices=INTENT_TYPE_CHOICES)
+    description = models.TextField(blank=True)
+    priority = models.IntegerField(default=5, validators=[MinValueValidator(1), MaxValueValidator(10)])
+    is_active = models.BooleanField(default=True)
+    
+    # Response configuration
+    default_response = models.TextField(blank=True, help_text="Default response for this intent")
+    requires_clarification = models.BooleanField(default=False)
+    clarification_prompt = models.TextField(blank=True)
+    
+    # Metadata
+    usage_count = models.IntegerField(default=0)
+    success_rate = models.FloatField(default=0.0, validators=[MinValueValidator(0.0), MaxValueValidator(100.0)])
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_intents')
+    
+    class Meta:
+        ordering = ['-priority', 'name']
+        indexes = [
+            models.Index(fields=['intent_type', 'is_active']),
+            models.Index(fields=['priority']),
+        ]
+    
+    def __str__(self):
+        return f"{self.name} ({self.get_intent_type_display()})"
+
+
+class Keyword(models.Model):
+    """Keywords mapped to intents for rule-based matching"""
+    
+    intent = models.ForeignKey(Intent, on_delete=models.CASCADE, related_name='keywords')
+    keyword = models.CharField(max_length=100, db_index=True)
+    weight = models.FloatField(default=1.0, validators=[MinValueValidator(0.0), MaxValueValidator(10.0)])
+    is_active = models.BooleanField(default=True)
+    
+    # Matching options
+    exact_match = models.BooleanField(default=False, help_text="Require exact match")
+    case_sensitive = models.BooleanField(default=False)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        unique_together = ['intent', 'keyword']
+        ordering = ['-weight', 'keyword']
+        indexes = [
+            models.Index(fields=['keyword', 'is_active']),
+            models.Index(fields=['intent', 'is_active']),
+        ]
+    
+    def __str__(self):
+        return f"{self.keyword} -> {self.intent.name}"
+
+
 class KnowledgeBaseItem(models.Model):
-    """Knowledge Base entries for FAQs, troubleshooting steps, and device guides"""
+    """Knowledge Base entries for FAQs, troubleshooting, and guides"""
     
     CATEGORY_CHOICES = [
         ('faq', 'FAQ'),
-        ('troubleshooting', 'Troubleshooting Steps'),
+        ('troubleshooting', 'Troubleshooting'),
         ('device_guide', 'Device Guide'),
+        ('software_guide', 'Software Guide'),
+        ('network_guide', 'Network Guide'),
         ('general', 'General Information'),
     ]
     
-    STATUS_CHOICES = [
-        ('draft', 'Draft'),
-        ('published', 'Published'),
-        ('archived', 'Archived'),
+    LANGUAGE_CHOICES = [
+        ('english', 'English'),
+        ('tagalog', 'Tagalog'),
+        ('bisaya', 'Bisaya'),
+        ('waray', 'Waray'),
+        ('spanish', 'Spanish'),
     ]
     
     title = models.CharField(max_length=200)
-    category = models.CharField(max_length=50, choices=CATEGORY_CHOICES)
-    question = models.TextField(help_text="User question or issue description")
-    answer = models.TextField(help_text="Detailed answer or solution")
-    tags = models.JSONField(default=list, blank=True, help_text="List of tags for categorization")
+    category = models.CharField(max_length=30, choices=CATEGORY_CHOICES)
+    language = models.CharField(max_length=20, choices=LANGUAGE_CHOICES, default='english')
     
-    # Rich content
-    content = models.TextField(blank=True, help_text="Markdown or rich text content")
-    steps = models.JSONField(default=list, blank=True, help_text="Step-by-step instructions")
+    # Content
+    question = models.TextField(help_text="Question or issue description")
+    answer = models.TextField(help_text="Answer or solution")
+    content = models.TextField(blank=True, help_text="Full markdown/rich text content")
     
     # Metadata
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
+    tags = models.CharField(max_length=500, blank=True, help_text="Comma-separated tags")
+    keywords = models.TextField(blank=True, help_text="Comma-separated keywords for search")
     priority = models.IntegerField(default=5, validators=[MinValueValidator(1), MaxValueValidator(10)])
-    usage_count = models.IntegerField(default=0, help_text="Number of times this KB item was used")
+    
+    # Status
+    is_active = models.BooleanField(default=True)
+    is_featured = models.BooleanField(default=False)
+    view_count = models.IntegerField(default=0)
     helpful_count = models.IntegerField(default=0)
     not_helpful_count = models.IntegerField(default=0)
     
-    # Relations
-    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='kb_items_created')
-    updated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='kb_items_updated')
+    # Related items
+    related_items = models.ManyToManyField('self', blank=True, symmetrical=True)
     
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    published_at = models.DateTimeField(null=True, blank=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_kb_items')
+    last_reviewed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='reviewed_kb_items')
+    last_reviewed_at = models.DateTimeField(null=True, blank=True)
     
     class Meta:
-        ordering = ['-priority', '-usage_count', 'title']
+        ordering = ['-priority', '-is_featured', '-created_at']
         indexes = [
-            models.Index(fields=['category', 'status']),
-            models.Index(fields=['status', 'priority']),
+            models.Index(fields=['category', 'is_active']),
+            models.Index(fields=['language', 'is_active']),
+            models.Index(fields=['tags']),
         ]
-        verbose_name = 'Knowledge Base Item'
-        verbose_name_plural = 'Knowledge Base Items'
     
     def __str__(self):
         return f"{self.title} ({self.get_category_display()})"
     
-    def publish(self):
-        """Mark as published"""
-        self.status = 'published'
-        if not self.published_at:
-            self.published_at = timezone.now()
-        self.save()
-    
-    def increment_usage(self):
-        """Increment usage counter"""
-        self.usage_count += 1
-        self.save(update_fields=['usage_count'])
-
-
-class Intent(models.Model):
-    """Intent definitions for chatbot intent classification"""
-    
-    name = models.CharField(max_length=100, unique=True, help_text="Intent name (e.g., wifi_issue, printer_problem)")
-    display_name = models.CharField(max_length=200, help_text="Human-readable intent name")
-    description = models.TextField(blank=True)
-    
-    # Keywords for matching
-    keywords = models.JSONField(default=list, help_text="List of keywords that trigger this intent")
-    patterns = models.JSONField(default=list, help_text="Regex patterns for matching")
-    
-    # Response configuration
-    response_template = models.TextField(blank=True, help_text="Template for bot response")
-    mapped_kb_items = models.ManyToManyField(KnowledgeBaseItem, blank=True, related_name='intents')
-    
-    # Priority and ordering
-    priority = models.IntegerField(default=5, validators=[MinValueValidator(1), MaxValueValidator(10)])
-    is_active = models.BooleanField(default=True)
-    
-    # Metadata
-    usage_count = models.IntegerField(default=0)
-    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='intents_created')
-    
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    
-    class Meta:
-        ordering = ['priority', 'name']
-        indexes = [
-            models.Index(fields=['is_active', 'priority']),
-        ]
-    
-    def __str__(self):
-        return f"{self.display_name} ({self.name})"
+    def increment_view(self):
+        """Increment view count"""
+        self.view_count += 1
+        self.save(update_fields=['view_count'])
 
 
 class Ticket(models.Model):
-    """Support tickets for reported issues"""
+    """Support tickets for user-reported issues"""
     
     STATUS_CHOICES = [
         ('open', 'Open'),
         ('in_progress', 'In Progress'),
         ('resolved', 'Resolved'),
         ('closed', 'Closed'),
-        ('escalated', 'Escalated'),
+        ('cancelled', 'Cancelled'),
     ]
     
     PRIORITY_CHOICES = [
@@ -133,66 +173,53 @@ class Ticket(models.Model):
         ('urgent', 'Urgent'),
     ]
     
-    ticket_number = models.CharField(max_length=20, unique=True, editable=False)
+    ticket_id = models.CharField(max_length=20, unique=True, default=generate_ticket_id)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='tickets')
+    
+    # Ticket details
     title = models.CharField(max_length=200)
     description = models.TextField()
+    category = models.CharField(max_length=50, blank=True)
     
     # Status and priority
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='open')
     priority = models.CharField(max_length=20, choices=PRIORITY_CHOICES, default='medium')
     
-    # Relations
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='tickets')
+    # Assignment
     assigned_to = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_tickets')
+    assigned_at = models.DateTimeField(null=True, blank=True)
+    
+    # Resolution
+    resolution = models.TextField(blank=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    resolved_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='resolved_tickets')
+    
+    # Metadata
+    tags = models.CharField(max_length=500, blank=True)
     related_conversation = models.ForeignKey('chatbot_core.ConversationSession', on_delete=models.SET_NULL, null=True, blank=True)
-    related_kb_item = models.ForeignKey(KnowledgeBaseItem, on_delete=models.SET_NULL, null=True, blank=True)
     
-    # Internal notes
-    internal_notes = models.TextField(blank=True, help_text="Internal notes visible only to admins")
-    
-    # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    resolved_at = models.DateTimeField(null=True, blank=True)
-    closed_at = models.DateTimeField(null=True, blank=True)
     
     class Meta:
         ordering = ['-created_at']
         indexes = [
             models.Index(fields=['status', 'priority']),
-            models.Index(fields=['user', 'status']),
             models.Index(fields=['assigned_to', 'status']),
+            models.Index(fields=['user', 'status']),
         ]
     
     def __str__(self):
-        return f"#{self.ticket_number} - {self.title}"
-    
-    def save(self, *args, **kwargs):
-        if not self.ticket_number:
-            self.ticket_number = f"TKT-{uuid.uuid4().hex[:8].upper()}"
-        super().save(*args, **kwargs)
-    
-    def resolve(self):
-        """Mark ticket as resolved"""
-        self.status = 'resolved'
-        self.resolved_at = timezone.now()
-        self.save()
-    
-    def close(self):
-        """Close the ticket"""
-        self.status = 'closed'
-        self.closed_at = timezone.now()
-        self.save()
+        return f"{self.ticket_id} - {self.title}"
 
 
-class TicketHistory(models.Model):
-    """History timeline for ticket changes"""
+class TicketNote(models.Model):
+    """Internal notes for tickets"""
     
-    ticket = models.ForeignKey(Ticket, on_delete=models.CASCADE, related_name='history')
-    action = models.CharField(max_length=100, help_text="Action taken (e.g., 'Status changed to Resolved')")
-    description = models.TextField(blank=True)
-    changed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
-    changes = models.JSONField(default=dict, blank=True, help_text="JSON of field changes")
+    ticket = models.ForeignKey(Ticket, on_delete=models.CASCADE, related_name='notes')
+    author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='ticket_notes')
+    note = models.TextField()
+    is_internal = models.BooleanField(default=True, help_text="Internal notes are not visible to users")
     
     created_at = models.DateTimeField(auto_now_add=True)
     
@@ -200,94 +227,137 @@ class TicketHistory(models.Model):
         ordering = ['-created_at']
     
     def __str__(self):
-        return f"{self.ticket.ticket_number} - {self.action}"
+        return f"Note on {self.ticket.ticket_id} by {self.author.username}"
+
+
+class TicketHistory(models.Model):
+    """History log for ticket status changes"""
+    
+    ticket = models.ForeignKey(Ticket, on_delete=models.CASCADE, related_name='history')
+    changed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    action = models.CharField(max_length=100)
+    old_value = models.CharField(max_length=200, blank=True)
+    new_value = models.CharField(max_length=200, blank=True)
+    notes = models.TextField(blank=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.ticket.ticket_id} - {self.action}"
 
 
 class NotificationTemplate(models.Model):
     """Notification templates for user announcements"""
     
+    NOTIFICATION_TYPE_CHOICES = [
+        ('announcement', 'Announcement'),
+        ('maintenance', 'Maintenance'),
+        ('update', 'Update'),
+        ('alert', 'Alert'),
+        ('promotion', 'Promotion'),
+    ]
+    
     name = models.CharField(max_length=100, unique=True)
+    notification_type = models.CharField(max_length=20, choices=NOTIFICATION_TYPE_CHOICES)
     subject = models.CharField(max_length=200)
     message = models.TextField()
-    template_type = models.CharField(max_length=50, default='email', help_text="email, push, sms")
+    html_content = models.TextField(blank=True, help_text="HTML content for rich notifications")
     
-    # Variables
-    variables = models.JSONField(default=list, blank=True, help_text="Available template variables")
-    
+    # Targeting
+    target_audience = models.CharField(max_length=50, default='all', help_text="all, students, staff, admin")
     is_active = models.BooleanField(default=True)
-    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
     
     class Meta:
-        ordering = ['name']
+        ordering = ['-created_at']
     
     def __str__(self):
-        return f"{self.name} ({self.template_type})"
+        return f"{self.name} ({self.get_notification_type_display()})"
 
 
 class Notification(models.Model):
-    """User notifications and announcements"""
-    
-    STATUS_CHOICES = [
-        ('pending', 'Pending'),
-        ('sent', 'Sent'),
-        ('failed', 'Failed'),
-    ]
+    """Sent notifications to users"""
     
     template = models.ForeignKey(NotificationTemplate, on_delete=models.SET_NULL, null=True, blank=True)
-    recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications', null=True, blank=True)
     
+    # Custom notification (if not using template)
     subject = models.CharField(max_length=200)
     message = models.TextField()
-    notification_type = models.CharField(max_length=50, default='email')
+    html_content = models.TextField(blank=True)
     
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-    sent_at = models.DateTimeField(null=True, blank=True)
+    # Status
+    is_read = models.BooleanField(default=False)
+    read_at = models.DateTimeField(null=True, blank=True)
+    sent_at = models.DateTimeField(auto_now_add=True)
     
-    # Metadata
-    metadata = models.JSONField(default=dict, blank=True)
+    # Delivery
+    delivery_method = models.CharField(max_length=20, default='in_app', help_text="in_app, email, push")
+    delivery_status = models.CharField(max_length=20, default='pending', help_text="pending, sent, failed")
     
     created_at = models.DateTimeField(auto_now_add=True)
     
     class Meta:
         ordering = ['-created_at']
         indexes = [
-            models.Index(fields=['recipient', 'status']),
+            models.Index(fields=['user', 'is_read']),
+            models.Index(fields=['delivery_status']),
         ]
     
     def __str__(self):
-        return f"{self.subject} to {self.recipient.username}"
+        return f"Notification to {self.user.username if self.user else 'All Users'}"
+
+
+class ChatbotSettings(models.Model):
+    """System-wide chatbot configuration"""
+    
+    setting_key = models.CharField(max_length=100, unique=True)
+    setting_value = models.TextField()
+    setting_type = models.CharField(max_length=20, default='string', help_text="string, integer, boolean, json")
+    description = models.TextField(blank=True)
+    category = models.CharField(max_length=50, default='general', help_text="general, ai, ui, notifications")
+    
+    is_active = models.BooleanField(default=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    
+    class Meta:
+        ordering = ['category', 'setting_key']
+        verbose_name = "Chatbot Setting"
+        verbose_name_plural = "Chatbot Settings"
+    
+    def __str__(self):
+        return f"{self.setting_key} = {self.setting_value[:50]}"
 
 
 class AdminActivity(models.Model):
     """Log of admin activities for audit trail"""
     
-    ACTION_CHOICES = [
+    ACTION_TYPE_CHOICES = [
         ('create', 'Create'),
         ('update', 'Update'),
         ('delete', 'Delete'),
-        ('publish', 'Publish'),
-        ('unpublish', 'Unpublish'),
-        ('assign', 'Assign'),
-        ('resolve', 'Resolve'),
+        ('view', 'View'),
         ('export', 'Export'),
-        ('import', 'Import'),
         ('login', 'Login'),
         ('logout', 'Logout'),
+        ('settings_change', 'Settings Change'),
     ]
     
     admin = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='admin_activities')
-    action = models.CharField(max_length=50, choices=ACTION_CHOICES)
-    resource_type = models.CharField(max_length=50, help_text="Model name (e.g., KnowledgeBaseItem, Ticket)")
-    resource_id = models.IntegerField(null=True, blank=True)
+    action_type = models.CharField(max_length=20, choices=ACTION_TYPE_CHOICES)
+    resource_type = models.CharField(max_length=50, help_text="Model name or resource type")
+    resource_id = models.CharField(max_length=100, blank=True)
     description = models.TextField()
     
-    # Changes
-    changes = models.JSONField(default=dict, blank=True, help_text="JSON of what changed")
-    
-    # IP and user agent
+    # Additional data
+    metadata = models.JSONField(default=dict, blank=True)
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     user_agent = models.TextField(blank=True)
     
@@ -297,62 +367,45 @@ class AdminActivity(models.Model):
         ordering = ['-created_at']
         indexes = [
             models.Index(fields=['admin', 'created_at']),
-            models.Index(fields=['resource_type', 'resource_id']),
+            models.Index(fields=['action_type', 'created_at']),
+            models.Index(fields=['resource_type']),
         ]
     
     def __str__(self):
-        return f"{self.admin} - {self.action} {self.resource_type}"
+        return f"{self.admin.username} - {self.get_action_type_display()} - {self.resource_type}"
 
 
-class SystemSettings(models.Model):
-    """System-wide configuration settings"""
+class AdminRole(models.Model):
+    """Custom admin roles with permissions"""
     
-    SETTING_CATEGORY_CHOICES = [
-        ('chatbot', 'Chatbot Settings'),
-        ('ai', 'AI Configuration'),
-        ('notifications', 'Notifications'),
-        ('branding', 'Branding'),
-        ('security', 'Security'),
-        ('general', 'General'),
-    ]
-    
-    key = models.CharField(max_length=100, unique=True)
-    category = models.CharField(max_length=50, choices=SETTING_CATEGORY_CHOICES)
-    value = models.TextField(help_text="JSON-encoded value")
-    value_type = models.CharField(max_length=20, default='string', help_text="string, number, boolean, json")
+    name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True)
     
-    is_public = models.BooleanField(default=False, help_text="Can be accessed by frontend without auth")
+    # Permissions (stored as JSON)
+    permissions = models.JSONField(default=dict, help_text="Dictionary of permissions")
     
-    updated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:
-        ordering = ['category', 'key']
-        verbose_name = 'System Setting'
-        verbose_name_plural = 'System Settings'
+        ordering = ['name']
     
     def __str__(self):
-        return f"{self.key} ({self.get_category_display()})"
-    
-    def get_value(self):
-        """Get typed value"""
-        import json
-        if self.value_type == 'json':
-            return json.loads(self.value)
-        elif self.value_type == 'number':
-            return float(self.value) if '.' in self.value else int(self.value)
-        elif self.value_type == 'boolean':
-            return self.value.lower() in ('true', '1', 'yes')
-        return self.value
-    
-    def set_value(self, value):
-        """Set typed value"""
-        import json
-        if self.value_type == 'json':
-            self.value = json.dumps(value)
-        else:
-            self.value = str(value)
-        self.save()
+        return self.name
 
+
+class AdminUserRole(models.Model):
+    """Many-to-many relationship between users and admin roles"""
+    
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='admin_roles')
+    role = models.ForeignKey(AdminRole, on_delete=models.CASCADE, related_name='users')
+    assigned_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='role_assignments')
+    assigned_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        unique_together = ['user', 'role']
+        ordering = ['-assigned_at']
+    
+    def __str__(self):
+        return f"{self.user.username} - {self.role.name}"

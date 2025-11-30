@@ -1,151 +1,218 @@
 """
-Serializers for Admin Panel API
+Serializers for Admin Panel REST API
 """
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from .models import (
-    KnowledgeBaseItem, Intent, Ticket, TicketHistory,
-    NotificationTemplate, Notification, AdminActivity, SystemSettings
+    Intent, Keyword, KnowledgeBaseItem, Ticket, TicketNote, TicketHistory,
+    NotificationTemplate, Notification, ChatbotSettings, AdminActivity,
+    AdminRole, AdminUserRole
 )
 from chatbot_core.models import ConversationSession, ChatMessage
-from analytics.models import QueryLog, DailyStats
+from analytics.models import QueryLog
+from user_account.models import User
 
 User = get_user_model()
 
 
-class KnowledgeBaseItemSerializer(serializers.ModelSerializer):
-    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
-    updated_by_name = serializers.CharField(source='updated_by.get_full_name', read_only=True)
-    
-    class Meta:
-        model = KnowledgeBaseItem
-        fields = '__all__'
-        read_only_fields = ['usage_count', 'helpful_count', 'not_helpful_count', 'created_at', 'updated_at', 'published_at']
-
-
-class IntentSerializer(serializers.ModelSerializer):
-    mapped_kb_items_data = KnowledgeBaseItemSerializer(source='mapped_kb_items', many=True, read_only=True)
-    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
-    
-    class Meta:
-        model = Intent
-        fields = '__all__'
-
-
-class TicketHistorySerializer(serializers.ModelSerializer):
-    changed_by_name = serializers.CharField(source='changed_by.get_full_name', read_only=True)
-    
-    class Meta:
-        model = TicketHistory
-        fields = '__all__'
-        read_only_fields = ['created_at']
-
-
-class TicketSerializer(serializers.ModelSerializer):
-    user_name = serializers.CharField(source='user.get_full_name', read_only=True)
-    user_email = serializers.CharField(source='user.email', read_only=True)
-    assigned_to_name = serializers.CharField(source='assigned_to.get_full_name', read_only=True)
-    history = TicketHistorySerializer(many=True, read_only=True)
-    
-    class Meta:
-        model = Ticket
-        fields = '__all__'
-        read_only_fields = ['ticket_number', 'created_at', 'updated_at', 'resolved_at', 'closed_at']
-
-
-class NotificationTemplateSerializer(serializers.ModelSerializer):
-    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
-    
-    class Meta:
-        model = NotificationTemplate
-        fields = '__all__'
-
-
-class NotificationSerializer(serializers.ModelSerializer):
-    recipient_name = serializers.CharField(source='recipient.get_full_name', read_only=True)
-    recipient_email = serializers.CharField(source='recipient.email', read_only=True)
-    
-    class Meta:
-        model = Notification
-        fields = '__all__'
-        read_only_fields = ['created_at', 'sent_at']
-
-
-class AdminActivitySerializer(serializers.ModelSerializer):
-    admin_name = serializers.CharField(source='admin.get_full_name', read_only=True)
-    
-    class Meta:
-        model = AdminActivity
-        fields = '__all__'
-        read_only_fields = ['created_at']
-
-
-class SystemSettingsSerializer(serializers.ModelSerializer):
-    updated_by_name = serializers.CharField(source='updated_by.get_full_name', read_only=True)
-    typed_value = serializers.SerializerMethodField()
-    
-    class Meta:
-        model = SystemSettings
-        fields = '__all__'
-        read_only_fields = ['created_at', 'updated_at']
-    
-    def get_typed_value(self, obj):
-        return obj.get_value()
-
-
-class UserSerializer(serializers.ModelSerializer):
+# User Serializers
+class UserListSerializer(serializers.ModelSerializer):
+    """Serializer for user list view"""
+    role_display = serializers.CharField(source='get_role_display', read_only=True)
     conversation_count = serializers.SerializerMethodField()
-    ticket_count = serializers.SerializerMethodField()
     
     class Meta:
         model = User
-        fields = [
-            'id', 'username', 'email', 'first_name', 'last_name', 'middle_name',
-            'role', 'department', 'student_id', 'phone_number', 'is_active',
-            'date_joined', 'last_login', 'conversation_count', 'ticket_count'
-        ]
-        read_only_fields = ['date_joined', 'last_login']
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'role', 
+                  'role_display', 'department', 'student_id', 'is_active', 
+                  'date_joined', 'last_login', 'conversation_count']
+    
+    def get_conversation_count(self, obj):
+        return ConversationSession.objects.filter(user=obj).count()
+
+
+class UserDetailSerializer(serializers.ModelSerializer):
+    """Serializer for user detail view"""
+    role_display = serializers.CharField(source='get_role_display', read_only=True)
+    conversation_count = serializers.SerializerMethodField()
+    total_messages = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'role',
+                  'role_display', 'department', 'student_id', 'phone_number',
+                  'profile_picture', 'bio', 'is_active', 'is_staff', 'is_superuser',
+                  'date_joined', 'last_login', 'conversation_count', 'total_messages']
     
     def get_conversation_count(self, obj):
         return ConversationSession.objects.filter(user=obj).count()
     
-    def get_ticket_count(self, obj):
-        return Ticket.objects.filter(user=obj).count()
+    def get_total_messages(self, obj):
+        return ChatMessage.objects.filter(session__user=obj).count()
 
 
-class ConversationMessageSerializer(serializers.ModelSerializer):
+# Intent & Keyword Serializers
+class KeywordSerializer(serializers.ModelSerializer):
     class Meta:
-        model = ChatMessage
-        fields = ['id', 'sender', 'message', 'response', 'intent_detected', 
-                 'response_source', 'confidence_score', 'timestamp']
+        model = Keyword
+        fields = ['id', 'keyword', 'weight', 'is_active', 'exact_match', 
+                  'case_sensitive', 'created_at', 'updated_at']
 
 
-class ConversationSessionSerializer(serializers.ModelSerializer):
-    user_name = serializers.CharField(source='user.get_full_name', read_only=True)
-    message_count = serializers.IntegerField(read_only=True)
-    messages = ConversationMessageSerializer(many=True, read_only=True)
+class IntentSerializer(serializers.ModelSerializer):
+    keywords = KeywordSerializer(many=True, read_only=True)
+    created_by_username = serializers.CharField(source='created_by.username', read_only=True)
     
     class Meta:
-        model = ConversationSession
-        fields = '__all__'
+        model = Intent
+        fields = ['id', 'name', 'intent_type', 'description', 'priority', 
+                  'is_active', 'default_response', 'requires_clarification',
+                  'clarification_prompt', 'usage_count', 'success_rate',
+                  'keywords', 'created_by_username', 'created_at', 'updated_at']
 
 
-class QueryLogSerializer(serializers.ModelSerializer):
-    user_name = serializers.CharField(source='user.get_full_name', read_only=True)
+class IntentCreateUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Intent
+        fields = ['name', 'intent_type', 'description', 'priority', 'is_active',
+                  'default_response', 'requires_clarification', 'clarification_prompt']
+
+
+# Knowledge Base Serializers
+class KnowledgeBaseItemSerializer(serializers.ModelSerializer):
+    created_by_username = serializers.CharField(source='created_by.username', read_only=True)
+    last_reviewed_by_username = serializers.CharField(source='last_reviewed_by.username', read_only=True)
+    category_display = serializers.CharField(source='get_category_display', read_only=True)
+    language_display = serializers.CharField(source='get_language_display', read_only=True)
     
     class Meta:
-        model = QueryLog
-        fields = '__all__'
+        model = KnowledgeBaseItem
+        fields = ['id', 'title', 'category', 'category_display', 'language', 
+                  'language_display', 'question', 'answer', 'content', 'tags',
+                  'keywords', 'priority', 'is_active', 'is_featured', 'view_count',
+                  'helpful_count', 'not_helpful_count', 'related_items',
+                  'created_by_username', 'last_reviewed_by_username',
+                  'created_at', 'updated_at', 'last_reviewed_at']
 
 
+class KnowledgeBaseItemCreateUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = KnowledgeBaseItem
+        fields = ['title', 'category', 'language', 'question', 'answer', 'content',
+                  'tags', 'keywords', 'priority', 'is_active', 'is_featured', 'related_items']
+
+
+# Ticket Serializers
+class TicketNoteSerializer(serializers.ModelSerializer):
+    author_username = serializers.CharField(source='author.username', read_only=True)
+    
+    class Meta:
+        model = TicketNote
+        fields = ['id', 'note', 'is_internal', 'author_username', 'created_at']
+
+
+class TicketHistorySerializer(serializers.ModelSerializer):
+    changed_by_username = serializers.CharField(source='changed_by.username', read_only=True)
+    
+    class Meta:
+        model = TicketHistory
+        fields = ['id', 'action', 'old_value', 'new_value', 'notes',
+                  'changed_by_username', 'created_at']
+
+
+class TicketSerializer(serializers.ModelSerializer):
+    user_username = serializers.CharField(source='user.username', read_only=True)
+    user_email = serializers.CharField(source='user.email', read_only=True)
+    assigned_to_username = serializers.CharField(source='assigned_to.username', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    priority_display = serializers.CharField(source='get_priority_display', read_only=True)
+    notes = TicketNoteSerializer(many=True, read_only=True)
+    history = TicketHistorySerializer(many=True, read_only=True)
+    
+    class Meta:
+        model = Ticket
+        fields = ['id', 'ticket_id', 'title', 'description', 'category', 'status',
+                  'status_display', 'priority', 'priority_display', 'user_username',
+                  'user_email', 'assigned_to_username', 'assigned_at', 'resolution',
+                  'resolved_at', 'resolved_by', 'tags', 'related_conversation',
+                  'notes', 'history', 'created_at', 'updated_at']
+
+
+class TicketCreateUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Ticket
+        fields = ['title', 'description', 'category', 'status', 'priority',
+                  'assigned_to', 'tags', 'related_conversation']
+
+
+# Notification Serializers
+class NotificationTemplateSerializer(serializers.ModelSerializer):
+    notification_type_display = serializers.CharField(source='get_notification_type_display', read_only=True)
+    created_by_username = serializers.CharField(source='created_by.username', read_only=True)
+    
+    class Meta:
+        model = NotificationTemplate
+        fields = ['id', 'name', 'notification_type', 'notification_type_display',
+                  'subject', 'message', 'html_content', 'target_audience', 'is_active',
+                  'created_by_username', 'created_at', 'updated_at']
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    user_username = serializers.CharField(source='user.username', read_only=True)
+    user_email = serializers.CharField(source='user.email', read_only=True)
+    
+    class Meta:
+        model = Notification
+        fields = ['id', 'template', 'user_username', 'user_email', 'subject',
+                  'message', 'html_content', 'is_read', 'read_at', 'sent_at',
+                  'delivery_method', 'delivery_status', 'created_at']
+
+
+# Settings Serializers
+class ChatbotSettingsSerializer(serializers.ModelSerializer):
+    updated_by_username = serializers.CharField(source='updated_by.username', read_only=True)
+    
+    class Meta:
+        model = ChatbotSettings
+        fields = ['id', 'setting_key', 'setting_value', 'setting_type', 'description',
+                  'category', 'is_active', 'updated_by_username', 'updated_at']
+
+
+# Activity Serializers
+class AdminActivitySerializer(serializers.ModelSerializer):
+    admin_username = serializers.CharField(source='admin.username', read_only=True)
+    action_type_display = serializers.CharField(source='get_action_type_display', read_only=True)
+    
+    class Meta:
+        model = AdminActivity
+        fields = ['id', 'admin_username', 'action_type', 'action_type_display',
+                  'resource_type', 'resource_id', 'description', 'metadata',
+                  'ip_address', 'user_agent', 'created_at']
+
+
+# Role Serializers
+class AdminRoleSerializer(serializers.ModelSerializer):
+    user_count = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = AdminRole
+        fields = ['id', 'name', 'description', 'permissions', 'is_active',
+                  'user_count', 'created_at', 'updated_at']
+    
+    def get_user_count(self, obj):
+        return obj.users.count()
+
+
+# Dashboard Serializers
 class DashboardStatsSerializer(serializers.Serializer):
     """Serializer for dashboard statistics"""
     total_users = serializers.IntegerField()
     total_conversations = serializers.IntegerField()
     total_tickets = serializers.IntegerField()
-    total_kb_items = serializers.IntegerField()
+    open_tickets = serializers.IntegerField()
+    resolved_tickets = serializers.IntegerField()
+    total_queries = serializers.IntegerField()
     most_common_intents = serializers.DictField()
     usage_chart_data = serializers.DictField()
     recent_activities = AdminActivitySerializer(many=True)
-    recent_tickets = TicketSerializer(many=True)
 

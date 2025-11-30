@@ -11,12 +11,11 @@ import {
   Animated,
   ActivityIndicator,
   Alert,
+  SafeAreaView,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
-import { lumaTheme } from '../../theme/lumaTheme';
-import HolographicOrb from '../../components/HolographicOrb';
+import GlitchText from '../../components/GlitchText';
 
 export default function LoginScreen({ navigation }) {
   const { login } = useAuth();
@@ -67,10 +66,7 @@ export default function LoginScreen({ navigation }) {
   };
 
   return (
-    <LinearGradient
-      colors={['#000000', '#0A0A0A']}
-      style={styles.container}
-    >
+    <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
@@ -86,14 +82,11 @@ export default function LoginScreen({ navigation }) {
                 style={styles.backButton}
                 onPress={() => navigation.goBack()}
               >
-                <MaterialIcons name="arrow-back" size={24} color={lumaTheme.colors.text} />
+                <MaterialIcons name="arrow-back" size={24} color="#5F6368" />
               </TouchableOpacity>
-              <Text style={styles.headerTitle}>KonsultaBot</Text>
-            </View>
-
-            {/* Holographic Orb */}
-            <View style={styles.orbContainer}>
-              <HolographicOrb size={80} animate={true} />
+              <View style={styles.headerTitleContainer}>
+                <GlitchText style={styles.headerTitle}>Konsultabot</GlitchText>
+              </View>
             </View>
 
             {/* Title */}
@@ -108,13 +101,10 @@ export default function LoginScreen({ navigation }) {
             <View style={styles.form}>
               {/* Email Input */}
               <View style={styles.inputContainer}>
-                <View style={styles.inputIconContainer}>
-                  <MaterialIcons name="email" size={20} color={lumaTheme.colors.textMuted} />
-                </View>
                 <TextInput
                   style={styles.input}
                   placeholder="Email address"
-                  placeholderTextColor={lumaTheme.colors.textMuted}
+                  placeholderTextColor="#9AA0A6"
                   value={email}
                   onChangeText={setEmail}
                   keyboardType="email-address"
@@ -125,13 +115,10 @@ export default function LoginScreen({ navigation }) {
 
               {/* Password Input */}
               <View style={styles.inputContainer}>
-                <View style={styles.inputIconContainer}>
-                  <MaterialIcons name="lock" size={20} color={lumaTheme.colors.textMuted} />
-                </View>
                 <TextInput
                   style={styles.input}
                   placeholder="Password"
-                  placeholderTextColor={lumaTheme.colors.textMuted}
+                  placeholderTextColor="#9AA0A6"
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry={!showPassword}
@@ -144,7 +131,7 @@ export default function LoginScreen({ navigation }) {
                   <MaterialIcons
                     name={showPassword ? 'visibility' : 'visibility-off'}
                     size={20}
-                    color={lumaTheme.colors.textMuted}
+                    color="#5F6368"
                   />
                 </TouchableOpacity>
               </View>
@@ -152,7 +139,7 @@ export default function LoginScreen({ navigation }) {
               {/* Error Message */}
               {error ? (
                 <View style={styles.errorContainer}>
-                  <MaterialIcons name="error-outline" size={16} color={lumaTheme.colors.error} />
+                  <MaterialIcons name="error-outline" size={16} color="#EA4335" />
                   <Text style={styles.errorText}>{error}</Text>
                 </View>
               ) : null}
@@ -160,7 +147,7 @@ export default function LoginScreen({ navigation }) {
               {/* Backend Connection Info */}
               {loading && (
                 <View style={styles.infoContainer}>
-                  <MaterialIcons name="info-outline" size={16} color={lumaTheme.colors.primary} />
+                  <ActivityIndicator size="small" color="#4285F4" />
                   <Text style={styles.infoText}>Connecting to server...</Text>
                 </View>
               )}
@@ -172,18 +159,11 @@ export default function LoginScreen({ navigation }) {
                 disabled={loading}
                 activeOpacity={0.8}
               >
-                <LinearGradient
-                  colors={lumaTheme.gradients.button}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.loginButtonGradient}
-                >
-                  {loading ? (
-                    <ActivityIndicator color={lumaTheme.colors.text} />
-                  ) : (
-                    <Text style={styles.loginButtonText}>Sign In</Text>
-                  )}
-                </LinearGradient>
+                {loading ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.loginButtonText}>Sign In</Text>
+                )}
               </TouchableOpacity>
 
               {/* Sign Up Link */}
@@ -197,63 +177,56 @@ export default function LoginScreen({ navigation }) {
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </LinearGradient>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#F8F9FA',
   },
   keyboardView: {
     flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
-    alignItems: 'center',
   },
   content: {
     flex: 1,
-    width: '100%',
-    maxWidth: 480,
-    paddingHorizontal: lumaTheme.spacing.lg,
-    paddingTop: Platform.OS === 'ios' ? 40 : lumaTheme.spacing.md,
+    paddingHorizontal: 24,
+    paddingTop: Platform.OS === 'ios' ? 20 : 40,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: lumaTheme.spacing.md,
-  },
-  orbContainer: {
-    alignItems: 'center',
-    marginVertical: lumaTheme.spacing.md,
+    marginBottom: 32,
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: lumaTheme.colors.surface,
-    justifyContent: 'center',
+    padding: 8,
+  },
+  headerTitleContainer: {
+    flex: 1,
     alignItems: 'center',
-    marginRight: lumaTheme.spacing.md,
   },
   headerTitle: {
-    fontSize: lumaTheme.fontSize.lg,
-    fontWeight: lumaTheme.fontWeight.semibold,
-    color: lumaTheme.colors.text,
+    fontSize: 42,
+    fontWeight: '700',
+    color: '#202124',
+    letterSpacing: 1,
   },
   titleContainer: {
-    marginBottom: lumaTheme.spacing.md,
+    marginBottom: 32,
   },
   title: {
-    fontSize: lumaTheme.fontSize.xxl,
-    fontWeight: lumaTheme.fontWeight.bold,
-    color: lumaTheme.colors.text,
-    marginBottom: lumaTheme.spacing.xs,
+    fontSize: 32,
+    fontWeight: '400',
+    color: '#1A73E8',
+    marginBottom: 8,
   },
   subtitle: {
-    fontSize: lumaTheme.fontSize.sm,
-    color: lumaTheme.colors.textSecondary,
+    fontSize: 14,
+    color: '#5F6368',
     lineHeight: 20,
   },
   form: {
@@ -262,82 +235,74 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: lumaTheme.colors.surface,
-    borderRadius: lumaTheme.borderRadius.md,
-    borderWidth: 1,
-    borderColor: lumaTheme.colors.border,
-    marginBottom: lumaTheme.spacing.sm,
-    height: 48,
-    paddingHorizontal: lumaTheme.spacing.md,
-  },
-  inputIconContainer: {
-    marginRight: lumaTheme.spacing.sm,
+    backgroundColor: '#F1F3F4',
+    borderRadius: 24,
+    marginBottom: 16,
+    paddingHorizontal: 16,
+    minHeight: 56,
   },
   input: {
     flex: 1,
-    fontSize: lumaTheme.fontSize.md,
-    color: lumaTheme.colors.text,
+    fontSize: 16,
+    color: '#202124',
+    paddingVertical: 16,
   },
   eyeIcon: {
-    padding: lumaTheme.spacing.sm,
+    padding: 8,
   },
   errorContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    borderRadius: lumaTheme.borderRadius.sm,
-    padding: lumaTheme.spacing.sm,
-    marginBottom: lumaTheme.spacing.md,
+    backgroundColor: 'rgba(234, 67, 53, 0.1)',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
   },
   errorText: {
-    fontSize: lumaTheme.fontSize.sm,
-    color: lumaTheme.colors.error,
-    marginLeft: lumaTheme.spacing.sm,
+    fontSize: 14,
+    color: '#EA4335',
+    marginLeft: 8,
     flex: 1,
   },
   infoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-    borderRadius: lumaTheme.borderRadius.sm,
-    padding: lumaTheme.spacing.sm,
-    marginBottom: lumaTheme.spacing.md,
+    backgroundColor: 'rgba(66, 133, 244, 0.1)',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
   },
   infoText: {
-    fontSize: lumaTheme.fontSize.sm,
-    color: lumaTheme.colors.primary,
-    marginLeft: lumaTheme.spacing.sm,
+    fontSize: 14,
+    color: '#4285F4',
+    marginLeft: 8,
   },
   loginButton: {
-    height: 48,
-    borderRadius: lumaTheme.borderRadius.xl,
-    overflow: 'hidden',
-    marginTop: lumaTheme.spacing.md,
-    ...lumaTheme.shadows.medium,
-  },
-  loginButtonGradient: {
-    flex: 1,
+    backgroundColor: '#4285F4',
+    height: 56,
+    borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
+    marginTop: 8,
   },
   loginButtonText: {
-    fontSize: lumaTheme.fontSize.lg,
-    fontWeight: lumaTheme.fontWeight.semibold,
-    color: lumaTheme.colors.text,
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#FFFFFF',
   },
   signupContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: lumaTheme.spacing.md,
-    marginBottom: lumaTheme.spacing.sm,
+    marginTop: 24,
+    marginBottom: 16,
   },
   signupText: {
-    fontSize: lumaTheme.fontSize.sm,
-    color: lumaTheme.colors.textSecondary,
+    fontSize: 14,
+    color: '#5F6368',
   },
   signupLink: {
-    fontSize: lumaTheme.fontSize.md,
-    color: lumaTheme.colors.primary,
-    fontWeight: lumaTheme.fontWeight.semibold,
+    fontSize: 14,
+    color: '#4285F4',
+    fontWeight: '500',
   },
 });

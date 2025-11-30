@@ -24,7 +24,7 @@ except LookupError:
 
 class IntentClassifier:
     """
-    Advanced intent classification for IT support queries
+    Advanced intent classification for user queries
     """
     
     def __init__(self):

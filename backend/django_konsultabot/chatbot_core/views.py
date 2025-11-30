@@ -21,6 +21,7 @@ import tempfile
 import os
 
 from .ai_handler import multilingual_ai_handler
+from .mode_router import ChatMode, detect_mode
 from .utils.speech_processor import speech_processor
 from .utils.translation_service import translation_service
 from .models import ConversationSession, ChatMessage
@@ -97,7 +98,7 @@ def chat_history(request):
 @csrf_exempt
 def chat_endpoint(request):
     """
-    Enhanced chat endpoint for KonsultaBot IT Support with improved error handling
+    Enhanced chat endpoint for KonsultaBot with improved error handling
     
     POST /api/v1/chat/
     {
@@ -252,8 +253,12 @@ def chat_endpoint(request):
                 language=language if language != 'auto' else 'english'
             )
         
-        # Get conversation context
-        context = session.get_recent_context(limit=5)
+        # Get conversation context (track last 10 messages for adaptive flow)
+        context = session.get_recent_context(limit=10)
+        
+        # Detect mode upfront to satisfy routing rules
+        routed = detect_mode(query)
+        forced_mode = routed.mode
         
         # Process AI query with improved error handling
         try:
@@ -262,8 +267,12 @@ def chat_endpoint(request):
                 user=request.user if request.user.is_authenticated else None,
                 language=language,
                 session=session,
-                context=context
+                context=context,
+                forced_mode=forced_mode
             )
+            ai_response['mode'] = routed.mode.value
+            ai_response['routing_reason'] = routed.reason
+            ai_response.setdefault('metadata', {}).update(routed.metadata)
         except Exception as e:
             # Check for API key error
             if 'GOOGLE_API_KEY' in str(e):

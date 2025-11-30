@@ -1,55 +1,30 @@
 """
-KonsultaBot - Advanced IT Support Configuration for Gemini AI
+KonsultaBot - General AI Assistant Configuration
 """
 
-# Base system prompt for IT support
+# Base system prompt
 SYSTEM_PROMPT = """
-You are KonsultaBot, an AI assistant specializing in IT support at EVSU Dulag Campus.
+You are KonsultaBot, a helpful AI assistant.
 
 Your role:
-- Help students and faculty with IT-related issues
-- Provide clear, step-by-step troubleshooting guides
-- Focus on campus-specific solutions when relevant
-- Be friendly and encouraging while remaining technical when needed
-- Suggest contacting IT support for complex issues
+- Answer questions clearly and helpfully
+- Be friendly and conversational
+- Provide useful information when asked
 
 Guidelines:
 1. Be concise and practical in your responses
-2. Use numbered steps for complex procedures
-3. Explain technical terms when first used
-4. Include safety warnings when relevant
-5. Stay within IT and academic technology topics
-
-Common scenarios you handle:
-- WiFi connectivity issues
-- Software installation problems
-- Basic programming queries
-- Computer hardware troubleshooting
-- Campus system access help
-- Academic software guidance
+2. Use numbered steps when explaining procedures
+3. Explain terms when needed
+4. Be helpful and encouraging
 """
 
-# IT-specific categories for query classification
+# General categories for query classification
 CATEGORIES = {
-    'networking': [
-        'wifi', 'internet', 'connection', 'network', 'lan', 'ethernet',
-        'router', 'wireless', 'signal', 'ip address', 'dns', 'proxy'
+    'general': [
+        'question', 'help', 'information', 'explain', 'what', 'how', 'why'
     ],
-    'software': [
-        'python', 'java', 'code', 'program', 'software', 'app',
-        'installation', 'update', 'error', 'bug', 'compile'
-    ],
-    'hardware': [
-        'computer', 'laptop', 'printer', 'device', 'hardware',
-        'monitor', 'keyboard', 'mouse', 'battery', 'power'
-    ],
-    'account': [
-        'login', 'password', 'account', 'access', 'credentials',
-        'authentication', 'permission', 'username', 'email'
-    ],
-    'academic': [
-        'course', 'class', 'assignment', 'project', 'study',
-        'submission', 'deadline', 'grades', 'exam', 'laboratory'
+    'conversation': [
+        'hello', 'hi', 'thanks', 'thank you', 'greeting', 'chat'
     ]
 }
 
@@ -57,26 +32,18 @@ CATEGORIES = {
 ERROR_RESPONSES = {
     'offline': (
         "I'm currently in offline mode. I'll store your question and provide "
-        "an answer once internet connectivity is restored. In the meantime, "
-        "here are some basic troubleshooting steps you can try:\n\n"
-        "1. Check your device's power and connections\n"
-        "2. Try restarting the device\n"
-        "3. Look for visible hardware issues\n"
-        "4. Note any error messages\n\n"
-        "Your query has been saved and will be processed when online."
+        "an answer once internet connectivity is restored."
     ),
     'technical': (
         "I encountered a technical issue while processing your request. "
         "Please try again in a few moments. If the problem persists, "
         "you can:\n\n"
         "1. Check your internet connection\n"
-        "2. Try refreshing the app\n"
-        "3. Contact IT support at support@evsu.edu.ph"
+        "2. Try refreshing the app"
     ),
     'permission': (
         "This operation requires additional permissions. Please ensure "
-        "you're logged in with the appropriate credentials or contact "
-        "IT support for assistance."
+        "you're logged in with the appropriate credentials."
     )
 }
 
@@ -126,13 +93,13 @@ RESPONSE_TEMPLATES = {
 # Configuration for different environments
 ENVIRONMENTS = {
     'development': {
-        'model': 'gemini-1.5-pro',
+        'model': 'gemini-2.5-flash',
         'temperature': 0.7,
         'max_output_tokens': 1024,
         'log_level': 'DEBUG'
     },
     'production': {
-        'model': 'gemini-1.5-flash',
+        'model': 'gemini-2.5-flash',
         'temperature': 0.5,
         'max_output_tokens': 512,
         'log_level': 'INFO'

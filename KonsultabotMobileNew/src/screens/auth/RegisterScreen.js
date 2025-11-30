@@ -9,13 +9,12 @@ import {
   Platform,
   Alert,
   TouchableOpacity,
-  Animated,
+  ActivityIndicator,
+  SafeAreaView,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
-import { lumaTheme } from '../../theme/lumaTheme';
-import HolographicOrb from '../../components/HolographicOrb';
+import GlitchText from '../../components/GlitchText';
 
 export default function RegisterScreen({ navigation }) {
   const [formData, setFormData] = useState({
@@ -107,14 +106,14 @@ export default function RegisterScreen({ navigation }) {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboardView}
       >
         <ScrollView 
           contentContainerStyle={styles.scrollContainer}
-          showsVerticalScrollIndicator={true}
+          showsVerticalScrollIndicator={false}
           bounces={true}
           keyboardShouldPersistTaps="handled"
         >
@@ -124,14 +123,11 @@ export default function RegisterScreen({ navigation }) {
               style={styles.backButton}
               onPress={() => navigation.goBack()}
             >
-              <MaterialIcons name="arrow-back" size={24} color={lumaTheme.colors.text} />
+              <MaterialIcons name="arrow-back" size={24} color="#5F6368" />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>KonsultaBot</Text>
-          </View>
-
-          {/* Holographic Orb */}
-          <View style={styles.orbContainer}>
-            <HolographicOrb size={80} animate={true} />
+            <View style={styles.headerTitleContainer}>
+              <GlitchText style={styles.headerTitle}>Konsultabot</GlitchText>
+            </View>
           </View>
 
           {/* Title */}
@@ -144,10 +140,9 @@ export default function RegisterScreen({ navigation }) {
               
             {/* Student ID Input */}
             <View style={styles.inputContainer}>
-              <MaterialIcons name="badge" size={20} color={lumaTheme.colors.primary} style={styles.inputIcon} />
               <TextInput
                 placeholder="Student ID *"
-                placeholderTextColor={lumaTheme.colors.textMuted}
+                placeholderTextColor="#9AA0A6"
                 value={formData.student_id}
                 onChangeText={(value) => updateField('student_id', value)}
                 style={styles.input}
@@ -156,10 +151,9 @@ export default function RegisterScreen({ navigation }) {
 
             {/* Email Input */}
             <View style={styles.inputContainer}>
-              <MaterialIcons name="email" size={20} color={lumaTheme.colors.primary} style={styles.inputIcon} />
               <TextInput
                 placeholder="EVSU Email *"
-                placeholderTextColor={lumaTheme.colors.textMuted}
+                placeholderTextColor="#9AA0A6"
                 value={formData.email}
                 onChangeText={(value) => updateField('email', value)}
                 keyboardType="email-address"
@@ -170,10 +164,9 @@ export default function RegisterScreen({ navigation }) {
 
             {/* Password Input */}
             <View style={styles.inputContainer}>
-              <MaterialIcons name="lock" size={20} color={lumaTheme.colors.primary} style={styles.inputIcon} />
               <TextInput
                 placeholder="Password *"
-                placeholderTextColor={lumaTheme.colors.textMuted}
+                placeholderTextColor="#9AA0A6"
                 value={formData.password}
                 onChangeText={(value) => updateField('password', value)}
                 secureTextEntry
@@ -183,10 +176,9 @@ export default function RegisterScreen({ navigation }) {
 
             {/* Confirm Password Input */}
             <View style={styles.inputContainer}>
-              <MaterialIcons name="lock-outline" size={20} color={lumaTheme.colors.primary} style={styles.inputIcon} />
               <TextInput
                 placeholder="Confirm Password *"
-                placeholderTextColor={lumaTheme.colors.textMuted}
+                placeholderTextColor="#9AA0A6"
                 value={formData.password_confirm}
                 onChangeText={(value) => updateField('password_confirm', value)}
                 secureTextEntry
@@ -196,10 +188,9 @@ export default function RegisterScreen({ navigation }) {
 
             {/* First Name Input */}
             <View style={styles.inputContainer}>
-              <MaterialIcons name="person" size={20} color={lumaTheme.colors.primary} style={styles.inputIcon} />
               <TextInput
                 placeholder="First Name *"
-                placeholderTextColor={lumaTheme.colors.textMuted}
+                placeholderTextColor="#9AA0A6"
                 value={formData.first_name}
                 onChangeText={(value) => updateField('first_name', value)}
                 style={styles.input}
@@ -208,10 +199,9 @@ export default function RegisterScreen({ navigation }) {
 
             {/* Last Name Input */}
             <View style={styles.inputContainer}>
-              <MaterialIcons name="person-outline" size={20} color={lumaTheme.colors.primary} style={styles.inputIcon} />
               <TextInput
                 placeholder="Last Name *"
-                placeholderTextColor={lumaTheme.colors.textMuted}
+                placeholderTextColor="#9AA0A6"
                 value={formData.last_name}
                 onChangeText={(value) => updateField('last_name', value)}
                 style={styles.input}
@@ -220,10 +210,9 @@ export default function RegisterScreen({ navigation }) {
 
             {/* Course Input */}
             <View style={styles.inputContainer}>
-              <MaterialIcons name="school" size={20} color={lumaTheme.colors.primary} style={styles.inputIcon} />
               <TextInput
                 placeholder="Course (Optional)"
-                placeholderTextColor={lumaTheme.colors.textMuted}
+                placeholderTextColor="#9AA0A6"
                 value={formData.course}
                 onChangeText={(value) => updateField('course', value)}
                 style={styles.input}
@@ -232,10 +221,9 @@ export default function RegisterScreen({ navigation }) {
 
             {/* Year Level Input */}
             <View style={styles.inputContainer}>
-              <MaterialIcons name="calendar-today" size={20} color={lumaTheme.colors.primary} style={styles.inputIcon} />
               <TextInput
                 placeholder="Year Level (Optional)"
-                placeholderTextColor={lumaTheme.colors.textMuted}
+                placeholderTextColor="#9AA0A6"
                 value={formData.year_level}
                 onChangeText={(value) => updateField('year_level', value)}
                 keyboardType="numeric"
@@ -248,19 +236,13 @@ export default function RegisterScreen({ navigation }) {
               onPress={handleRegister}
               disabled={loading}
               activeOpacity={0.8}
+              style={styles.registerButton}
             >
-              <LinearGradient
-                colors={lumaTheme.gradients.primary}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.registerButton}
-              >
-                {loading ? (
-                  <Text style={styles.buttonText}>Creating Account...</Text>
-                ) : (
-                  <Text style={styles.buttonText}>Register</Text>
-                )}
-              </LinearGradient>
+              {loading ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.buttonText}>Register</Text>
+              )}
             </TouchableOpacity>
 
             {/* Login Link */}
@@ -275,114 +257,112 @@ export default function RegisterScreen({ navigation }) {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: lumaTheme.colors.background,
+    backgroundColor: '#F8F9FA',
   },
   keyboardView: {
     flex: 1,
   },
   scrollContainer: {
-    paddingHorizontal: lumaTheme.spacing.lg,
-    paddingTop: lumaTheme.spacing.md,
+    paddingHorizontal: 24,
+    paddingTop: Platform.OS === 'ios' ? 20 : 40,
     paddingBottom: 200,
     alignItems: 'center',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: lumaTheme.spacing.md,
+    marginBottom: 32,
+    width: '100%',
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: lumaTheme.colors.surface,
-    justifyContent: 'center',
+    padding: 8,
+  },
+  headerTitleContainer: {
+    flex: 1,
     alignItems: 'center',
-    marginRight: lumaTheme.spacing.md,
   },
   headerTitle: {
-    fontSize: lumaTheme.fontSize.lg,
-    fontWeight: lumaTheme.fontWeight.semibold,
-    color: lumaTheme.colors.text,
-  },
-  orbContainer: {
-    alignItems: 'center',
-    marginVertical: lumaTheme.spacing.md,
-  },
-  titleContainer: {
-    width: '100%',
-    maxWidth: 480,
-    alignItems: 'center',
-    marginBottom: lumaTheme.spacing.md,
-  },
-  appTitle: {
-    fontSize: lumaTheme.fontSize.xl,
-    fontWeight: lumaTheme.fontWeight.bold,
-    color: lumaTheme.colors.text,
+    fontSize: 42,
+    fontWeight: '700',
+    color: '#202124',
     letterSpacing: 1,
   },
-  subtitle: {
-    fontSize: lumaTheme.fontSize.sm,
-    color: lumaTheme.colors.textSecondary,
-    marginTop: lumaTheme.spacing.xs,
+  titleContainer: {
+    alignItems: 'center',
+    marginBottom: 32,
+    width: '100%',
+  },
+  appTitle: {
+    fontSize: 32,
+    fontWeight: '400',
+    color: '#1A73E8',
+    marginBottom: 8,
     textAlign: 'center',
   },
+  subtitle: {
+    fontSize: 14,
+    color: '#5F6368',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
   formCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
     width: '100%',
     maxWidth: 480,
-    backgroundColor: lumaTheme.colors.surface,
-    borderRadius: lumaTheme.borderRadius.xl,
-    padding: lumaTheme.spacing.xl,
-    ...lumaTheme.shadows.medium,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: lumaTheme.colors.inputBackground,
-    borderRadius: lumaTheme.borderRadius.lg,
-    paddingHorizontal: lumaTheme.spacing.md,
-    marginBottom: lumaTheme.spacing.md,
-    borderWidth: 1,
-    borderColor: lumaTheme.colors.border,
-  },
-  inputIcon: {
-    marginRight: lumaTheme.spacing.sm,
+    backgroundColor: '#F1F3F4',
+    borderRadius: 24,
+    marginBottom: 16,
+    paddingHorizontal: 16,
+    minHeight: 56,
   },
   input: {
     flex: 1,
-    color: lumaTheme.colors.text,
-    fontSize: lumaTheme.fontSize.md,
-    paddingVertical: lumaTheme.spacing.md,
+    color: '#202124',
+    fontSize: 16,
+    paddingVertical: 16,
   },
   registerButton: {
-    borderRadius: lumaTheme.borderRadius.lg,
-    paddingVertical: lumaTheme.spacing.md,
+    backgroundColor: '#4285F4',
+    borderRadius: 28,
+    paddingVertical: 16,
     alignItems: 'center',
-    marginTop: lumaTheme.spacing.lg,
-    ...lumaTheme.shadows.glow,
+    marginTop: 24,
+    minHeight: 56,
+    justifyContent: 'center',
   },
   buttonText: {
-    color: lumaTheme.colors.text,
-    fontSize: lumaTheme.fontSize.md,
-    fontWeight: lumaTheme.fontWeight.bold,
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '500',
   },
   loginLink: {
-    marginTop: lumaTheme.spacing.lg,
+    marginTop: 24,
     alignItems: 'center',
   },
   loginLinkText: {
-    color: lumaTheme.colors.textSecondary,
-    fontSize: lumaTheme.fontSize.md,
+    color: '#5F6368',
+    fontSize: 14,
   },
   loginLinkBold: {
-    color: lumaTheme.colors.primary,
-    fontWeight: lumaTheme.fontWeight.bold,
+    color: '#4285F4',
+    fontWeight: '500',
   },
 });

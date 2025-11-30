@@ -144,6 +144,7 @@ class SessionContext(models.Model):
     operating_system = models.CharField(max_length=50, blank=True)
     reported_issues = models.JSONField(default=list, blank=True)
     
+    conversation_state = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
