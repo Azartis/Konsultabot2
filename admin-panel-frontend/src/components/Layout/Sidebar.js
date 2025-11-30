@@ -1,5 +1,5 @@
 /**
- * Sidebar Navigation Component
+ * Sidebar Navigation Component - Updated to match Chat Screen Design
  */
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -9,7 +9,6 @@ import {
   ListItem,
   ListItemIcon,
   ListItemText,
-  Divider,
   Typography,
   Box,
 } from '@mui/material';
@@ -51,20 +50,31 @@ const Sidebar = () => {
         '& .MuiDrawer-paper': {
           width: drawerWidth,
           boxSizing: 'border-box',
-          backgroundColor: '#1a1a1a',
-          color: '#fff',
+          backgroundColor: '#FFFFFF',
+          borderRight: '1px solid #E8EAED',
+          boxShadow: '0 1px 2px 0 rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15)',
         },
       }}
     >
-      <Box sx={{ p: 3, borderBottom: '1px solid #333' }}>
-        <Typography variant="h5" component="div" sx={{ fontWeight: 'bold', color: '#4285F4' }}>
-          KonsultaBot
+      <Box sx={{ p: 3, borderBottom: '1px solid #E8EAED' }}>
+        <Typography 
+          variant="h5" 
+          component="div" 
+          className="glitch-text"
+          sx={{ 
+            fontWeight: 700, 
+            color: '#4285F4',
+            letterSpacing: 0.5,
+            fontSize: '1.5rem',
+          }}
+        >
+          Konsultabot
         </Typography>
-        <Typography variant="caption" sx={{ color: '#999' }}>
+        <Typography variant="caption" sx={{ color: '#5F6368', fontSize: '0.75rem' }}>
           Admin Panel
         </Typography>
       </Box>
-      <List sx={{ pt: 2 }}>
+      <List sx={{ pt: 2, px: 1 }}>
         {menuItems.map((item) => {
           const isActive = location.pathname === item.path;
           return (
@@ -73,20 +83,35 @@ const Sidebar = () => {
               component={Link}
               to={item.path}
               sx={{
-                color: isActive ? '#4285F4' : '#ccc',
-                backgroundColor: isActive ? 'rgba(66, 133, 244, 0.1)' : 'transparent',
+                color: isActive ? '#4285F4' : '#5F6368',
+                backgroundColor: isActive ? '#E8F0FE' : 'transparent',
                 '&:hover': {
-                  backgroundColor: 'rgba(66, 133, 244, 0.15)',
+                  backgroundColor: isActive ? '#E8F0FE' : '#F1F3F4',
                 },
                 mb: 0.5,
-                mx: 1,
-                borderRadius: 1,
+                borderRadius: '12px',
+                py: 1.5,
+                px: 2,
               }}
             >
-              <ListItemIcon sx={{ color: isActive ? '#4285F4' : '#999', minWidth: 40 }}>
+              <ListItemIcon 
+                sx={{ 
+                  color: isActive ? '#4285F4' : '#5F6368', 
+                  minWidth: 40,
+                  '& svg': {
+                    fontSize: '1.5rem',
+                  },
+                }}
+              >
                 {item.icon}
               </ListItemIcon>
-              <ListItemText primary={item.text} />
+              <ListItemText 
+                primary={item.text}
+                primaryTypographyProps={{
+                  fontSize: '0.875rem',
+                  fontWeight: isActive ? 500 : 400,
+                }}
+              />
             </ListItem>
           );
         })}
@@ -96,4 +121,3 @@ const Sidebar = () => {
 };
 
 export default Sidebar;
-

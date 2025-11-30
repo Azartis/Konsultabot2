@@ -1,5 +1,5 @@
 /**
- * Login Page
+ * Login Page - Updated to match Chat Screen Design
  */
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -14,6 +14,7 @@ import {
   CircularProgress,
 } from '@mui/material';
 import { useAuth } from '../context/AuthContext';
+import GlitchText from '../components/GlitchText';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -49,27 +50,49 @@ const Login = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#1a1a1a',
+        backgroundColor: '#F8F9FA',
+        padding: 2,
       }}
     >
       <Container maxWidth="sm">
         <Paper
-          elevation={3}
+          elevation={0}
           sx={{
             p: 4,
-            backgroundColor: '#2c2c2c',
-            color: '#fff',
+            backgroundColor: '#FFFFFF',
+            borderRadius: '8px',
+            boxShadow: '0 1px 2px 0 rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15)',
           }}
         >
-          <Typography variant="h4" component="h1" gutterBottom sx={{ mb: 3, textAlign: 'center' }}>
-            KonsultaBot Admin
+          <Box sx={{ textAlign: 'center', mb: 4 }}>
+            <GlitchText>
+              <Typography
+                variant="h4"
+                component="h1"
+                sx={{
+                  fontWeight: 700,
+                  color: '#202124',
+                  letterSpacing: 0.5,
+                  mb: 1,
+                }}
+              >
+                Konsultabot
+              </Typography>
+            </GlitchText>
+            <Typography variant="body2" sx={{ color: '#5F6368', mt: 1 }}>
+              Admin Panel
+            </Typography>
+          </Box>
+
+          <Typography variant="h5" component="h2" sx={{ mb: 1, fontWeight: 400, color: '#1A73E8' }}>
+            Welcome Back
           </Typography>
-          <Typography variant="body2" sx={{ mb: 3, textAlign: 'center', color: '#999' }}>
+          <Typography variant="body2" sx={{ mb: 3, color: '#5F6368' }}>
             Sign in to access the admin panel
           </Typography>
 
           {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
+            <Alert severity="error" sx={{ mb: 3, borderRadius: '8px' }}>
               {error}
             </Alert>
           )}
@@ -85,11 +108,14 @@ const Login = () => {
               margin="normal"
               sx={{
                 '& .MuiOutlinedInput-root': {
-                  color: '#fff',
-                  '& fieldset': { borderColor: '#555' },
-                  '&:hover fieldset': { borderColor: '#4285F4' },
+                  backgroundColor: '#F1F3F4',
+                  borderRadius: '24px',
+                  '& fieldset': { border: 'none' },
+                  '&:hover fieldset': { border: '1px solid #DADCE0' },
+                  '&.Mui-focused fieldset': { border: '1px solid #4285F4' },
                 },
-                '& .MuiInputLabel-root': { color: '#999' },
+                '& .MuiInputLabel-root': { color: '#5F6368' },
+                mb: 2,
               }}
             />
             <TextField
@@ -102,11 +128,14 @@ const Login = () => {
               margin="normal"
               sx={{
                 '& .MuiOutlinedInput-root': {
-                  color: '#fff',
-                  '& fieldset': { borderColor: '#555' },
-                  '&:hover fieldset': { borderColor: '#4285F4' },
+                  backgroundColor: '#F1F3F4',
+                  borderRadius: '24px',
+                  '& fieldset': { border: 'none' },
+                  '&:hover fieldset': { border: '1px solid #DADCE0' },
+                  '&.Mui-focused fieldset': { border: '1px solid #4285F4' },
                 },
-                '& .MuiInputLabel-root': { color: '#999' },
+                '& .MuiInputLabel-root': { color: '#5F6368' },
+                mb: 3,
               }}
             />
             <Button
@@ -115,14 +144,25 @@ const Login = () => {
               variant="contained"
               disabled={loading}
               sx={{
-                mt: 3,
+                mt: 2,
                 mb: 2,
                 backgroundColor: '#4285F4',
-                '&:hover': { backgroundColor: '#357ae8' },
+                borderRadius: '24px',
                 py: 1.5,
+                textTransform: 'none',
+                fontWeight: 500,
+                fontSize: '0.875rem',
+                '&:hover': {
+                  backgroundColor: '#357AE8',
+                  boxShadow: 'none',
+                },
+                '&:disabled': {
+                  backgroundColor: '#DADCE0',
+                  color: '#FFFFFF',
+                },
               }}
             >
-              {loading ? <CircularProgress size={24} /> : 'Sign In'}
+              {loading ? <CircularProgress size={24} color="inherit" /> : 'Sign In'}
             </Button>
           </form>
         </Paper>
@@ -132,4 +172,3 @@ const Login = () => {
 };
 
 export default Login;
-

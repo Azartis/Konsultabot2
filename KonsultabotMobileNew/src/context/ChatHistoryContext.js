@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ChatHistoryContext = createContext();
@@ -57,7 +57,7 @@ export const ChatHistoryProvider = ({ children }) => {
     }
   };
 
-  const createNewChat = (temporary = false) => {
+  const createNewChat = useCallback((temporary = false) => {
     const newChat = {
       id: Date.now().toString(),
       title: 'New Chat',
@@ -70,9 +70,9 @@ export const ChatHistoryProvider = ({ children }) => {
     setChats(prevChats => [newChat, ...prevChats]);
     setCurrentChatId(newChat.id);
     return newChat.id;
-  };
+  }, []);
 
-  const updateChatMessages = (chatId, messages) => {
+  const updateChatMessages = useCallback((chatId, messages) => {
     setChats(prevChats =>
       prevChats.map(chat => {
         if (chat.id === chatId) {
@@ -102,31 +102,33 @@ export const ChatHistoryProvider = ({ children }) => {
         return chat;
       })
     );
-  };
+  }, []);
 
-  const deleteChat = (chatId) => {
-    setChats(prevChats => prevChats.filter(chat => chat.id !== chatId));
-    if (currentChatId === chatId) {
-      const remainingChats = chats.filter(chat => chat.id !== chatId);
-      setCurrentChatId(remainingChats.length > 0 ? remainingChats[0].id : null);
-    }
-  };
+  const deleteChat = useCallback((chatId) => {
+    setChats(prevChats => {
+      const filtered = prevChats.filter(chat => chat.id !== chatId);
+      if (currentChatId === chatId) {
+        setCurrentChatId(filtered.length > 0 ? filtered[0].id : null);
+      }
+      return filtered;
+    });
+  }, [currentChatId]);
 
-  const getChatById = (chatId) => {
+  const getChatById = useCallback((chatId) => {
     return chats.find(chat => chat.id === chatId);
-  };
+  }, [chats]);
 
-  const getCurrentChat = () => {
+  const getCurrentChat = useCallback(() => {
     return getChatById(currentChatId);
-  };
+  }, [currentChatId, getChatById]);
 
-  const clearAllChats = async () => {
+  const clearAllChats = useCallback(async () => {
     setChats([]);
     setCurrentChatId(null);
     await AsyncStorage.removeItem('chat_history');
-  };
+  }, []);
 
-  const removeTemporaryChats = () => {
+  const removeTemporaryChats = useCallback(() => {
     setChats(prevChats => {
       const permanentChats = prevChats.filter(chat => !chat.temporary);
       // If current chat was temporary and removed, set to first permanent chat or null
@@ -135,7 +137,7 @@ export const ChatHistoryProvider = ({ children }) => {
       }
       return permanentChats;
     });
-  };
+  }, [currentChatId]);
 
   return (
     <ChatHistoryContext.Provider

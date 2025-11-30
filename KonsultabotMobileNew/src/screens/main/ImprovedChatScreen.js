@@ -119,7 +119,8 @@ export default function ImprovedChatScreen({ navigation }) {
     
     // Update ref for next comparison
     prevUserRef.current = currentUser;
-  }, [user, createNewChat, removeTemporaryChats, currentChatId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, currentChatId]); // Removed function dependencies to prevent infinite loops
 
   // Cleanup wake word listener on unmount
   useEffect(() => {
@@ -140,7 +141,7 @@ export default function ImprovedChatScreen({ navigation }) {
         const recognition = new SpeechRecognition();
         recognition.continuous = false;
         recognition.interimResults = false;
-        recognition.lang = 'en-US';
+        recognition.lang = 'en-US'; // Default to English
         
         recognition.onresult = (event) => {
           const transcript = event.results[0][0].transcript;
@@ -188,7 +189,7 @@ export default function ImprovedChatScreen({ navigation }) {
         const wakeRecognition = new SpeechRecognition();
         wakeRecognition.continuous = true;
         wakeRecognition.interimResults = true;
-        wakeRecognition.lang = 'en-US';
+        wakeRecognition.lang = 'en-US'; // Default to English
         
         wakeRecognition.onresult = (event) => {
           const last = event.results.length - 1;
@@ -319,7 +320,8 @@ export default function ImprovedChatScreen({ navigation }) {
         }
       }
     }
-  }, [messages, currentChatId, updateChatMessages]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages, currentChatId]); // Removed updateChatMessages to prevent infinite loops
 
   const handleNewChat = () => {
     try {
@@ -404,15 +406,16 @@ export default function ImprovedChatScreen({ navigation }) {
 
       setMessages(prev => [...prev, botMessage]);
       
-      // Speak the bot's response with text-to-speech ONLY if from voice input
+      // Speak the bot's response with text-to-speech when from voice input
+      // Always use English as default language
       if (fromVoice && botMessage && botMessage.text) {
         try {
           // Stop any ongoing speech first
           await Speech.stop();
           
-          // Speak the response
+          // Speak the response - Always use English (en-US)
           Speech.speak(botMessage.text, {
-            language: 'en-US',
+            language: 'en-US', // Default to English
             pitch: 1.0,
             rate: 0.9,
             onDone: () => {
@@ -424,7 +427,7 @@ export default function ImprovedChatScreen({ navigation }) {
               setIsVoiceInput(false);
             },
           });
-          console.log('🔊 Speaking AI response (voice input detected)...');
+          console.log('🔊 Speaking AI response in English (voice input detected)...');
         } catch (ttsError) {
           console.error('❌ Text-to-speech error:', ttsError);
           setIsVoiceInput(false);
@@ -725,7 +728,7 @@ export default function ImprovedChatScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, Platform.OS === 'web' && { height: '100vh', maxHeight: '100vh' }]}>
       {/* Recording Overlay - Only show when actively recording */}
       {(isRecording || isTranscribing) && (
         <View style={styles.recordingOverlay} pointerEvents="box-none">
@@ -749,12 +752,15 @@ export default function ImprovedChatScreen({ navigation }) {
       )}
 
       <KeyboardAvoidingView 
-        style={[
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'web' ? undefined : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        enabled={Platform.OS !== 'web'}
+      >
+        <View style={[
           styles.contentContainer,
           (isRecording || isTranscribing) && styles.contentContainerBlurred
-        ]}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
+        ]}>
         {/* Gemini-Style Header */}
         <View style={styles.geminiHeader}>
           <TouchableOpacity 
@@ -893,6 +899,10 @@ export default function ImprovedChatScreen({ navigation }) {
           style={styles.mainContent}
           contentContainerStyle={styles.mainContentInner}
           onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+          keyboardShouldPersistTaps="handled"
+          {...(Platform.OS === 'web' && {
+            style: [styles.mainContent, { maxHeight: 'calc(100vh - 200px)' }],
+          })}
         >
           {/* Greeting Section - Show when no messages or first message */}
           {messages.length === 0 && (
@@ -1009,6 +1019,7 @@ export default function ImprovedChatScreen({ navigation }) {
             Konsultabot can make mistakes, so double-check it
           </Text>
         </View>
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -1018,9 +1029,20 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8F9FA',
+    ...(Platform.OS === 'web' && {
+      height: '100vh',
+      maxHeight: '100vh',
+      overflow: 'hidden',
+    }),
   },
   contentContainer: {
     flex: 1,
+    ...(Platform.OS === 'web' && {
+      display: 'flex',
+      flexDirection: 'column',
+      height: '100%',
+      maxHeight: '100%',
+    }),
   },
   contentContainerBlurred: {
     opacity: 0.1,
@@ -1162,6 +1184,11 @@ const styles = StyleSheet.create({
   mainContent: {
     flex: 1,
     backgroundColor: '#F8F9FA',
+    ...(Platform.OS === 'web' && {
+      flexShrink: 1,
+      minHeight: 0,
+      overflow: 'auto',
+    }),
   },
   recordingOverlay: {
     position: 'absolute',
@@ -1183,6 +1210,9 @@ const styles = StyleSheet.create({
   },
   mainContentInner: {
     paddingBottom: 20,
+    ...(Platform.OS === 'web' && {
+      minHeight: 'auto',
+    }),
   },
   recordingText: {
     color: '#202124',
@@ -1522,8 +1552,16 @@ const styles = StyleSheet.create({
   geminiInputContainer: {
     backgroundColor: '#FFFFFF',
     paddingTop: 12,
-    paddingBottom: Platform.OS === 'ios' ? 20 : 12,
+    paddingBottom: Platform.OS === 'ios' ? 20 : Platform.OS === 'web' ? 12 : 12,
     borderTopWidth: 0,
+    zIndex: 10,
+    elevation: 5, // For Android shadow
+    ...(Platform.OS === 'web' && {
+      position: 'relative',
+      flexShrink: 0,
+      width: '100%',
+      boxShadow: '0 -2px 8px rgba(0,0,0,0.1)',
+    }),
   },
   geminiInputField: {
     flexDirection: 'row',
@@ -1535,6 +1573,13 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     minHeight: 56,
     maxHeight: 120,
+    borderWidth: 1,
+    borderColor: '#E8EAED',
+    ...(Platform.OS === 'web' && {
+      width: '100%',
+      maxWidth: '100%',
+      boxSizing: 'border-box',
+    }),
   },
   geminiTextInput: {
     flex: 1,
@@ -1547,10 +1592,18 @@ const styles = StyleSheet.create({
   geminiMicButton: {
     padding: 10,
     marginRight: 4,
+    minWidth: 40,
+    minHeight: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   geminiSendButton: {
     padding: 10,
     marginRight: 4,
+    minWidth: 40,
+    minHeight: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   geminiDisclaimer: {
     fontSize: 11,
