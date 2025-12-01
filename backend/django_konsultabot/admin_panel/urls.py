@@ -6,7 +6,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     dashboard_stats,
     UserViewSet, IntentViewSet, KeywordViewSet, KnowledgeBaseViewSet,
-    TicketViewSet, NotificationTemplateViewSet, NotificationViewSet,
+    NotificationTemplateViewSet, NotificationViewSet,
     ChatbotSettingsViewSet, AdminActivityViewSet,
     conversation_logs, conversation_detail, export_conversations_csv
 )
@@ -16,7 +16,6 @@ router.register(r'users', UserViewSet, basename='user')
 router.register(r'intents', IntentViewSet, basename='intent')
 router.register(r'keywords', KeywordViewSet, basename='keyword')
 router.register(r'knowledge-base', KnowledgeBaseViewSet, basename='knowledgebase')
-router.register(r'tickets', TicketViewSet, basename='ticket')
 router.register(r'notification-templates', NotificationTemplateViewSet, basename='notification-template')
 router.register(r'notifications', NotificationViewSet, basename='notification')
 router.register(r'settings', ChatbotSettingsViewSet, basename='settings')

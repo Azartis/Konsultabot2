@@ -132,13 +132,23 @@ def chat_endpoint(request):
 
         # Extract and validate query
         query = data.get('query', '').strip()
-        if not query:
+        feedback_only = data.get('feedback_only', False)
+        
+        # Allow empty query only for feedback-only requests
+        if not query and not feedback_only:
             return Response({
                 'status': 'error',
                 'message': 'Query is required',
                 'code': 'MISSING_QUERY'
             }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Force English as default language - always use English for responses
         language = data.get('language', 'english').lower()
+        # Normalize language - always default to English
+        if language in ['auto', 'spanish', 'mexican', 'español', 'espanol'] or language not in ['english', 'tagalog', 'bisaya', 'waray']:
+            language = 'english'
+            logger.info(f"Language normalized to English (was: {data.get('language', 'english')})")
+        
         session_id = data.get('session_id')
         voice_response = data.get('voice_response', False)
         offline_mode = data.get('offline', False)
@@ -154,18 +164,6 @@ def chat_endpoint(request):
                     'query': 'How do I connect to EVSU WiFi?',
                     'language': 'english'
                 }
-            }, status=status.HTTP_400_BAD_REQUEST)
-            
-        # Validate language with detailed feedback
-        supported_languages = ['english', 'tagalog', 'bisaya', 'waray']
-        if language not in supported_languages:
-            return Response({
-                'status': 'error',
-                'error': f'Unsupported language. Supported languages: {", ".join(supported_languages)}',
-                'code': 'INVALID_LANGUAGE',
-                'supported_languages': supported_languages,
-                'provided_language': language,
-                'suggestion': 'Use "english" if unsure'
             }, status=status.HTTP_400_BAD_REQUEST)
             
             # Initialize timing and connectivity checks
@@ -236,22 +234,133 @@ def chat_endpoint(request):
                     'retry_after': 60  # Suggest retry after 1 minute
                 }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
+        # Try to get user from token if not authenticated
+        user = None
+        if request.user.is_authenticated:
+            user = request.user
+        else:
+            # Try to get user from Authorization header
+            auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+            if auth_header.startswith('Bearer '):
+                from rest_framework.authtoken.models import Token
+                from django.contrib.auth import get_user_model
+                User = get_user_model()
+                try:
+                    token_key = auth_header.split(' ')[1]
+                    token = Token.objects.get(key=token_key)
+                    user = token.user
+                except (Token.DoesNotExist, IndexError, AttributeError):
+                    pass
+        
         # Get or create session
         session = None
         if session_id:
             try:
                 session = ConversationSession.objects.get(
-                    session_id=session_id,
-                    user=request.user if request.user.is_authenticated else None
+                    session_id=session_id
                 )
+                # Update user if we now have authentication
+                if user and not session.user:
+                    session.user = user
+                    session.save()
             except ConversationSession.DoesNotExist:
                 pass
         
         if not session:
             session = ConversationSession.objects.create(
-                user=request.user if request.user.is_authenticated else None,
+                user=user,
                 language=language if language != 'auto' else 'english'
             )
+        
+        # Get or create session context for tracking question count and satisfaction
+        from .models import SessionContext
+        session_context, _ = SessionContext.objects.get_or_create(
+            session=session,
+            defaults={'conversation_state': {}}
+        )
+        
+        # Get current question count and satisfaction from conversation state
+        state = session_context.conversation_state or {}
+        question_count = state.get('question_count', 0)
+        is_satisfied = state.get('is_satisfied', True)
+        
+        # Handle feedback-only requests (no AI processing needed)
+        if feedback_only:
+            satisfaction_feedback = data.get('is_satisfied')
+            if satisfaction_feedback is not None:
+                state['is_satisfied'] = bool(satisfaction_feedback)
+            
+            # Try to save previous technical solution if user gave positive feedback
+            if satisfaction_feedback == True and query:
+                # Get the last bot message from this session
+                last_bot_message = ChatMessage.objects.filter(
+                    session=session,
+                    sender='bot',
+                    response_source='gemini'
+                ).order_by('-timestamp').first()
+                
+                if last_bot_message:
+                    # Check if it's a technical query and save to KB
+                    query_lower = query.lower()
+                    technical_keywords = [
+                        'wifi', 'network', 'internet', 'connection', 'connect',
+                        'printer', 'print', 'printing',
+                        'laptop', 'computer', 'pc', 'desktop',
+                        'password', 'login', 'account', 'reset',
+                        'error', 'crash', 'not working', 'broken', 'fix', 'repair',
+                        'software', 'app', 'application', 'program',
+                        'hardware', 'device', 'screen', 'keyboard', 'mouse',
+                        'troubleshoot', 'problem', 'issue', 'help',
+                        'install', 'update', 'download', 'virus', 'malware',
+                        'email', 'outlook', 'microsoft', 'office',
+                        'evsu', 'campus', 'it support', 'technical'
+                    ]
+                    
+                    is_technical = any(keyword in query_lower for keyword in technical_keywords)
+                    
+                    if is_technical:
+                        try:
+                            from .knowledge_base import add_entry, search_best_match
+                            existing_match = search_best_match(query, min_score=0.75)
+                            if not existing_match:
+                                tags = []
+                                tag_keywords = {
+                                    'wifi': ['wifi', 'network', 'internet', 'connection'],
+                                    'printer': ['printer', 'print', 'printing'],
+                                    'laptop': ['laptop', 'computer', 'pc', 'desktop'],
+                                    'password': ['password', 'login', 'account', 'reset'],
+                                    'software': ['software', 'app', 'application', 'program', 'install'],
+                                    'hardware': ['hardware', 'device', 'screen', 'keyboard', 'mouse'],
+                                    'error': ['error', 'crash', 'not working', 'broken'],
+                                }
+                                
+                                for tag, keywords in tag_keywords.items():
+                                    if any(kw in query_lower for kw in keywords):
+                                        tags.append(tag)
+                                
+                                if not tags:
+                                    tags = ['technical', 'support']
+                                
+                                title = query.strip()[:50] + ('...' if len(query) > 50 else '')
+                                kb_entry = add_entry(
+                                    title=title,
+                                    question_pattern=query,
+                                    answer=last_bot_message.message,
+                                    tags=tags,
+                                    source='gemini'
+                                )
+                                logger.info(f"✅ Auto-saved technical solution to KB from feedback: {kb_entry.get('id')} - {title}")
+                        except Exception as e:
+                            logger.error(f"Failed to auto-save technical solution to KB from feedback: {e}")
+            
+            session_context.conversation_state = state
+            session_context.save(update_fields=['conversation_state', 'updated_at'])
+            
+            return Response({
+                'status': 'success',
+                'message': 'Feedback received',
+                'feedback_saved': True,
+            }, status=status.HTTP_200_OK)
         
         # Get conversation context (track last 10 messages for adaptive flow)
         context = session.get_recent_context(limit=10)
@@ -302,12 +411,19 @@ def chat_endpoint(request):
         )
         
         # Save bot's response
+        response_source = ai_response.get('source', 'unknown')
+        # Map 'knowledge_base' to the correct source choice
+        if response_source == 'knowledge_base':
+            response_source = 'knowledge_base'
+        elif response_source not in ['gemini', 'knowledge_base', 'local_intelligence', 'hybrid', 'system']:
+            response_source = 'gemini' if 'gemini' in response_source else 'unknown'
+        
         bot_message = ChatMessage.objects.create(
             session=session,
             sender='bot',
             message=ai_response['message'],
             response=ai_response['message'],  # Store the response separately
-            response_source=ai_response.get('source', 'unknown'),
+            response_source=response_source,
             response_time=ai_response.get('processing_time', 0),
             confidence_score=ai_response.get('confidence', 0)
         )
@@ -315,6 +431,92 @@ def chat_endpoint(request):
         # Update user message with bot's response
         user_message.response = ai_response['message']
         user_message.save()
+        
+        # Update question count in session context
+        question_count = ai_response.get('question_count', question_count + 1)
+        state['question_count'] = question_count
+        
+        # Check if user provided satisfaction feedback in the request
+        satisfaction_feedback = data.get('is_satisfied')
+        previous_satisfaction = state.get('is_satisfied', True)
+        if satisfaction_feedback is not None:
+            state['is_satisfied'] = bool(satisfaction_feedback)
+        
+        # Auto-save technical solutions to Knowledge Base when user is satisfied
+        # Only save technical solutions (not general chat) when:
+        # 1. Response came from Gemini (not already from KB)
+        # 2. User just gave positive feedback (satisfaction changed to True)
+        # 3. Query is technical support related
+        # 4. Similar entry doesn't already exist in KB
+        if (response_source == 'gemini' and 
+            satisfaction_feedback is not None and 
+            satisfaction_feedback == True):
+            
+            # Check if this is a technical support query
+            query_lower = query.lower()
+            intent = ai_response.get('intent', '').lower()
+            
+            # Technical keywords that indicate IT support queries
+            technical_keywords = [
+                'wifi', 'network', 'internet', 'connection', 'connect',
+                'printer', 'print', 'printing',
+                'laptop', 'computer', 'pc', 'desktop',
+                'password', 'login', 'account', 'reset',
+                'error', 'crash', 'not working', 'broken', 'fix', 'repair',
+                'software', 'app', 'application', 'program',
+                'hardware', 'device', 'screen', 'keyboard', 'mouse',
+                'troubleshoot', 'problem', 'issue', 'help',
+                'install', 'update', 'download', 'virus', 'malware',
+                'email', 'outlook', 'microsoft', 'office',
+                'evsu', 'campus', 'it support', 'technical'
+            ]
+            
+            is_technical = any(keyword in query_lower for keyword in technical_keywords) or \
+                          any(keyword in intent for keyword in ['tech', 'support', 'troubleshoot'])
+            
+            if is_technical:
+                try:
+                    from .knowledge_base import add_entry, search_best_match
+                    # Check if similar entry already exists (high threshold to avoid duplicates)
+                    existing_match = search_best_match(query, min_score=0.75)
+                    if not existing_match:
+                        # Extract relevant tags from query
+                        tags = []
+                        tag_keywords = {
+                            'wifi': ['wifi', 'network', 'internet', 'connection'],
+                            'printer': ['printer', 'print', 'printing'],
+                            'laptop': ['laptop', 'computer', 'pc', 'desktop'],
+                            'password': ['password', 'login', 'account', 'reset'],
+                            'software': ['software', 'app', 'application', 'program', 'install'],
+                            'hardware': ['hardware', 'device', 'screen', 'keyboard', 'mouse'],
+                            'error': ['error', 'crash', 'not working', 'broken'],
+                        }
+                        
+                        for tag, keywords in tag_keywords.items():
+                            if any(kw in query_lower for kw in keywords):
+                                tags.append(tag)
+                        
+                        if not tags:
+                            tags = ['technical', 'support']
+                        
+                        # Generate title from query (first 50 chars)
+                        title = query.strip()[:50] + ('...' if len(query) > 50 else '')
+                        
+                        # Save to Knowledge Base
+                        kb_entry = add_entry(
+                            title=title,
+                            question_pattern=query,
+                            answer=ai_response['message'],
+                            tags=tags,
+                            source='gemini'
+                        )
+                        logger.info(f"✅ Auto-saved technical solution to KB: {kb_entry.get('id')} - {title}")
+                except Exception as e:
+                    logger.error(f"Failed to auto-save technical solution to KB: {e}")
+                    # Don't fail the request if KB save fails
+        
+        session_context.conversation_state = state
+        session_context.save(update_fields=['conversation_state', 'updated_at'])
         
         # Prepare response
         response_data = {
@@ -326,7 +528,10 @@ def chat_endpoint(request):
             'source': ai_response.get('source', 'unknown'),
             'processing_time': ai_response.get('processing_time', 0),
             'translation_used': ai_response.get('translation_used', False),
-            'connection_status': ai_response.get('connection_status', 'unknown')
+            'connection_status': ai_response.get('connection_status', 'unknown'),
+            'question_count': question_count,
+            'is_satisfied': state.get('is_satisfied', True),
+            'deeper_search_triggered': question_count >= 10 and not state.get('is_satisfied', True),
         }
         
         # Add voice response if requested

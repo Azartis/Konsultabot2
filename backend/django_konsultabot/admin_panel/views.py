@@ -13,14 +13,13 @@ import csv
 import json
 
 from .models import (
-    Intent, Keyword, KnowledgeBaseItem, Ticket, TicketNote, TicketHistory,
+    Intent, Keyword, KnowledgeBaseItem,
     NotificationTemplate, Notification, ChatbotSettings, AdminActivity,
     AdminRole, AdminUserRole
 )
 from .serializers import (
     UserListSerializer, UserDetailSerializer, IntentSerializer, IntentCreateUpdateSerializer,
     KeywordSerializer, KnowledgeBaseItemSerializer, KnowledgeBaseItemCreateUpdateSerializer,
-    TicketSerializer, TicketCreateUpdateSerializer, TicketNoteSerializer, TicketHistorySerializer,
     NotificationTemplateSerializer, NotificationSerializer, ChatbotSettingsSerializer,
     AdminActivitySerializer, AdminRoleSerializer, DashboardStatsSerializer
 )
@@ -250,141 +249,50 @@ class KnowledgeBaseViewSet(viewsets.ModelViewSet):
             instance.id, request=self.request
         )
         instance.delete()
-
-
-# ==================== Ticket Views ====================
-
-class TicketViewSet(viewsets.ModelViewSet):
-    """ViewSet for ticket management"""
-    permission_classes = [IsAuthenticated, IsAdminOrITStaff]
-    queryset = Ticket.objects.all()
-    
-    def get_serializer_class(self):
-        if self.action in ['create', 'update', 'partial_update']:
-            return TicketCreateUpdateSerializer
-        return TicketSerializer
-    
-    def get_queryset(self):
-        queryset = Ticket.objects.all()
-        
-        # Filter by status
-        status_filter = self.request.query_params.get('status', None)
-        if status_filter:
-            queryset = queryset.filter(status=status_filter)
-        
-        # Filter by priority
-        priority = self.request.query_params.get('priority', None)
-        if priority:
-            queryset = queryset.filter(priority=priority)
-        
-        # Filter by assigned_to
-        assigned_to = self.request.query_params.get('assigned_to', None)
-        if assigned_to:
-            queryset = queryset.filter(assigned_to_id=assigned_to)
-        
-        # Filter by user
-        user_id = self.request.query_params.get('user', None)
-        if user_id:
-            queryset = queryset.filter(user_id=user_id)
-        
-        return queryset.order_by('-created_at')
-    
-    def perform_create(self, serializer):
-        instance = serializer.save()
-        TicketHistory.objects.create(
-            ticket=instance,
-            changed_by=self.request.user,
-            action='created',
-            notes=f"Ticket created by {self.request.user.username}"
-        )
-        log_admin_activity(
-            self.request.user, 'create', 'Ticket',
-            f"Created ticket: {instance.ticket_id}",
-            instance.id, request=self.request
-        )
-    
-    @action(detail=True, methods=['post'])
-    def assign(self, request, pk=None):
-        """Assign ticket to admin"""
-        ticket = self.get_object()
-        assigned_to_id = request.data.get('assigned_to')
-        
-        if assigned_to_id:
-            assigned_to = User.objects.get(id=assigned_to_id)
-            ticket.assigned_to = assigned_to
-            ticket.assigned_at = timezone.now()
-            ticket.save()
-            
-            TicketHistory.objects.create(
-                ticket=ticket,
-                changed_by=request.user,
-                action='assigned',
-                new_value=assigned_to.username,
-                notes=f"Ticket assigned to {assigned_to.username}"
-            )
-        
-        serializer = self.get_serializer(ticket)
-        return Response(serializer.data)
-    
-    @action(detail=True, methods=['post'])
-    def add_note(self, request, pk=None):
-        """Add note to ticket"""
-        ticket = self.get_object()
-        note = TicketNote.objects.create(
-            ticket=ticket,
-            author=request.user,
-            note=request.data.get('note', ''),
-            is_internal=request.data.get('is_internal', True)
-        )
-        
-        serializer = TicketNoteSerializer(note)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-    
-    @action(detail=True, methods=['post'])
-    def resolve(self, request, pk=None):
-        """Resolve ticket"""
-        ticket = self.get_object()
-        ticket.status = 'resolved'
-        ticket.resolution = request.data.get('resolution', '')
-        ticket.resolved_at = timezone.now()
-        ticket.resolved_by = request.user
-        ticket.save()
-        
-        TicketHistory.objects.create(
-            ticket=ticket,
-            changed_by=request.user,
-            action='resolved',
-            old_value='open',
-            new_value='resolved',
-            notes=request.data.get('notes', '')
-        )
-        
-        serializer = self.get_serializer(ticket)
-        return Response(serializer.data)
     
     @action(detail=False, methods=['get'])
-    def export_csv(self, request):
-        """Export tickets to CSV"""
-        tickets = self.get_queryset()
-        
-        response = HttpResponse(content_type='text/csv')
-        response['Content-Disposition'] = 'attachment; filename="tickets.csv"'
-        
-        writer = csv.writer(response)
-        writer.writerow(['Ticket ID', 'Title', 'User', 'Status', 'Priority', 'Assigned To', 'Created At'])
-        
-        for ticket in tickets:
-            writer.writerow([
-                ticket.ticket_id,
-                ticket.title,
-                ticket.user.username,
-                ticket.status,
-                ticket.priority,
-                ticket.assigned_to.username if ticket.assigned_to else '',
-                ticket.created_at
-            ])
-        
-        return response
+    def sync_offline_kb(self, request):
+        """Sync offline Knowledge Base (JSON file) with admin panel"""
+        try:
+            from chatbot_core.knowledge_base import get_all_entries
+            kb_entries = get_all_entries()
+            
+            # Return offline KB entries
+            return Response({
+                'count': len(kb_entries),
+                'entries': kb_entries
+            })
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=False, methods=['get'])
+    def offline_kb(self, request):
+        """Get offline Knowledge Base entries from JSON file"""
+        try:
+            from chatbot_core.knowledge_base import get_all_entries
+            kb_entries = get_all_entries()
+            
+            # Format for admin panel
+            formatted_entries = []
+            for entry in kb_entries:
+                formatted_entries.append({
+                    'id': entry.get('id'),
+                    'title': entry.get('title'),
+                    'question_pattern': entry.get('question_pattern'),
+                    'answer': entry.get('answer'),
+                    'tags': entry.get('tags', []),
+                    'source': entry.get('source', 'kb'),
+                    'created_at': entry.get('created_at'),
+                    'updated_at': entry.get('updated_at'),
+                    'view_count': entry.get('view_count', 0),
+                })
+            
+            return Response({
+                'count': len(formatted_entries),
+                'results': formatted_entries
+            })
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 # ==================== Notification Views ====================
@@ -514,15 +422,34 @@ def conversation_logs(request):
     
     data = []
     for conv in conversations:
+        # Try to get user info, if not available, try to get from first message
+        user_info = {
+            'id': None,
+            'username': 'Anonymous',
+            'email': ''
+        }
+        
+        if conv.user:
+            user_info = {
+                'id': conv.user.id,
+                'username': conv.user.username or conv.user.email or 'Anonymous',
+                'email': conv.user.email or ''
+            }
+        else:
+            # Try to get user from first message in the conversation
+            first_message = ChatMessage.objects.filter(session=conv).order_by('timestamp').first()
+            if first_message and hasattr(first_message, 'user') and first_message.user:
+                user_info = {
+                    'id': first_message.user.id,
+                    'username': first_message.user.username or first_message.user.email or 'Anonymous',
+                    'email': first_message.user.email or ''
+                }
+        
         data.append({
             'id': conv.id,
             'session_id': conv.session_id,
-            'user': {
-                'id': conv.user.id if conv.user else None,
-                'username': conv.user.username if conv.user else 'Anonymous',
-                'email': conv.user.email if conv.user else ''
-            },
-            'title': conv.title,
+            'user': user_info,
+            'title': conv.title or f'Conversation {conv.session_id[:8]}',
             'message_count': conv.message_count,
             'created_at': conv.created_at,
             'last_activity': conv.last_activity,

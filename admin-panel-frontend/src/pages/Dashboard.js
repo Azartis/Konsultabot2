@@ -21,7 +21,7 @@ import {
 import {
   People,
   Chat,
-  Support,
+  Book,
   Assessment,
   Download,
   Refresh,
@@ -113,15 +113,33 @@ const Dashboard = () => {
 
   useEffect(() => {
     loadDashboardStats();
+    // Auto-reload every 30 seconds
+    const interval = setInterval(() => {
+      loadDashboardStats();
+    }, 30000);
+    return () => clearInterval(interval);
   }, [days]);
 
   const loadDashboardStats = async () => {
     setLoading(true);
     try {
       const data = await apiService.getDashboardStats(days);
+      console.log('Dashboard stats received:', data); // Debug log
       setStats(data);
     } catch (error) {
       console.error('Error loading dashboard stats:', error);
+      // Set default values on error
+      setStats({
+        total_users: 0,
+        total_conversations: 0,
+        total_queries: 0,
+        total_kb_items: 0,
+        kb_views: 0,
+        most_common_intents: {},
+        usage_chart_data: {},
+        kb_usage_data: {},
+        recent_activities: []
+      });
     } finally {
       setLoading(false);
     }
@@ -134,7 +152,7 @@ const Dashboard = () => {
       ['Metric', 'Value'],
       ['Total Users', stats.total_users || 0],
       ['Total Conversations', stats.total_conversations || 0],
-      ['Total Tickets', stats.total_tickets || 0],
+      ['Knowledge Base Items', stats.total_kb_items || 0],
       ['Total Queries', stats.total_queries || 0],
     ].map(row => row.join(',')).join('\n');
     
@@ -156,29 +174,54 @@ const Dashboard = () => {
     );
   }
 
-  // Prepare chart data
-  const usageData = stats?.usage_chart_data
+  // Prepare chart data - Usage over time
+  const usageData = stats?.usage_chart_data && Object.keys(stats.usage_chart_data).length > 0
     ? Object.entries(stats.usage_chart_data)
         .map(([date, value]) => ({ 
           date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
           queries: value || 0 
         }))
         .reverse()
-        .slice(-days)
-    : [];
+        .slice(-Math.min(days, 30))
+    : Array.from({ length: Math.min(days, 7) }, (_, i) => {
+        const date = new Date();
+        date.setDate(date.getDate() - (Math.min(days, 7) - i - 1));
+        return {
+          date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          queries: 0
+        };
+      });
 
-  const intentData = stats?.most_common_intents
+  // Intent distribution data
+  const intentData = stats?.most_common_intents && Object.keys(stats.most_common_intents).length > 0
     ? Object.entries(stats.most_common_intents)
-        .map(([name, count]) => ({ name, count, value: count }))
+        .map(([name, count]) => ({ name: name || 'Unknown', count: count || 0, value: count || 0 }))
         .slice(0, 6)
     : [];
 
-  const ticketStatusData = stats?.ticket_status_breakdown
-    ? Object.entries(stats.ticket_status_breakdown).map(([status, count]) => ({
-        name: status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' '),
-        value: count,
-      }))
-    : [];
+  // Knowledge Base usage data
+  const kbUsageData = stats?.kb_usage_data && Object.keys(stats.kb_usage_data).length > 0
+    ? Object.entries(stats.kb_usage_data)
+        .map(([date, count]) => ({
+          date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          views: count || 0
+        }))
+        .reverse()
+        .slice(-Math.min(days, 30))
+    : Array.from({ length: Math.min(days, 7) }, (_, i) => {
+        const date = new Date();
+        date.setDate(date.getDate() - (Math.min(days, 7) - i - 1));
+        return {
+          date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          views: 0
+        };
+      });
+
+  // Combined usage data for comparison
+  const combinedUsageData = usageData.map((item, index) => ({
+    ...item,
+    kb_views: kbUsageData[index]?.views || 0
+  }));
 
   return (
     <MainLayout>
@@ -243,11 +286,11 @@ const Dashboard = () => {
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
           <StatCard
-            title="Total Tickets"
-            value={stats?.total_tickets || 0}
-            icon={<Support sx={{ fontSize: 28 }} />}
-            color="#FBBC04"
-            subtitle={`${stats?.open_tickets || 0} open`}
+            title="Knowledge Base"
+            value={stats?.total_kb_items || 0}
+            icon={<Book sx={{ fontSize: 28 }} />}
+            color="#9334E6"
+            subtitle={`${stats?.kb_views || 0} views`}
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
@@ -261,8 +304,8 @@ const Dashboard = () => {
           />
         </Grid>
 
-        {/* Usage Chart - Interactive */}
-        <Grid item xs={12} md={8}>
+        {/* Usage Chart - Bigger and More Prominent */}
+        <Grid item xs={12}>
           <Paper sx={{ p: 3, backgroundColor: '#FFFFFF', boxShadow: '0 1px 2px 0 rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15)' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
               <Typography variant="h6" sx={{ fontWeight: 500, color: '#202124' }}>
@@ -289,7 +332,7 @@ const Dashboard = () => {
             </Box>
             <ResponsiveContainer width="100%" height={300}>
               {chartType === 'line' ? (
-                <LineChart data={usageData}>
+                <LineChart data={combinedUsageData.length > 0 ? combinedUsageData : usageData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E8EAED" />
                   <XAxis dataKey="date" stroke="#5F6368" fontSize={12} />
                   <YAxis stroke="#5F6368" fontSize={12} />
@@ -307,14 +350,25 @@ const Dashboard = () => {
                     type="monotone"
                     dataKey="queries"
                     stroke="#4285F4"
-                    strokeWidth={2}
-                    dot={{ fill: '#4285F4', r: 4 }}
-                    activeDot={{ r: 6 }}
-                    name="Queries"
+                    strokeWidth={3}
+                    dot={{ fill: '#4285F4', r: 5 }}
+                    activeDot={{ r: 8 }}
+                    name="Total Queries"
                   />
+                  {kbUsageData.length > 0 && (
+                    <Line
+                      type="monotone"
+                      dataKey="kb_views"
+                      stroke="#9334E6"
+                      strokeWidth={3}
+                      dot={{ fill: '#9334E6', r: 5 }}
+                      activeDot={{ r: 8 }}
+                      name="KB Usage"
+                    />
+                  )}
                 </LineChart>
               ) : (
-                <AreaChart data={usageData}>
+                <AreaChart data={combinedUsageData.length > 0 ? combinedUsageData : usageData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E8EAED" />
                   <XAxis dataKey="date" stroke="#5F6368" fontSize={12} />
                   <YAxis stroke="#5F6368" fontSize={12} />
@@ -330,23 +384,33 @@ const Dashboard = () => {
                     dataKey="queries"
                     stroke="#4285F4"
                     fill="#4285F4"
-                    fillOpacity={0.1}
-                    name="Queries"
+                    fillOpacity={0.2}
+                    name="Total Queries"
                   />
+                  {kbUsageData.length > 0 && (
+                    <Area
+                      type="monotone"
+                      dataKey="kb_views"
+                      stroke="#9334E6"
+                      fill="#9334E6"
+                      fillOpacity={0.2}
+                      name="KB Usage"
+                    />
+                  )}
                 </AreaChart>
               )}
             </ResponsiveContainer>
           </Paper>
         </Grid>
 
-        {/* Most Common Intents */}
-        <Grid item xs={12} md={4}>
+        {/* Most Common Intents - Bigger */}
+        <Grid item xs={12} md={6}>
           <Paper sx={{ p: 3, backgroundColor: '#FFFFFF', boxShadow: '0 1px 2px 0 rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15)' }}>
             <Typography variant="h6" sx={{ fontWeight: 500, color: '#202124', mb: 2 }}>
               Most Common Intents
             </Typography>
             {intentData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={400}>
                 <PieChart>
                   <Pie
                     data={intentData}
@@ -366,7 +430,7 @@ const Dashboard = () => {
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <Box sx={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Box sx={{ height: 400, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Typography variant="body2" sx={{ color: '#9AA0A6' }}>
                   No intent data available
                 </Typography>
@@ -375,40 +439,14 @@ const Dashboard = () => {
           </Paper>
         </Grid>
 
-        {/* Ticket Status Breakdown */}
-        {ticketStatusData.length > 0 && (
-          <Grid item xs={12} md={6}>
-            <Paper sx={{ p: 3, backgroundColor: '#FFFFFF', boxShadow: '0 1px 2px 0 rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15)' }}>
-              <Typography variant="h6" sx={{ fontWeight: 500, color: '#202124', mb: 2 }}>
-                Ticket Status Breakdown
-              </Typography>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={ticketStatusData} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E8EAED" />
-                  <XAxis type="number" stroke="#5F6368" fontSize={12} />
-                  <YAxis dataKey="name" type="category" stroke="#5F6368" fontSize={12} width={120} />
-                  <RechartsTooltip
-                    contentStyle={{
-                      backgroundColor: '#FFFFFF',
-                      border: '1px solid #E8EAED',
-                      borderRadius: '8px',
-                    }}
-                  />
-                  <Bar dataKey="value" fill="#4285F4" radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </Paper>
-          </Grid>
-        )}
-
-        {/* Most Common Intents Bar Chart */}
+        {/* Most Common Intents Bar Chart - Bigger */}
         {intentData.length > 0 && (
           <Grid item xs={12} md={6}>
             <Paper sx={{ p: 3, backgroundColor: '#FFFFFF', boxShadow: '0 1px 2px 0 rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15)' }}>
               <Typography variant="h6" sx={{ fontWeight: 500, color: '#202124', mb: 2 }}>
                 Intent Distribution
               </Typography>
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={400}>
                 <BarChart data={intentData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E8EAED" />
                   <XAxis dataKey="name" stroke="#5F6368" fontSize={12} angle={-45} textAnchor="end" height={100} />
@@ -434,10 +472,10 @@ const Dashboard = () => {
               Recent Activities
             </Typography>
             <Box sx={{ mt: 2 }}>
-              {stats?.recent_activities?.length > 0 ? (
+              {stats?.recent_activities && Array.isArray(stats.recent_activities) && stats.recent_activities.length > 0 ? (
                 stats.recent_activities.slice(0, 10).map((activity, index) => (
                   <Box
-                    key={index}
+                    key={activity.id || index}
                     sx={{
                       p: 2,
                       mb: 1,
@@ -450,7 +488,7 @@ const Dashboard = () => {
                     }}
                   >
                     <Typography variant="body2" sx={{ color: '#202124', fontWeight: 500, mb: 0.5 }}>
-                      {activity.admin_username} - {activity.action_type_display} - {activity.resource_type}
+                      {activity.admin_username || 'System'} - {activity.action_type_display || activity.action_type || 'Action'} - {activity.resource_type || 'Resource'}
                     </Typography>
                     {activity.description && (
                       <Typography variant="body2" sx={{ color: '#5F6368', mb: 0.5 }}>
@@ -458,7 +496,7 @@ const Dashboard = () => {
                       </Typography>
                     )}
                     <Typography variant="caption" sx={{ color: '#9AA0A6', fontSize: '0.75rem' }}>
-                      {new Date(activity.created_at).toLocaleString()}
+                      {activity.created_at ? new Date(activity.created_at).toLocaleString() : 'Unknown time'}
                     </Typography>
                   </Box>
                 ))

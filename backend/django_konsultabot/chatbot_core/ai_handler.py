@@ -26,15 +26,19 @@ class MultilingualAIHandler:
                        forced_mode: Optional[Any] = None) -> Dict[str, Any]:
         """
         Process a user query using pure Gemini Flash - no keywords, no knowledge base.
+        ALWAYS responds in English only.
         """
         start_time = time.time()
         logger.info(f'[INFO] Query: "{query}"')
+        
+        # FORCE English - always use English for responses
+        language = 'english'
         
         response_data = {
             'message': '',
             'original_query': query,
             'detected_language': 'english',
-            'response_language': 'english',
+            'response_language': 'english',  # Always English
             'translation_used': False,
             'source': 'gemini',
             'method': 'gemini_flash',
@@ -52,11 +56,11 @@ class MultilingualAIHandler:
         }
         
         try:
-            # Handle language processing (translate to English if needed)
-            lang_result = self._handle_language_processing(query, language)
+            # Handle language processing (translate to English if needed, but always respond in English)
+            lang_result = self._handle_language_processing(query, 'english')  # Force English
             response_data.update({
                 'detected_language': lang_result['detected_language'],
-                'response_language': lang_result['target_language'],
+                'response_language': 'english',  # Always English
                 'translation_used': lang_result['translation_used'],
             })
             english_query = lang_result['english_query']
@@ -66,30 +70,47 @@ class MultilingualAIHandler:
             response_data['connection_status'] = connection_info.get('recommended_mode', 'unknown')
             online = connection_info.get('connected', True)
 
-            # Call pure Gemini Flash flow
+            # Get question count and satisfaction from session context
+            question_count = 0
+            is_satisfied = True
+            if session:
+                try:
+                    context = session.context
+                    if context:
+                        state = context.conversation_state or {}
+                        question_count = state.get('question_count', 0)
+                        is_satisfied = state.get('is_satisfied', True)
+                except Exception as e:
+                    logger.warning(f"Error reading session context: {e}")
+
+            # Call enhanced chatbot flow with KB integration
             flow_result = chatbot_flow_handle_message(
                 user_id=str(user.id) if user else None,
                 message=english_query,
-                online=online
+                online=online,
+                question_count=question_count,
+                is_satisfied=is_satisfied
             )
 
             response_text = flow_result.get('text', '').strip()
             
-            # Translate back if needed
-            if lang_result['translation_used'] and response_text:
-                response_text = self._translate_response_back(
-                    response_text,
-                    lang_result['target_language']
-                )
+            # DO NOT translate back - always keep response in English
+            # Response is always in English regardless of user's input language
 
+            # Update question count - increment for each user query
+            metadata = flow_result.get('metadata', {})
+            question_count = question_count + 1  # Increment for this query
+            metadata['question_count'] = question_count
+            
             response_data.update({
                 'message': response_text,
                 'source': flow_result.get('source', 'gemini'),
                 'method': 'gemini_flash',
-                'confidence': 0.9 if flow_result.get('source') == 'gemini' else 0.5,
-                'fallback_used': flow_result.get('source') != 'gemini',
-                'metadata': flow_result.get('metadata', {}),
+                'confidence': 0.9 if flow_result.get('source') == 'gemini' else 0.95 if flow_result.get('source') == 'knowledge_base' else 0.5,
+                'fallback_used': flow_result.get('source') not in ['gemini', 'knowledge_base'],
+                'metadata': metadata,
                 'mode': flow_result.get('mode', 'normal'),
+                'question_count': question_count,
             })
             
         except Exception as e:
@@ -109,42 +130,52 @@ class MultilingualAIHandler:
 
     
     def _handle_language_processing(self, query: str, language: str) -> Dict[str, Any]:
-        """Handle language detection and translation"""
+        """Handle language detection and translation - ALWAYS responds in English"""
         result = {
             'detected_language': 'english',
-            'target_language': 'english',
+            'target_language': 'english',  # ALWAYS English for responses
             'english_query': query,
             'translation_used': False
         }
         
         try:
-            # Detect language if auto
+            # Detect input language (for logging/understanding), but always process in English
             if language == 'auto':
-                detection = translation_service.detect_language(query)
-                detected_lang = detection['language']
+                try:
+                    detection = translation_service.detect_language(query)
+                    detected_lang = detection.get('language', 'english')
+                except Exception:
+                    detected_lang = 'english'
             else:
-                detected_lang = language
+                detected_lang = 'english'  # Force English processing
             
             result['detected_language'] = detected_lang
-            result['target_language'] = detected_lang
+            # target_language is ALWAYS English - we never translate responses back
             
-            # Translate to English for processing if needed
+            # Translate to English for processing if input is not English
             if detected_lang != 'english':
-                translation = translation_service.translate_text(
-                    query, 'english', detected_lang
-                )
-                
-                if translation['confidence'] > 0.5:
-                    result['english_query'] = translation['translated_text']
-                    result['translation_used'] = True
-                else:
-                    # Keep original if translation confidence is low
+                try:
+                    translation = translation_service.translate_text(
+                        query, 'english', detected_lang
+                    )
+                    
+                    if translation.get('confidence', 0) > 0.5:
+                        result['english_query'] = translation.get('translated_text', query)
+                        result['translation_used'] = True
+                    else:
+                        # Keep original if translation confidence is low
+                        result['english_query'] = query
+                except Exception as trans_error:
+                    logger.warning(f"Translation failed, using original query: {trans_error}")
                     result['english_query'] = query
+            else:
+                result['english_query'] = query
             
         except Exception as e:
             logger.error(f"Language processing error: {e}")
             # Fallback to treating as English
             result['english_query'] = query
+            result['detected_language'] = 'english'
         
         return result
     

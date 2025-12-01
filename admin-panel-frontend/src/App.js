@@ -12,7 +12,6 @@ import Dashboard from './pages/Dashboard';
 import Users from './pages/Users';
 import KnowledgeBase from './pages/KnowledgeBase';
 import Intents from './pages/Intents';
-import Tickets from './pages/Tickets';
 import Conversations from './pages/Conversations';
 import Notifications from './pages/Notifications';
 import Settings from './pages/Settings';
@@ -172,14 +171,6 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Intents />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/tickets"
-        element={
-          <ProtectedRoute>
-            <Tickets />
           </ProtectedRoute>
         }
       />

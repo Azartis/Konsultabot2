@@ -137,6 +137,7 @@ CORS_ALLOW_HEADERS = [
     'x-client-version',
     'x-client-platform',
 ]
+# CSRF Trusted Origins - Add Ngrok URLs dynamically
 CSRF_TRUSTED_ORIGINS = [
     'http://127.0.0.1:8000',
     'http://localhost:8000',
@@ -145,6 +146,20 @@ CSRF_TRUSTED_ORIGINS = [
     'http://localhost:8081',  # Expo web dev server
     'http://127.0.0.1:8081',  # Expo web dev server
 ]
+
+# Add Ngrok URLs from environment (for global access)
+NGROK_URL = os.getenv('NGROK_URL', '')
+if NGROK_URL:
+    # Add both http and https versions
+    ngrok_domain = NGROK_URL.replace('https://', '').replace('http://', '').split('/')[0]
+    CSRF_TRUSTED_ORIGINS.extend([
+        f'https://{ngrok_domain}',
+        f'http://{ngrok_domain}',
+    ])
+
+# Note: Django doesn't support wildcards in CSRF_TRUSTED_ORIGINS
+# We'll add specific ngrok domains dynamically when they're detected
+# For now, CORS_ALLOW_ALL_ORIGINS = True handles CORS, and we exempt CSRF for API views
 USE_X_FORWARDED_HOST = False
 SECURE_PROXY_SSL_HEADER = None
 

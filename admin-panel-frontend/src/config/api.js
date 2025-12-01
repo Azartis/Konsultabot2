@@ -29,6 +29,8 @@ export const API_ENDPOINTS = {
   // Knowledge Base
   knowledgeBase: `${ADMIN_API_BASE}/api/knowledge-base/`,
   kbDetail: (id) => `${ADMIN_API_BASE}/api/knowledge-base/${id}/`,
+  kbOffline: `${ADMIN_API_BASE}/api/knowledge-base/offline_kb/`,
+  kbSync: `${ADMIN_API_BASE}/api/knowledge-base/sync_offline_kb/`,
   
   // Tickets
   tickets: `${ADMIN_API_BASE}/api/tickets/`,

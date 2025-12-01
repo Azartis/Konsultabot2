@@ -2,24 +2,33 @@ import React, { useEffect, useRef } from 'react';
 import { Text, View, StyleSheet, Animated } from 'react-native';
 
 export default function GlitchText({ children, style }) {
+  // Use only native driver for all animations to avoid conflicts
   const glitchAnim1 = useRef(new Animated.Value(0)).current;
   const glitchAnim2 = useRef(new Animated.Value(0)).current;
   const glitchAnim3 = useRef(new Animated.Value(0)).current;
-  const skewAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-  const colorShift = useRef(new Animated.Value(0)).current;
+  const skewAnim1 = useRef(new Animated.Value(0)).current;
+  const skewAnim2 = useRef(new Animated.Value(0)).current;
+  const skewAnim3 = useRef(new Animated.Value(0)).current;
+  const scaleAnim1 = useRef(new Animated.Value(1)).current;
+  const scaleAnim2 = useRef(new Animated.Value(1)).current;
+  // Use opacity with native driver (works for opacity, just not for color changes)
+  const shadowOpacity1 = useRef(new Animated.Value(0)).current;
+  const shadowOpacity2 = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const createGlitch = () => {
-      // More pronounced distortion values
-      const skewValue = (Math.random() - 0.5) * 0.3;
-      const scaleValue = 1 + (Math.random() - 0.5) * 0.1;
-      const glitchX1 = (Math.random() - 0.5) * 12; // Increased from ±3 to ±12
+      const skewValue1 = (Math.random() - 0.5) * 0.3;
+      const skewValue2 = (Math.random() - 0.5) * 0.3;
+      const skewValue3 = (Math.random() - 0.5) * 0.2;
+      const scaleValue1 = 1 + (Math.random() - 0.5) * 0.1;
+      const scaleValue2 = 1 + (Math.random() - 0.5) * 0.1;
+      const glitchX1 = (Math.random() - 0.5) * 12;
       const glitchX2 = (Math.random() - 0.5) * 12;
       const glitchX3 = (Math.random() - 0.5) * 4;
       
+      // All animations use native driver
       Animated.parallel([
-        // Horizontal glitch movement - much more pronounced
+        // Shadow layer 1
         Animated.sequence([
           Animated.timing(glitchAnim1, {
             toValue: glitchX1,
@@ -38,6 +47,48 @@ export default function GlitchText({ children, style }) {
           }),
         ]),
         Animated.sequence([
+          Animated.timing(skewAnim1, {
+            toValue: skewValue1,
+            duration: 15,
+            useNativeDriver: true,
+          }),
+          Animated.timing(skewAnim1, {
+            toValue: -skewValue1,
+            duration: 15,
+            useNativeDriver: true,
+          }),
+          Animated.timing(skewAnim1, {
+            toValue: 0,
+            duration: 15,
+            useNativeDriver: true,
+          }),
+        ]),
+        Animated.sequence([
+          Animated.timing(scaleAnim1, {
+            toValue: scaleValue1,
+            duration: 15,
+            useNativeDriver: true,
+          }),
+          Animated.timing(scaleAnim1, {
+            toValue: 1,
+            duration: 15,
+            useNativeDriver: true,
+          }),
+        ]),
+        Animated.sequence([
+          Animated.timing(shadowOpacity1, {
+            toValue: 0.7,
+            duration: 10,
+            useNativeDriver: true,
+          }),
+          Animated.timing(shadowOpacity1, {
+            toValue: 0,
+            duration: 10,
+            useNativeDriver: true,
+          }),
+        ]),
+        // Shadow layer 2
+        Animated.sequence([
           Animated.timing(glitchAnim2, {
             toValue: glitchX2,
             duration: 25,
@@ -54,51 +105,48 @@ export default function GlitchText({ children, style }) {
             useNativeDriver: true,
           }),
         ]),
-        // Skew distortion - more pronounced
         Animated.sequence([
-          Animated.timing(skewAnim, {
-            toValue: skewValue,
+          Animated.timing(skewAnim2, {
+            toValue: skewValue2,
             duration: 15,
             useNativeDriver: true,
           }),
-          Animated.timing(skewAnim, {
-            toValue: -skewValue,
+          Animated.timing(skewAnim2, {
+            toValue: -skewValue2,
             duration: 15,
             useNativeDriver: true,
           }),
-          Animated.timing(skewAnim, {
+          Animated.timing(skewAnim2, {
             toValue: 0,
             duration: 15,
             useNativeDriver: true,
           }),
         ]),
-        // Scale distortion - more pronounced
         Animated.sequence([
-          Animated.timing(scaleAnim, {
-            toValue: scaleValue,
+          Animated.timing(scaleAnim2, {
+            toValue: scaleValue2,
             duration: 15,
             useNativeDriver: true,
           }),
-          Animated.timing(scaleAnim, {
+          Animated.timing(scaleAnim2, {
             toValue: 1,
             duration: 15,
             useNativeDriver: true,
           }),
         ]),
-        // Color shift - more visible
         Animated.sequence([
-          Animated.timing(colorShift, {
-            toValue: 1,
+          Animated.timing(shadowOpacity2, {
+            toValue: 0.7,
             duration: 10,
-            useNativeDriver: false,
+            useNativeDriver: true,
           }),
-          Animated.timing(colorShift, {
+          Animated.timing(shadowOpacity2, {
             toValue: 0,
             duration: 10,
-            useNativeDriver: false,
+            useNativeDriver: true,
           }),
         ]),
-        // Main text movement - more pronounced
+        // Main text
         Animated.sequence([
           Animated.timing(glitchAnim3, {
             toValue: glitchX3,
@@ -111,8 +159,24 @@ export default function GlitchText({ children, style }) {
             useNativeDriver: true,
           }),
         ]),
+        Animated.sequence([
+          Animated.timing(skewAnim3, {
+            toValue: skewValue3,
+            duration: 15,
+            useNativeDriver: true,
+          }),
+          Animated.timing(skewAnim3, {
+            toValue: -skewValue3,
+            duration: 15,
+            useNativeDriver: true,
+          }),
+          Animated.timing(skewAnim3, {
+            toValue: 0,
+            duration: 15,
+            useNativeDriver: true,
+          }),
+        ]),
       ]).start(() => {
-        // More frequent glitches (0.8-2.5 seconds)
         setTimeout(createGlitch, 800 + Math.random() * 1700);
       });
     };
@@ -120,19 +184,23 @@ export default function GlitchText({ children, style }) {
     createGlitch();
   }, []);
 
-  const skewInterpolate = skewAnim.interpolate({
+  const skewInterpolate1 = skewAnim1.interpolate({
     inputRange: [-1, 1],
     outputRange: ['-8deg', '8deg'],
   });
 
-  const colorOpacity = colorShift.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 0.7],
+  const skewInterpolate2 = skewAnim2.interpolate({
+    inputRange: [-1, 1],
+    outputRange: ['-8deg', '8deg'],
+  });
+
+  const skewInterpolate3 = skewAnim3.interpolate({
+    inputRange: [-1, 1],
+    outputRange: ['-6deg', '6deg'],
   });
 
   return (
     <View style={styles.container}>
-      {/* Distorted shadow layers for glitch effect */}
       <Animated.Text
         style={[
           styles.text,
@@ -141,10 +209,10 @@ export default function GlitchText({ children, style }) {
           {
             transform: [
               { translateX: glitchAnim1 },
-              { skewX: skewInterpolate },
-              { scale: scaleAnim },
+              { skewX: skewInterpolate1 },
+              { scale: scaleAnim1 },
             ],
-            opacity: colorOpacity,
+            opacity: shadowOpacity1,
           },
         ]}
       >
@@ -158,16 +226,15 @@ export default function GlitchText({ children, style }) {
           {
             transform: [
               { translateX: glitchAnim2 },
-              { skewX: skewInterpolate },
-              { scale: scaleAnim },
+              { skewX: skewInterpolate2 },
+              { scale: scaleAnim2 },
             ],
-            opacity: colorOpacity,
+            opacity: shadowOpacity2,
           },
         ]}
       >
         {children}
       </Animated.Text>
-      {/* Main text with subtle distortion */}
       <Animated.Text 
         style={[
           styles.text, 
@@ -175,7 +242,7 @@ export default function GlitchText({ children, style }) {
           {
             transform: [
               { translateX: glitchAnim3 },
-              { skewX: skewInterpolate },
+              { skewX: skewInterpolate3 },
             ],
           }
         ]}
@@ -197,12 +264,9 @@ const styles = StyleSheet.create({
   shadow1: {
     position: 'absolute',
     color: '#4285F4',
-    opacity: 0.9,
   },
   shadow2: {
     position: 'absolute',
     color: '#EA4335',
-    opacity: 0.9,
   },
 });
-

@@ -1,3 +1,154 @@
-[]
-
-
+[
+  {
+    "id": "kb_1",
+    "title": "WiFi Connection Issues",
+    "question_pattern": "wifi not working cannot connect no internet slow connection",
+    "answer": "Here are steps to fix WiFi issues:\n\n1. Restart your router (unplug 30 secs).\n2. Forget and reconnect to the WiFi network.\n3. Check if other devices can connect.\n4. Update or reinstall your network adapter drivers.\n5. Reset network settings on your device.\n6. Try using mobile hotspot or another network.\n\nIf the issue persists, there may be ISP or router hardware problems.",
+    "tags": ["wifi", "network", "internet", "connection"],
+    "source": "kb"
+  },
+  {
+    "id": "kb_2",
+    "title": "Laptop Won't Turn On",
+    "question_pattern": "laptop not turning on power button no display dead",
+    "answer": "If your laptop won't turn on:\n\n1. Check the charger and power outlet.\n2. Remove battery (if removable) and do a power drain (hold button 30–60 secs).\n3. Observe LED lights or fan activity.\n4. Try external monitor to check for display failure.\n5. Remove external devices (USB, HDMI).\n\nIf still dead, it's likely a battery, motherboard, or power IC issue.",
+    "tags": ["laptop", "hardware", "power"],
+    "source": "kb"
+  },
+  {
+    "id": "kb_3",
+    "title": "Printer Not Printing",
+    "question_pattern": "printer not printing offline error",
+    "answer": "To fix printer printing issues:\n\n1. Make sure printer is powered on with ink/paper.\n2. Check USB cable/WiFi connection.\n3. Clear print queue.\n4. Update printer drivers.\n5. Restart printer and print spooler service.\n6. Perform a test print.\n7. Check printer display for error messages.\n\nIf it still won't print, test the printer on another device.",
+    "tags": ["printer", "printing", "hardware"],
+    "source": "kb"
+  },
+  {
+    "id": "kb_4",
+    "title": "Application Crashes",
+    "question_pattern": "app crashing closing unexpectedly software not responding",
+    "answer": "If an application keeps crashing:\n\n1. Restart the app.\n2. Update to the latest version.\n3. Restart your device.\n4. Clear cache or temporary data.\n5. Check system requirements.\n6. Reinstall the application.\n7. Close apps that may conflict.\n\nIf it still crashes, it may be due to corrupted files or system compatibility.",
+    "tags": ["software", "app", "crash"],
+    "source": "kb"
+  },
+  {
+    "id": "kb_5",
+    "title": "Password Reset",
+    "question_pattern": "forgot password cannot login reset password account",
+    "answer": "To reset your password:\n\n1. Click 'Forgot Password' on the login page.\n2. Enter your email or username.\n3. Check your inbox or spam folder.\n4. Click the reset link.\n5. Create a new secure password.\n\nIf no email arrives, contact IT support.",
+    "tags": ["password", "login", "account"],
+    "source": "kb"
+  },
+  {
+    "id": "kb_6",
+    "title": "Slow Laptop Performance",
+    "question_pattern": "laptop slow lagging freezing performance issue",
+    "answer": "To fix slow or lagging laptops:\n\n1. Close unused apps and browser tabs.\n2. Restart the device.\n3. Check storage — free at least 15% space.\n4. Disable startup programs.\n5. Run a virus/malware scan.\n6. Update Windows/macOS.\n7. Upgrade RAM or SSD for long-term improvement.",
+    "tags": ["performance", "slow", "lag", "laptop"],
+    "source": "kb"
+  },
+  {
+    "id": "kb_7",
+    "title": "Mobile Device Overheating",
+    "question_pattern": "phone overheating hot device temperature high",
+    "answer": "If your phone is overheating:\n\n1. Close apps running in background.\n2. Remove case temporarily.\n3. Avoid charging while playing games.\n4. Disable hotspot, Bluetooth, GPS.\n5. Let it rest in a cool area.\n\nPersistent overheating may indicate battery or hardware issues.",
+    "tags": ["mobile", "overheat", "temperature"],
+    "source": "kb"
+  },
+  {
+    "id": "kb_8",
+    "title": "Blue Screen of Death (BSOD)",
+    "question_pattern": "blue screen bsod crash windows error",
+    "answer": "For Windows BSOD issues:\n\n1. Restart your computer.\n2. Disconnect newly attached hardware.\n3. Update drivers and Windows.\n4. Run Memory Diagnostic.\n5. Run System File Checker (sfc /scannow).\n6. Check disk (chkdsk).\n\nIf BSOD continues, backup files and bring for diagnostics.",
+    "tags": ["bsod", "windows", "crash"],
+    "source": "kb"
+  },
+  {
+    "id": "kb_9",
+    "title": "No Sound / Audio Not Working",
+    "question_pattern": "no sound audio not working speaker issue",
+    "answer": "If audio is not working:\n\n1. Check volume and mute.\n2. Switch output device (speaker/headset).\n3. Restart device.\n4. Update audio drivers.\n5. Test with wired/wireless headphones.\n6. Check if audio service is running.\n\nIf still no sound, audio hardware may be failing.",
+    "tags": ["audio", "sound", "speaker"],
+    "source": "kb"
+  },
+  {
+    "id": "kb_10",
+    "title": "Cannot Install an Application",
+    "question_pattern": "cannot install app installation error",
+    "answer": "If you can't install an app:\n\n1. Check if storage is enough.\n2. Verify file compatibility (.exe/.apk/etc.).\n3. Allow installation from trusted sources.\n4. Restart device.\n5. Disable antivirus temporarily.\n6. Ensure your OS meets requirements.\n\nIf it still fails, the installer may be corrupted.",
+    "tags": ["install", "app", "software"],
+    "source": "kb"
+  }
+  {
+    "id": "kb_11",
+    "title": "Keyboard Not Working",
+    "question_pattern": "keyboard not working keys not typing unresponsive",
+    "answer": "If your keyboard isn't working:\n\n1. Restart your device.\n2. Try another USB port (for wired keyboards).\n3. For wireless, replace batteries or recharge.\n4. Clean keys and remove debris.\n5. Reinstall keyboard drivers.\n6. Test an external keyboard.\n\nIf the internal keyboard fails but external works, it's a hardware issue.",
+    "tags": ["keyboard", "typing", "hardware"],
+    "source": "kb"
+  }
+  {
+    "id": "kb_12",
+    "title": "Mouse Not Working",
+    "question_pattern": "mouse not working cursor not moving",
+    "answer": "Steps to fix a non-working mouse:\n\n1. Try a different USB port.\n2. Replace batteries (wireless).\n3. Clean the mouse sensor.\n4. Restart device.\n5. Update mouse drivers.\n6. Test with a different mouse.\n\nIf only your mouse fails, the issue may be with its hardware.",
+    "tags": ["mouse", "cursor", "hardware"],
+    "source": "kb"
+  }
+  {
+    "id": "kb_13",
+    "title": "Screen Flickering",
+    "question_pattern": "screen flickering display flashing monitor issue",
+    "answer": "To fix screen flickering:\n\n1. Restart device.\n2. Update display drivers.\n3. Adjust refresh rate.\n4. Check loose cable connections.\n5. Test with external monitor.\n\nIf flickering continues, the backlight or ribbon cable may be failing.",
+    "tags": ["screen", "display", "monitor"],
+    "source": "kb"
+  }
+  {
+    "id": "kb_14",
+    "title": "Laptop Overheating",
+    "question_pattern": "laptop overheating too hot high temperature",
+    "answer": "If your laptop is overheating:\n\n1. Clean vents and fans.\n2. Use on a flat, hard surface.\n3. Close heavy applications.\n4. Check Task Manager for high CPU usage.\n5. Replace thermal paste (advanced).\n\nSevere overheating may lead to auto shutdowns.",
+    "tags": ["overheat", "temperature", "laptop"],
+    "source": "kb"
+  }
+  {
+    "id": "kb_15",
+    "title": "Black Screen / No Display",
+    "question_pattern": "black screen no display monitor blank",
+    "answer": "If screen is black:\n\n1. Check brightness.\n2. Ensure power cable and display cable are connected.\n3. Try external monitor.\n4. Reseat RAM.\n\nIf external monitor works, the laptop display or cable may be damaged.",
+    "tags": ["screen", "black", "display"],
+    "source": "kb"
+  }
+  {
+    "id": "kb_16",
+    "title": "Bluetooth Not Connecting",
+    "question_pattern": "bluetooth not connecting pairing failed",
+    "answer": "If Bluetooth won’t connect:\n\n1. Restart device.\n2. Toggle Bluetooth off/on.\n3. Remove and repair device.\n4. Ensure devices are within range.\n5. Update Bluetooth drivers.\n\nSome devices cannot connect to multiple devices at once.",
+    "tags": ["bluetooth", "wireless", "pairing"],
+    "source": "kb"
+  }
+  {
+    "id": "kb_17",
+    "title": "Microphone Not Working",
+    "question_pattern": "microphone not working cannot record mic issue",
+    "answer": "If your mic is not working:\n\n1. Check if muted.\n2. Select correct input device.\n3. Allow apps microphone permissions.\n4. Update audio drivers.\n5. Test with voice recorder.\n\nIf still not working, try external microphone.",
+    "tags": ["microphone", "audio", "recording"],
+    "source": "kb"
+  }
+  {
+    "id": "kb_18",
+    "title": "Cannot Access Play Store",
+    "question_pattern": "cannot access play store app store not loading",
+    "answer": "If Play Store/App Store won't load:\n\n1. Check internet connection.\n2. Clear cache and data.\n3. Restart device.\n4. Correct date and time.\n5. Update system.\n\nIf still not loading, servers may be down.",
+    "tags": ["mobile", "store", "apps"],
+    "source": "kb"
+  }
+  {
+    "id": "kb_19",
+    "title": "USB Not Detected",
+    "question_pattern": "usb not detected no response flash drive not reading",
+    "answer": "If a USB device is not detected:\n\n1. Try different port.\n2. Try USB on another device.\n3. Update chipset/USB drivers.\n4. Check Disk Management for recognition.\n\nIf unreadable on all devices, the drive may be corrupted.",
+    "tags": ["usb", "storage", "hardware"],
+    "source": "kb"
+  }
+]

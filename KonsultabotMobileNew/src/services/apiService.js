@@ -133,25 +133,74 @@ let cachedBackendURL = null;
 
 // Function to discover working backend URL
 const discoverBackendURL = async () => {
-  // Check cache first
+  // PRIORITY 1: Check for Ngrok URL from environment/config (highest priority for global access)
   try {
-    const stored = await AsyncStorage.getItem('backend_url');
-    if (stored) {
-      // Verify cached URL still works
+    const ngrokUrl = Constants.expoConfig?.extra?.ngrokUrl || 
+                     (Constants.expoConfig?.extra?.apiUrl && typeof Constants.expoConfig.extra.apiUrl === 'string' 
+                       ? Constants.expoConfig.extra.apiUrl.replace('/api', '') 
+                       : null) ||
+                     process.env.EXPO_PUBLIC_NGROK_URL;
+    
+    if (ngrokUrl && typeof ngrokUrl === 'string' && (ngrokUrl.includes('ngrok.io') || ngrokUrl.includes('ngrok-free.dev') || ngrokUrl.includes('ngrok.app'))) {
+      const ngrokApiUrl = ngrokUrl.endsWith('/api') ? ngrokUrl : `${ngrokUrl}/api`;
       try {
-        const testResponse = await axios.get(`${stored.replace('/api', '')}/api/health/`, {
-          timeout: 5000,
+        const testResponse = await axios.get(`${ngrokUrl}/api/health/`, {
+          timeout: 10000,
           headers: { 'Accept': 'application/json' }
         });
         if (testResponse.status === 200) {
-          console.log('📦 Using cached backend URL:', stored);
-          cachedBackendURL = stored;
-          return stored;
+          console.log('🌐 Using Ngrok URL for global access:', ngrokApiUrl);
+          cachedBackendURL = ngrokApiUrl;
+          await AsyncStorage.setItem('backend_url', ngrokApiUrl);
+          return ngrokApiUrl;
         }
       } catch (e) {
-        console.log('⚠️ Cached URL no longer works, discovering new one...');
-        // Clear invalid cache
-        await AsyncStorage.removeItem('backend_url');
+        console.log('⚠️ Ngrok URL not responding, trying other options...');
+      }
+    }
+  } catch (error) {
+    console.log('Ngrok URL check error:', error);
+  }
+
+  // PRIORITY 2: Check cache
+  try {
+    const stored = await AsyncStorage.getItem('backend_url');
+    if (stored && typeof stored === 'string') {
+      // Skip cache if it's a local IP and we're looking for global access
+      const isLocalIP = stored.includes('192.168.') || stored.includes('10.0.') || stored.includes('127.0.0.1') || stored.includes('localhost');
+      
+            // If cached URL is Ngrok, always try it first
+            if (stored.includes('ngrok.io') || stored.includes('ngrok-free.dev') || stored.includes('ngrok.app')) {
+        try {
+          const testResponse = await axios.get(`${stored.replace('/api', '')}/api/health/`, {
+            timeout: 10000,
+            headers: { 'Accept': 'application/json' }
+          });
+          if (testResponse.status === 200) {
+            console.log('📦 Using cached Ngrok URL:', stored);
+            cachedBackendURL = stored;
+            return stored;
+          }
+        } catch (e) {
+          console.log('⚠️ Cached Ngrok URL no longer works, discovering new one...');
+          await AsyncStorage.removeItem('backend_url');
+        }
+      } else if (!isLocalIP) {
+        // Try cached non-local URL
+        try {
+          const testResponse = await axios.get(`${stored.replace('/api', '')}/api/health/`, {
+            timeout: 5000,
+            headers: { 'Accept': 'application/json' }
+          });
+          if (testResponse.status === 200) {
+            console.log('📦 Using cached backend URL:', stored);
+            cachedBackendURL = stored;
+            return stored;
+          }
+        } catch (e) {
+          console.log('⚠️ Cached URL no longer works, discovering new one...');
+          await AsyncStorage.removeItem('backend_url');
+        }
       }
     }
   } catch (error) {
@@ -160,7 +209,7 @@ const discoverBackendURL = async () => {
 
   console.log('🔍 Discovering backend URL...');
   
-  // Get platform-specific URLs
+  // PRIORITY 3: Get platform-specific URLs (local network fallback)
   const POSSIBLE_BACKEND_URLS = getPossibleBackendURLs();
   
   // Check for manually set backend URL
@@ -492,6 +541,14 @@ class ApiService {
     // Request interceptor
     this.api.interceptors.request.use(
       (config) => {
+        // Add auth token if available
+        if (this.authToken) {
+          config.headers.Authorization = `Bearer ${this.authToken}`;
+        }
+        // Add ngrok bypass header for ngrok-free.dev (bypasses browser verification)
+        if (config.baseURL && (config.baseURL.includes('ngrok-free.dev') || config.baseURL.includes('ngrok.io') || config.baseURL.includes('ngrok.app'))) {
+          config.headers['ngrok-skip-browser-warning'] = 'true';
+        }
         // Only log non-health-check requests
         if (!config.url?.includes('health')) {
           console.log('Making API request to:', config.baseURL + config.url);
@@ -839,10 +896,11 @@ class ApiService {
   }
 
   // Direct Django V1 chat endpoint (uses backend 3-mode router)
-  async sendV1ChatMessage(query, language = 'english', sessionId = null) {
+  async sendV1ChatMessage(query, language = 'english', sessionId = null, additionalData = {}) {
     const payload = {
       query,
       language,
+      ...additionalData,
     };
     if (sessionId) {
       payload.session_id = sessionId;

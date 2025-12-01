@@ -31,7 +31,6 @@ const menuItems = [
   { text: 'Users', icon: <People />, path: '/users' },
   { text: 'Knowledge Base', icon: <Book />, path: '/knowledge-base' },
   { text: 'Intents & Keywords', icon: <Psychology />, path: '/intents' },
-  { text: 'Tickets', icon: <Support />, path: '/tickets' },
   { text: 'Conversations', icon: <Chat />, path: '/conversations' },
   { text: 'Notifications', icon: <Notifications />, path: '/notifications' },
   { text: 'Settings', icon: <Settings />, path: '/settings' },

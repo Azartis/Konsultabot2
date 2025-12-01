@@ -1,15 +1,21 @@
 """
-Pure Gemini Flash chatbot flow - no modes, no keywords, no knowledge base.
+Konsultabot chatbot flow with offline Knowledge Base integration.
+
+Flow:
+1. Check offline Knowledge Base FIRST (even when online) for technical solutions
+2. If KB match found, return KB answer
+3. If no KB match, use Gemini Flash
+4. Track question count and satisfaction
 
 This module exposes a single main entrypoint:
 
-    handle_message(user_id, message, online=True) -> dict
+    handle_message(user_id, message, online=True, question_count=0, is_satisfied=True) -> dict
 
 The returned dict ALWAYS includes:
     {
       "text": "...",
       "mode": "normal",
-      "source": "gemini" | "gemini_error",
+      "source": "knowledge_base" | "gemini" | "gemini_error",
       "metadata": {...}
     }
 """
@@ -24,6 +30,7 @@ from django.conf import settings
 
 from .gemini_client import GeminiClientError, generate_text, is_configured
 from .mode_router import ChatMode, detect_mode
+from .knowledge_base import search_best_match
 
 logger = logging.getLogger('konsultabot.chatbot_flow')
 
@@ -35,7 +42,7 @@ Conversational AI
 
 Senior Technical Support Specialist
 
-You understand and respond in any language or dialect, always replying in the user’s language unless they request another.
+IMPORTANT LANGUAGE RULE: You MUST always respond in English (US) only, regardless of what language the user writes in. Even if the user writes in Spanish, Tagalog, or any other language, you must respond in clear, professional English. This is a strict requirement.
 
 1. Intent Classification (Required Internally Every Turn)
 
@@ -164,7 +171,7 @@ Maintain full context awareness
 
 Adjust to the user’s emotional tone
 
-Understand mixed languages and dialects
+IMPORTANT LANGUAGE RULE: Always respond in English (US) only, regardless of the user's input language. This is a strict requirement. Never respond in Spanish, Tagalog, or any other language - always English only.
 
 Switch modes instantly when the topic changes
 
@@ -192,10 +199,54 @@ class ChatResult:
         }
 
 
-def _handle_message(user_id: str, message: str, online: bool) -> ChatResult:
+def _handle_message(
+    user_id: str, 
+    message: str, 
+    online: bool,
+    question_count: int = 0,
+    is_satisfied: bool = True
+) -> ChatResult:
     """
-    Pure Gemini Flash handler - no modes, no keywords, no knowledge base.
+    Enhanced handler with offline Knowledge Base integration.
+    
+    Flow:
+    1. Check KB FIRST (even when online) for technical solutions
+    2. If KB match found, return KB answer
+    3. If no KB match, use Gemini Flash
+    4. Track question count and satisfaction
     """
+    # Step 1: Check Knowledge Base FIRST (always, even when online)
+    logger.info(f"Checking Knowledge Base for: {message[:50]}...")
+    kb_match = search_best_match(message, min_score=0.35)
+    
+    if kb_match:
+        entry, score = kb_match
+        logger.info(f"KB match found: {entry.get('title', 'N/A')} (score: {score:.2f})")
+        return ChatResult(
+            text=entry.get('answer', ''),
+            mode=ChatMode.NORMAL,
+            source="knowledge_base",
+            metadata={
+                "kb_id": entry.get('id'),
+                "kb_title": entry.get('title'),
+                "kb_score": score,
+                "kb_tags": entry.get('tags', []),
+            },
+        )
+    
+    logger.info("No KB match found, proceeding to Gemini...")
+    
+    # Step 2: Check if we need to inform user about deeper search
+    if question_count >= 10 and not is_satisfied:
+        deeper_search_notice = (
+            "\n\n🔍 I notice you've asked several questions. "
+            "I'm now digging deeper into my knowledge base and advanced resources "
+            "to provide you with a more comprehensive solution."
+        )
+    else:
+        deeper_search_notice = ""
+    
+    # Step 3: Use Gemini Flash if online and configured
     if not online or not is_configured():
         text = (
             "I'm currently unable to connect to Gemini Flash. "
@@ -213,11 +264,21 @@ def _handle_message(user_id: str, message: str, online: bool) -> ChatResult:
         logger.debug(f"Calling Gemini with prompt (length={len(prompt)})")
         gemini_resp = generate_text(prompt)
         logger.info(f"Successfully got response from Gemini (length={len(gemini_resp.text)})")
+        
+        # Append deeper search notice if needed
+        response_text = gemini_resp.text.strip()
+        if deeper_search_notice:
+            response_text += deeper_search_notice
+        
         return ChatResult(
-            text=gemini_resp.text.strip(),
+            text=response_text,
             mode=ChatMode.NORMAL,
             source="gemini",
-            metadata={},
+            metadata={
+                "question_count": question_count,
+                "is_satisfied": is_satisfied,
+                "deeper_search_triggered": question_count >= 10 and not is_satisfied,
+            },
         )
     except GeminiClientError as exc:
         logger.error(f"Gemini client error: {exc}")
@@ -237,19 +298,29 @@ def handle_message(
     user_id: Optional[str],
     message: str,
     online: bool = True,
+    question_count: int = 0,
+    is_satisfied: bool = True,
 ) -> Dict:
     """
-    Main entrypoint for pure Gemini Flash chatbot.
+    Main entrypoint for Konsultabot with KB integration.
 
     Parameters:
         user_id: ID or username of the user (optional, for logging/future use)
         message: raw user message
-        online : True if Gemini can be used, False for offline mode
+        online: True if Gemini can be used, False for offline mode
+        question_count: Number of questions asked in this session (default: 0)
+        is_satisfied: Whether user is satisfied with responses (default: True)
 
     Returns:
         dict with keys: text, mode, source, metadata
     """
-    result = _handle_message(user_id or "anonymous", message, online)
+    result = _handle_message(
+        user_id or "anonymous", 
+        message, 
+        online,
+        question_count=question_count,
+        is_satisfied=is_satisfied
+    )
     return result.to_dict()
 
 

@@ -14,7 +14,9 @@ import {
   FlatList,
   Modal,
   Alert,
+  StatusBar,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Audio } from 'expo-av';
@@ -47,6 +49,9 @@ export default function ImprovedChatScreen({ navigation }) {
   // Network status detection
   const { isOnline, isBackendOnline, checkConnectivity } = useNetworkStatus();
   
+  // Get safe area insets for proper spacing on mobile devices
+  const insets = useSafeAreaInsets();
+  
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -63,6 +68,10 @@ export default function ImprovedChatScreen({ navigation }) {
   const [isVoiceInput, setIsVoiceInput] = useState(false);
   const [wakeWordListening, setWakeWordListening] = useState(false);
   const [wakeWordRecognition, setWakeWordRecognition] = useState(null);
+  const [questionCount, setQuestionCount] = useState(0);
+  const [isSatisfied, setIsSatisfied] = useState(true);
+  const [warningMessage, setWarningMessage] = useState(null);
+  const [lastBotMessage, setLastBotMessage] = useState(null);
   const scrollViewRef = useRef();
   const carouselRef = useRef();
   const prevUserRef = useRef(user);
@@ -388,10 +397,39 @@ export default function ImprovedChatScreen({ navigation }) {
 
       let botMessage;
 
-      // Step 2: Always use backend 3-mode chatbot (no offline fallback)
+      // Step 2: Always use backend chatbot with KB integration
       console.log('🌐 Calling backend /api/v1/chat/ via apiService...');
-      const backendResponse = await apiService.sendV1ChatMessage(text.trim(), 'english');
+      const backendResponse = await apiService.sendV1ChatMessage(
+        text.trim(), 
+        'english', 
+        null, // sessionId
+        { is_satisfied: isSatisfied } // additionalData
+      );
       const data = backendResponse.data || backendResponse; // Axios wraps in .data
+
+      // Update question count and satisfaction from response
+      if (data.question_count !== undefined) {
+        setQuestionCount(data.question_count);
+      }
+      if (data.is_satisfied !== undefined) {
+        setIsSatisfied(data.is_satisfied);
+      }
+
+      // Handle warnings separately (not as chat messages)
+      if (data.warning) {
+        setWarningMessage(data.warning);
+        // Auto-hide warning after 5 seconds
+        setTimeout(() => setWarningMessage(null), 5000);
+      }
+
+      // Check if deeper search was triggered
+      if (data.deeper_search_triggered) {
+        setWarningMessage({
+          type: 'info',
+          message: '🔍 I\'m now digging deeper into my knowledge base to provide you with a more comprehensive solution.',
+        });
+        setTimeout(() => setWarningMessage(null), 8000);
+      }
 
       const answerText = data.text || data.message || '';
       botMessage = {
@@ -402,9 +440,19 @@ export default function ImprovedChatScreen({ navigation }) {
         confidence: data.confidence ?? 0.9,
         source: data.source || 'backend',
         mode: data.mode || data.metadata?.mode || 'normal',
+        kb_source: data.source === 'knowledge_base',
+        question_count: data.question_count || questionCount + 1,
+        userQuery: text.trim(), // Store the user's query for feedback
+        satisfied: null, // Track satisfaction state per message
       };
 
       setMessages(prev => [...prev, botMessage]);
+      
+      // Store last bot message for feedback tracking
+      setLastBotMessage({
+        ...botMessage,
+        userQuery: text.trim(),
+      });
       
       // Speak the bot's response with text-to-speech when from voice input
       // Always use English as default language
@@ -440,15 +488,13 @@ export default function ImprovedChatScreen({ navigation }) {
       
     } catch (error) {
       console.error('❌ Error in sendMessage:', error);
-      // No offline fallback – surface error so user knows connection is required
-      const errorMessage = {
-        id: Date.now() + 1,
-        text: "I couldn't reach the online assistant. Please check your internet connection or make sure the backend server is running, then try again.",
-        sender: 'bot',
-        timestamp: new Date(),
-        source: 'error_fallback'
-      };
-      setMessages(prev => [...prev, errorMessage]);
+      // Show error as warning (not as chat message)
+      setWarningMessage({
+        type: 'error',
+        message: "I couldn't reach the online assistant. Please check your internet connection or make sure the backend server is running, then try again.",
+      });
+      // Auto-hide warning after 8 seconds
+      setTimeout(() => setWarningMessage(null), 8000);
     } finally {
       setIsLoading(false);
     }
@@ -461,8 +507,38 @@ export default function ImprovedChatScreen({ navigation }) {
     return parsed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  const handleSatisfactionFeedback = async (satisfied, messageItem = null) => {
+    setIsSatisfied(satisfied);
+    
+    // Get the message to provide feedback for (use provided item or last bot message)
+    const targetMessage = messageItem || lastBotMessage;
+    if (!targetMessage) {
+      console.log('No message to provide feedback for');
+      return;
+    }
+    
+    // Send feedback to backend with the original query
+    // This allows backend to save technical solutions to KB
+    try {
+      const feedbackQuery = targetMessage.userQuery || targetMessage.text || '';
+      await apiService.sendV1ChatMessage(
+        feedbackQuery, 
+        'english', 
+        null, 
+        { 
+          is_satisfied: satisfied,
+          feedback_only: true, // Flag to indicate this is just feedback
+        }
+      );
+      console.log(`✅ Feedback sent: ${satisfied ? 'thumbs up' : 'thumbs down'}`);
+    } catch (error) {
+      console.log('Feedback update failed (non-critical):', error);
+    }
+  };
+
   const renderMessage = (item) => {
     const isUser = item.sender === 'user';
+    const isKB = item.kb_source === true;
     return (
       <View key={item.id} style={[styles.messageRow, isUser ? styles.userRow : styles.botRow]}>
         {!isUser && (
@@ -474,8 +550,15 @@ export default function ImprovedChatScreen({ navigation }) {
           style={[
             styles.messageBlock,
             isUser ? styles.userBlock : styles.botBlock,
+            isKB && styles.kbMessageBlock,
           ]}
         >
+          {isKB && (
+            <View style={styles.kbBadge}>
+              <MaterialIcons name="book" size={12} color="#4285F4" />
+              <Text style={styles.kbBadgeText}>Knowledge Base</Text>
+            </View>
+          )}
           <Text
             style={[
               styles.messageText,
@@ -484,6 +567,36 @@ export default function ImprovedChatScreen({ navigation }) {
           >
             {item.text}
           </Text>
+          {!isUser && (
+            <View style={styles.satisfactionButtons}>
+              <TouchableOpacity
+                style={[styles.satisfactionButton, item.satisfied === true && styles.satisfactionButtonActive]}
+                onPress={() => {
+                  item.satisfied = true;
+                  handleSatisfactionFeedback(true, item);
+                }}
+              >
+                <MaterialIcons 
+                  name="thumb-up" 
+                  size={16} 
+                  color={item.satisfied === true ? '#34A853' : '#9AA0A6'} 
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.satisfactionButton, item.satisfied === false && styles.satisfactionButtonActive]}
+                onPress={() => {
+                  item.satisfied = false;
+                  handleSatisfactionFeedback(false, item);
+                }}
+              >
+                <MaterialIcons 
+                  name="thumb-down" 
+                  size={16} 
+                  color={item.satisfied === false ? '#EA4335' : '#9AA0A6'} 
+                />
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
         {isUser && (
           <View style={styles.messageMenu}>
@@ -728,7 +841,16 @@ export default function ImprovedChatScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={[styles.container, Platform.OS === 'web' && { height: '100vh', maxHeight: '100vh' }]}>
+    <View style={[styles.container, Platform.OS === 'web' && { height: '100vh', maxHeight: '100vh' }]}>
+      <StatusBar 
+        barStyle="dark-content" 
+        backgroundColor={Platform.OS === 'android' ? 'transparent' : '#FFFFFF'}
+        translucent={Platform.OS === 'android'}
+      />
+      <SafeAreaView 
+        style={styles.safeArea}
+        edges={Platform.OS === 'ios' ? ['top', 'bottom'] : ['bottom']}
+      >
       {/* Recording Overlay - Only show when actively recording */}
       {(isRecording || isTranscribing) && (
         <View style={styles.recordingOverlay} pointerEvents="box-none">
@@ -751,18 +873,39 @@ export default function ImprovedChatScreen({ navigation }) {
         </View>
       )}
 
-      <KeyboardAvoidingView 
-        style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'web' ? undefined : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-        enabled={Platform.OS !== 'web'}
-      >
-        <View style={[
-          styles.contentContainer,
-          (isRecording || isTranscribing) && styles.contentContainerBlurred
-        ]}>
+      <View style={[
+        styles.contentContainer,
+        (isRecording || isTranscribing) && styles.contentContainerBlurred
+      ]}>
+        {/* Warning Banner - Shows warnings separately (not as chat messages) */}
+        {warningMessage && (
+          <View style={[
+            styles.warningBanner,
+            warningMessage.type === 'error' && styles.warningBannerError,
+            warningMessage.type === 'info' && styles.warningBannerInfo,
+          ]}>
+            <MaterialIcons 
+              name={warningMessage.type === 'error' ? 'error' : 'info'} 
+              size={20} 
+              color={warningMessage.type === 'error' ? '#EA4335' : '#4285F4'} 
+            />
+            <Text style={styles.warningBannerText}>
+              {typeof warningMessage === 'string' ? warningMessage : warningMessage.message}
+            </Text>
+            <TouchableOpacity
+              onPress={() => setWarningMessage(null)}
+              style={styles.warningBannerClose}
+            >
+              <MaterialIcons name="close" size={18} color="#5F6368" />
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Gemini-Style Header */}
-        <View style={styles.geminiHeader}>
+        <View style={[
+          styles.geminiHeader,
+          { paddingTop: Platform.OS === 'android' ? Math.max(insets.top, 8) : 12 }
+        ]}>
           <TouchableOpacity 
             style={styles.menuButton}
             onPress={() => setShowSideMenu(true)}
@@ -893,17 +1036,27 @@ export default function ImprovedChatScreen({ navigation }) {
           </View>
         </Modal>
 
-        {/* Main Content Area */}
-        <ScrollView 
-          ref={scrollViewRef}
-          style={styles.mainContent}
-          contentContainerStyle={styles.mainContentInner}
-          onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
-          keyboardShouldPersistTaps="handled"
-          {...(Platform.OS === 'web' && {
-            style: [styles.mainContent, { maxHeight: 'calc(100vh - 200px)' }],
-          })}
+        {/* Main Content Area - Only ScrollView adjusts with keyboard */}
+        <KeyboardAvoidingView 
+          style={styles.keyboardAvoidingView}
+          behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'web' ? undefined : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+          enabled={Platform.OS !== 'web'}
         >
+          <ScrollView 
+            ref={scrollViewRef}
+            style={styles.mainContent}
+            contentContainerStyle={[
+              styles.mainContentInner,
+              { paddingBottom: 8 }
+            ]}
+            onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            {...(Platform.OS === 'web' && {
+              style: [styles.mainContent, { maxHeight: 'calc(100vh - 200px)' }],
+            })}
+          >
           {/* Greeting Section - Show when no messages or first message */}
           {messages.length === 0 && (
             <View style={styles.greetingSection}>
@@ -963,10 +1116,14 @@ export default function ImprovedChatScreen({ navigation }) {
               )}
             </View>
           )}
-        </ScrollView>
+          </ScrollView>
+        </KeyboardAvoidingView>
 
-        {/* Konsultabot-Style Input Container */}
-        <View style={styles.geminiInputContainer}>
+        {/* Fixed Input Container - Outside KeyboardAvoidingView to stay fixed at bottom */}
+        <View style={[
+          styles.geminiInputContainer,
+          { paddingBottom: Platform.OS === 'ios' ? Math.max(insets.bottom, 20) : Math.max(insets.bottom, 12) }
+        ]}>
           <View style={styles.geminiInputField}>
             <TextInput
               style={styles.geminiTextInput}
@@ -1019,9 +1176,9 @@ export default function ImprovedChatScreen({ navigation }) {
             Konsultabot can make mistakes, so double-check it
           </Text>
         </View>
-        </View>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+      </View>
+      </SafeAreaView>
+    </View>
   );
 }
 
@@ -1035,11 +1192,20 @@ const styles = StyleSheet.create({
       overflow: 'hidden',
     }),
   },
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#F8F9FA',
+  },
+  keyboardAvoidingView: {
+    flex: 1,
+    flexShrink: 1,
+    minHeight: 0,
+  },
   contentContainer: {
     flex: 1,
+    flexDirection: 'column',
     ...(Platform.OS === 'web' && {
       display: 'flex',
-      flexDirection: 'column',
       height: '100%',
       maxHeight: '100%',
     }),
@@ -1552,13 +1718,12 @@ const styles = StyleSheet.create({
   geminiInputContainer: {
     backgroundColor: '#FFFFFF',
     paddingTop: 12,
-    paddingBottom: Platform.OS === 'ios' ? 20 : Platform.OS === 'web' ? 12 : 12,
     borderTopWidth: 0,
     zIndex: 10,
     elevation: 5, // For Android shadow
+    flexShrink: 0, // Prevent shrinking when keyboard appears
     ...(Platform.OS === 'web' && {
       position: 'relative',
-      flexShrink: 0,
       width: '100%',
       boxShadow: '0 -2px 8px rgba(0,0,0,0.1)',
     }),
@@ -1611,6 +1776,80 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 8,
     paddingHorizontal: 16,
+  },
+  // Warning Banner Styles
+  warningBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF3CD',
+    borderLeftWidth: 4,
+    borderLeftColor: '#FBBC04',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginHorizontal: 16,
+    marginTop: 8,
+    borderRadius: 8,
+    ...(Platform.OS === 'web' && {
+      boxShadow: '0 1px 2px 0 rgba(60,64,67,.3)',
+    }),
+  },
+  warningBannerError: {
+    backgroundColor: '#FEE',
+    borderLeftColor: '#EA4335',
+  },
+  warningBannerInfo: {
+    backgroundColor: '#E8F0FE',
+    borderLeftColor: '#4285F4',
+  },
+  warningBannerText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#202124',
+    marginLeft: 12,
+    lineHeight: 20,
+  },
+  warningBannerClose: {
+    padding: 4,
+    marginLeft: 8,
+  },
+  // Knowledge Base Badge
+  kbMessageBlock: {
+    borderLeftWidth: 3,
+    borderLeftColor: '#4285F4',
+  },
+  kbBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E8F0FE',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  kbBadgeText: {
+    fontSize: 11,
+    color: '#4285F4',
+    fontWeight: '500',
+    marginLeft: 4,
+  },
+  // Satisfaction Feedback Buttons
+  satisfactionButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#E8EAED',
+  },
+  satisfactionButton: {
+    padding: 6,
+    marginRight: 8,
+    borderRadius: 16,
+    backgroundColor: '#F1F3F4',
+  },
+  satisfactionButtonActive: {
+    backgroundColor: '#E8F0FE',
   },
   modalOverlay: {
     flex: 1,

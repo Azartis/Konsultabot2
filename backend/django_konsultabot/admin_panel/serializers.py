@@ -4,7 +4,7 @@ Serializers for Admin Panel REST API
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from .models import (
-    Intent, Keyword, KnowledgeBaseItem, Ticket, TicketNote, TicketHistory,
+    Intent, Keyword, KnowledgeBaseItem,
     NotificationTemplate, Notification, ChatbotSettings, AdminActivity,
     AdminRole, AdminUserRole
 )
@@ -102,49 +102,6 @@ class KnowledgeBaseItemCreateUpdateSerializer(serializers.ModelSerializer):
                   'tags', 'keywords', 'priority', 'is_active', 'is_featured', 'related_items']
 
 
-# Ticket Serializers
-class TicketNoteSerializer(serializers.ModelSerializer):
-    author_username = serializers.CharField(source='author.username', read_only=True)
-    
-    class Meta:
-        model = TicketNote
-        fields = ['id', 'note', 'is_internal', 'author_username', 'created_at']
-
-
-class TicketHistorySerializer(serializers.ModelSerializer):
-    changed_by_username = serializers.CharField(source='changed_by.username', read_only=True)
-    
-    class Meta:
-        model = TicketHistory
-        fields = ['id', 'action', 'old_value', 'new_value', 'notes',
-                  'changed_by_username', 'created_at']
-
-
-class TicketSerializer(serializers.ModelSerializer):
-    user_username = serializers.CharField(source='user.username', read_only=True)
-    user_email = serializers.CharField(source='user.email', read_only=True)
-    assigned_to_username = serializers.CharField(source='assigned_to.username', read_only=True)
-    status_display = serializers.CharField(source='get_status_display', read_only=True)
-    priority_display = serializers.CharField(source='get_priority_display', read_only=True)
-    notes = TicketNoteSerializer(many=True, read_only=True)
-    history = TicketHistorySerializer(many=True, read_only=True)
-    
-    class Meta:
-        model = Ticket
-        fields = ['id', 'ticket_id', 'title', 'description', 'category', 'status',
-                  'status_display', 'priority', 'priority_display', 'user_username',
-                  'user_email', 'assigned_to_username', 'assigned_at', 'resolution',
-                  'resolved_at', 'resolved_by', 'tags', 'related_conversation',
-                  'notes', 'history', 'created_at', 'updated_at']
-
-
-class TicketCreateUpdateSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Ticket
-        fields = ['title', 'description', 'category', 'status', 'priority',
-                  'assigned_to', 'tags', 'related_conversation']
-
-
 # Notification Serializers
 class NotificationTemplateSerializer(serializers.ModelSerializer):
     notification_type_display = serializers.CharField(source='get_notification_type_display', read_only=True)
@@ -208,11 +165,13 @@ class DashboardStatsSerializer(serializers.Serializer):
     """Serializer for dashboard statistics"""
     total_users = serializers.IntegerField()
     total_conversations = serializers.IntegerField()
-    total_tickets = serializers.IntegerField()
-    open_tickets = serializers.IntegerField()
-    resolved_tickets = serializers.IntegerField()
     total_queries = serializers.IntegerField()
+    total_kb_items = serializers.IntegerField()
+    kb_views = serializers.IntegerField()
     most_common_intents = serializers.DictField()
     usage_chart_data = serializers.DictField()
-    recent_activities = AdminActivitySerializer(many=True)
+    kb_usage_data = serializers.DictField(required=False)
+    conversation_growth_rate = serializers.FloatField(required=False)
+    query_growth_rate = serializers.FloatField(required=False)
+    recent_activities = serializers.ListField(required=False)
 

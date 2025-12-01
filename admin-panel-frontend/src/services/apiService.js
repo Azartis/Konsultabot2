@@ -173,6 +173,16 @@ const apiService = {
     return response.data;
   },
 
+  async getOfflineKB() {
+    const response = await apiClient.get(API_ENDPOINTS.kbOffline);
+    return response.data;
+  },
+
+  async syncOfflineKB() {
+    const response = await apiClient.get(API_ENDPOINTS.kbSync);
+    return response.data;
+  },
+
   // Tickets
   async getTickets(params = {}) {
     const response = await apiClient.get(API_ENDPOINTS.tickets, { params });

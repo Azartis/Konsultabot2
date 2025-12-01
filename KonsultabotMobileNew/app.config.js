@@ -55,7 +55,11 @@ export default {
     },
 
     extra: {
-      apiUrl: "http://192.168.103.243:8000/api",
+      // Ngrok URL takes priority if set, otherwise fallback to local IP
+      apiUrl: process.env.EXPO_PUBLIC_NGROK_URL 
+        ? `${process.env.EXPO_PUBLIC_NGROK_URL}/api`
+        : process.env.EXPO_PUBLIC_API_URL || "http://192.168.103.243:8000/api",
+      ngrokUrl: process.env.EXPO_PUBLIC_NGROK_URL || null,
       eas: {
         projectId: "a026b613-0cb1-45f4-8057-b32705e327f6"
       }
