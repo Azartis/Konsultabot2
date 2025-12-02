@@ -58,8 +58,8 @@ export default {
       // Ngrok URL takes priority if set, otherwise fallback to local IP
       apiUrl: process.env.EXPO_PUBLIC_NGROK_URL 
         ? `${process.env.EXPO_PUBLIC_NGROK_URL}/api`
-        : process.env.EXPO_PUBLIC_API_URL || "http://192.168.103.243:8000/api",
-      ngrokUrl: process.env.EXPO_PUBLIC_NGROK_URL || null,
+        : process.env.EXPO_PUBLIC_API_URL || "https://unmutated-nondeprecatively-bonnie.ngrok-free.dev/api",
+      ngrokUrl: process.env.EXPO_PUBLIC_NGROK_URL || "https://unmutated-nondeprecatively-bonnie.ngrok-free.dev",
       eas: {
         projectId: "a026b613-0cb1-45f4-8057-b32705e327f6"
       }
@@ -75,10 +75,9 @@ export default {
         }
       ],
       [
-        "expo-speech-recognition",
+        "@react-native-voice/voice",
         {
-          microphonePermission:
-            "Allow Konsultabot to access your microphone for voice input."
+          microphonePermission: "Allow Konsultabot to access your microphone for voice input."
         }
       ],
 

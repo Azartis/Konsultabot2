@@ -91,15 +91,16 @@ RESPONSE_TEMPLATES = {
 }
 
 # Configuration for different environments
+# Using stable, widely available models
 ENVIRONMENTS = {
     'development': {
-        'model': 'gemini-2.5-flash',
+        'model': 'models/gemini-2.5-flash',  # Latest stable Flash (June 2025)
         'temperature': 0.7,
         'max_output_tokens': 1024,
         'log_level': 'DEBUG'
     },
     'production': {
-        'model': 'gemini-2.5-flash',
+        'model': 'models/gemini-2.5-flash',  # Latest stable Flash (June 2025)
         'temperature': 0.5,
         'max_output_tokens': 512,
         'log_level': 'INFO'

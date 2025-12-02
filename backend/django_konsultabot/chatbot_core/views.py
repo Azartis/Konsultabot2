@@ -349,7 +349,7 @@ def chat_endpoint(request):
                                     tags=tags,
                                     source='gemini'
                                 )
-                                logger.info(f"✅ Auto-saved technical solution to KB from feedback: {kb_entry.get('id')} - {title}")
+                                logger.info(f"Auto-saved technical solution to KB from feedback: {kb_entry.get('id')} - {title}")
                         except Exception as e:
                             logger.error(f"Failed to auto-save technical solution to KB from feedback: {e}")
             
@@ -510,7 +510,7 @@ def chat_endpoint(request):
                             tags=tags,
                             source='gemini'
                         )
-                        logger.info(f"✅ Auto-saved technical solution to KB: {kb_entry.get('id')} - {title}")
+                        logger.info(f"Auto-saved technical solution to KB: {kb_entry.get('id')} - {title}")
                 except Exception as e:
                     logger.error(f"Failed to auto-save technical solution to KB: {e}")
                     # Don't fail the request if KB save fails

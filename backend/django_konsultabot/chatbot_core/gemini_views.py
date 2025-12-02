@@ -34,9 +34,33 @@ if GOOGLE_API_KEY:
         except Exception as list_error:
             logger.warning(f"Unable to list Gemini models: {list_error}")
 
-        model = genai.GenerativeModel('models/gemini-pro-latest')
-        GEMINI_ENABLED = True
-        logger.info("Gemini model initialized successfully.")
+        # Try models in order of preference with fallback
+        # Use models/ prefix for SDK
+        fallback_models = [
+            'models/gemini-2.5-flash',      # Latest stable Flash (June 2025)
+            'models/gemini-2.0-flash',      # Stable Flash (January 2025)
+            'models/gemini-flash-latest',    # Latest release alias
+            'models/gemini-2.5-pro',        # Pro version
+            'models/gemini-pro-latest',      # Legacy Pro alias
+        ]
+        
+        model = None
+        for model_name in fallback_models:
+            try:
+                model = genai.GenerativeModel(model_name)
+                logger.info(f"Successfully initialized Gemini model: {model_name}")
+                GEMINI_ENABLED = True
+                break
+            except Exception as model_error:
+                logger.warning(f"Could not initialize {model_name}: {model_error}")
+                if model_name == fallback_models[-1]:
+                    # Last model failed
+                    logger.error(f"All Gemini models failed. Last error: {model_error}")
+                    raise
+                continue
+        
+        if model:
+            logger.info("Gemini model initialized successfully.")
     except Exception as config_error:
         logger.error(f"Failed to initialize Gemini due to configuration error: {config_error}")
 else:

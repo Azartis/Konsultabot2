@@ -79,24 +79,39 @@ class GeminiModelManager:
             genai.configure(api_key=api_key)
             
             # Get model name from settings with better fallback handling
-            self.model_name = 'gemini-2.5-flash'  # Default to stable Flash model
-            if hasattr(settings, 'KONSULTABOT_SETTINGS'):
-                self.model_name = settings.KONSULTABOT_SETTINGS.get('AI_MODEL', self.model_name)
+            # Use stable, widely available models (with models/ prefix for SDK)
+            fallback_models = [
+                'models/gemini-2.5-flash',      # Latest stable Flash (June 2025)
+                'models/gemini-2.0-flash',      # Stable Flash (January 2025)
+                'models/gemini-flash-latest',    # Latest release alias
+                'models/gemini-2.5-pro',        # Pro version if Flash unavailable
+                'models/gemini-pro-latest',     # Legacy Pro alias
+            ]
             
-            # Initialize model with safer fallback
-            try:
-                self.model = genai.GenerativeModel(self.model_name)
-                logger.info(f"Successfully initialized primary model: {self.model_name}")
-            except Exception as model_error:
-                logger.warning(f"Could not initialize model {self.model_name}: {model_error}. Falling back to gemini-2.0-flash.")
-                self.model_name = 'gemini-2.0-flash'
+            self.model_name = 'models/gemini-2.5-flash'  # Default to latest stable Flash
+            if hasattr(settings, 'KONSULTABOT_SETTINGS'):
+                raw_model = settings.KONSULTABOT_SETTINGS.get('AI_MODEL', 'gemini-2.5-flash')
+                # Add models/ prefix if not present
+                self.model_name = raw_model if raw_model.startswith('models/') else f'models/{raw_model}'
+            
+            # Initialize model with safer fallback chain
+            models_to_try = [self.model_name] + [m for m in fallback_models if m != self.model_name]
+            
+            for model_name in models_to_try:
                 try:
-                    self.model = genai.GenerativeModel(self.model_name)
-                    logger.info("Successfully initialized fallback model: gemini-2.0-flash")
-                except Exception as fallback_error:
-                    logger.error(f"Failed to initialize fallback model: {fallback_error}")
-                    self.model = None
-                    return
+                    self.model = genai.GenerativeModel(model_name)
+                    self.model_name = model_name
+                    logger.info(f"Successfully initialized model: {model_name}")
+                    break
+                except Exception as model_error:
+                    logger.warning(f"Could not initialize model {model_name}: {model_error}")
+                    if model_name == models_to_try[-1]:
+                        # Last model failed
+                        logger.error(f"All models failed. Last error: {model_error}")
+                        self.model = None
+                        return
+                    # Continue to next model
+                    continue
 
             # Get generation config with defaults
             self.config = {

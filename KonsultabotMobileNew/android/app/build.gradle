@@ -108,13 +108,11 @@ android {
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
-            debuggable true
         }
         release {
             // Caution! In production, you need to generate your own keystore file.
             // see https://reactnative.dev/docs/signed-apk-android.
             signingConfig signingConfigs.debug
-            debuggable false
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()
             minifyEnabled enableMinifyInReleaseBuilds
@@ -128,21 +126,6 @@ android {
             def enableLegacyPackaging = findProperty('expo.useLegacyPackaging') ?: 'false'
             useLegacyPackaging enableLegacyPackaging.toBoolean()
         }
-        // Fix duplicate META-INF files issue - AndroidX vs Support Library conflicts
-        pickFirst 'META-INF/androidx.localbroadcastmanager_localbroadcastmanager.version'
-        pickFirst 'META-INF/androidx.customview_customview.version'
-        pickFirst 'META-INF/androidx.*.version'
-        pickFirst 'META-INF/DEPENDENCIES'
-        pickFirst 'META-INF/LICENSE'
-        pickFirst 'META-INF/LICENSE.txt'
-        pickFirst 'META-INF/license.txt'
-        pickFirst 'META-INF/NOTICE'
-        pickFirst 'META-INF/NOTICE.txt'
-        pickFirst 'META-INF/notice.txt'
-        pickFirst 'META-INF/ASL2.0'
-        pickFirst 'META-INF/*.kotlin_module'
-        // Exclude duplicate version files from old support libraries
-        exclude 'META-INF/com.android.support_*.version'
     }
     androidResources {
         ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:!CVS:!thumbs.db:!picasa.ini:!*~'
@@ -195,14 +178,5 @@ dependencies {
         implementation("com.facebook.react:hermes-android")
     } else {
         implementation jscFlavor
-    }
-    
-    // Exclude old Android Support libraries to prevent conflicts with AndroidX
-    configurations.all {
-        exclude group: 'com.android.support', module: 'support-compat'
-        exclude group: 'com.android.support', module: 'support-v4'
-        exclude group: 'com.android.support', module: 'support-annotations'
-        exclude group: 'com.android.support', module: 'versionedparcelable'
-        exclude group: 'com.android.support', module: 'customview'
     }
 }

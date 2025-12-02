@@ -15,12 +15,14 @@ import {
   Modal,
   Alert,
   StatusBar,
+  Keyboard,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Audio } from 'expo-av';
 import * as Speech from 'expo-speech';
+import { VoiceHelper } from '../../utils/voiceHelper';
 import { apiService } from '../../services/apiService';
 import { lumaTheme } from '../../theme/lumaTheme';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -66,6 +68,7 @@ export default function ImprovedChatScreen({ navigation }) {
   const [speechRecognition, setSpeechRecognition] = useState(null);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isVoiceInput, setIsVoiceInput] = useState(false);
+  const [voiceTranscript, setVoiceTranscript] = useState('');
   const [wakeWordListening, setWakeWordListening] = useState(false);
   const [wakeWordRecognition, setWakeWordRecognition] = useState(null);
   const [questionCount, setQuestionCount] = useState(0);
@@ -142,12 +145,31 @@ export default function ImprovedChatScreen({ navigation }) {
     };
   }, [wakeWordRecognition]);
 
-  // Initialize Speech Recognition (Web Speech API)
-  const initializeSpeechRecognition = () => {
+  // Handle keyboard show/hide to scroll to end
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+
+    const keyboardWillShowListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => {
+        // Small delay to ensure layout is updated
+        setTimeout(() => {
+          scrollViewRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      }
+    );
+
+    return () => {
+      keyboardWillShowListener.remove();
+    };
+  }, []);
+
+  // Initialize Speech Recognition (Web Speech API for web, VoiceHelper/@react-native-voice/voice for mobile)
+  const initializeSpeechRecognition = async () => {
     if (Platform.OS === 'web') {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        const recognition = new SpeechRecognition();
+      const WebSpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (WebSpeechRecognition) {
+        const recognition = new WebSpeechRecognition();
         recognition.continuous = false;
         recognition.interimResults = false;
         recognition.lang = 'en-US'; // Default to English
@@ -187,6 +209,10 @@ export default function ImprovedChatScreen({ navigation }) {
       } else {
         console.log('⚠️ Speech Recognition not supported in this browser');
       }
+    } else {
+      // Mobile: VoiceHelper handles permissions automatically
+      // No initialization needed here - permissions requested when starting
+      console.log('VoiceHelper available for mobile speech recognition');
     }
   };
 
@@ -595,6 +621,25 @@ export default function ImprovedChatScreen({ navigation }) {
                   color={item.satisfied === false ? '#EA4335' : '#9AA0A6'} 
                 />
               </TouchableOpacity>
+              {/* Text-to-Speech Button */}
+              <TouchableOpacity
+                style={styles.satisfactionButton}
+                onPress={() => {
+                  if (item.text) {
+                    VoiceHelper.speak(item.text, {
+                      language: 'en-US',
+                      pitch: 1.0,
+                      rate: 0.9,
+                    });
+                  }
+                }}
+              >
+                <MaterialIcons 
+                  name="volume-up" 
+                  size={16} 
+                  color="#4285F4" 
+                />
+              </TouchableOpacity>
             </View>
           )}
         </View>
@@ -646,33 +691,113 @@ export default function ImprovedChatScreen({ navigation }) {
         return;
       }
       
-      // Mobile Audio Recording
-      console.log('🎤 Requesting microphone permissions...');
-      const { granted } = await Audio.requestPermissionsAsync();
+      // Mobile: Use VoiceHelper (which wraps @react-native-voice/voice)
+      console.log('Starting mobile speech recognition...');
       
-      if (!granted) {
+      if (!VoiceHelper.isAvailable()) {
         Alert.alert(
-          'Microphone Permission Required',
-          'Please allow microphone access to use voice recording feature.',
+          'Speech Recognition Not Available',
+          'Speech recognition requires a native module that is not available in Expo Go.\n\nPlease create a development build:\n\n1. Run: npx expo prebuild --clean\n2. Run: npx expo run:android\n\nOr use EAS Build to create a development build.',
           [{ text: 'OK' }]
         );
         return;
       }
-
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
-
-      console.log('🎤 Starting recording...');
-      const { recording: newRecording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY
-      );
       
-      setRecording(newRecording);
-      setIsRecording(true);
-      setIsVoiceInput(true);
-      console.log('✅ Recording started');
+      // Check if native module is actually available (if method exists)
+      if (typeof VoiceHelper.checkNativeModule === 'function') {
+        try {
+          const nativeAvailable = await VoiceHelper.checkNativeModule();
+          if (nativeAvailable === false) {
+            Alert.alert(
+              'Native Module Not Linked',
+              'The voice recognition native module is not properly linked.\n\nThis requires a development build, not Expo Go.\n\nSteps:\n1. npx expo prebuild --clean\n2. npx expo run:android',
+              [{ text: 'OK' }]
+            );
+            return;
+          }
+        } catch (checkError) {
+          console.warn('Native module check failed:', checkError);
+          // Continue anyway - might still work
+        }
+      }
+      
+      try {
+        // Clean up any existing listeners first
+        VoiceHelper.removeAllListeners();
+        setVoiceTranscript('');
+        
+        // Set up event listeners BEFORE starting
+        // Set up partial results listener for real-time transcription
+        VoiceHelper.on('SpeechPartialResults', (event) => {
+          console.log('📝 SpeechPartialResults event:', event);
+          if (event && event.value && Array.isArray(event.value) && event.value.length > 0) {
+            const partialTranscript = event.value[0];
+            if (partialTranscript && typeof partialTranscript === 'string' && partialTranscript.trim()) {
+              console.log('✅ Partial speech recognized:', partialTranscript);
+              setVoiceTranscript(partialTranscript);
+              setInputText(partialTranscript);
+            }
+          }
+        });
+        
+        // Set up final result listener
+        VoiceHelper.on('SpeechResults', (event) => {
+          console.log('✅ SpeechResults event:', event);
+          // @react-native-voice/voice provides event.value as array of strings
+          if (event && event.value && Array.isArray(event.value) && event.value.length > 0) {
+            const transcript = event.value[0];
+            if (transcript && typeof transcript === 'string' && transcript.trim()) {
+              console.log('✅ Final speech recognized:', transcript);
+              setVoiceTranscript(transcript);
+              setInputText(transcript);
+            }
+          }
+        });
+        
+        VoiceHelper.on('SpeechError', (error) => {
+          console.error('❌ Speech recognition error:', error);
+          setIsRecording(false);
+          setIsTranscribing(false);
+          setIsVoiceInput(false);
+          setVoiceTranscript('');
+          const errorMsg = error?.error?.message || error?.message || error?.error || 'Unknown error';
+          Alert.alert(
+            'Speech Recognition Error',
+            `Could not recognize speech: ${errorMsg}`,
+            [{ text: 'OK' }]
+          );
+        });
+        
+        VoiceHelper.on('SpeechEnd', () => {
+          console.log('🛑 Speech recognition ended');
+          setIsRecording(false);
+        });
+        
+        VoiceHelper.on('SpeechStart', () => {
+          console.log('🎤 Speech recognition started');
+          setIsRecording(true);
+        });
+        
+        // Now start recognition
+        console.log('🚀 Starting voice recognition...');
+        const started = await VoiceHelper.start('en-US');
+        if (started) {
+          setIsRecording(true);
+          setIsVoiceInput(true);
+          console.log('✅ Mobile speech recognition started - speak now!');
+        } else {
+          throw new Error('Failed to start voice recognition - start() returned false');
+        }
+      } catch (error) {
+        console.error('Failed to start VoiceHelper:', error);
+        setIsRecording(false);
+        setIsVoiceInput(false);
+        Alert.alert(
+          'Speech Recognition Error',
+          `Could not start speech recognition: ${error.message || 'Unknown error'}`,
+          [{ text: 'OK' }]
+        );
+      }
     } catch (error) {
       console.error('❌ Failed to start recording:', error);
       setIsRecording(false);
@@ -706,36 +831,22 @@ export default function ImprovedChatScreen({ navigation }) {
       return;
     }
     
-    // Mobile - stop and discard recording
+    // Mobile - stop and discard speech recognition
     try {
-      if (recording) {
-        try {
-          await recording.stopAndUnloadAsync();
-        } catch (stopError) {
-          console.warn('Warning: Error stopping recording:', stopError);
-        }
-        setRecording(null);
+      if (VoiceHelper.isAvailable()) {
+        await VoiceHelper.stop();
+        VoiceHelper.removeAllListeners();
       }
-      
-      // Reset audio mode
-      try {
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: false,
-        });
-      } catch (audioError) {
-        console.warn('Warning: Error resetting audio mode:', audioError);
-      }
-      
       setIsRecording(false);
       setIsTranscribing(false);
       setIsVoiceInput(false);
-      console.log('✅ Recording canceled');
+      setVoiceTranscript('');
+      console.log('Recording canceled');
     } catch (error) {
-      console.error('❌ Error canceling recording:', error);
+      console.error('Error canceling speech recognition:', error);
       setIsRecording(false);
       setIsTranscribing(false);
       setIsVoiceInput(false);
-      setRecording(null);
     }
   };
 
@@ -758,46 +869,97 @@ export default function ImprovedChatScreen({ navigation }) {
       return;
     }
     
-    // Mobile Audio Recording
+    // Mobile: Stop speech recognition and get transcript
     setIsRecording(false);
+    setIsTranscribing(true);
     
-    if (!recording) {
-      console.warn('⚠️ No recording to stop');
-      setIsRecording(false);
-      setIsTranscribing(false);
-      setIsVoiceInput(false);
-      return;
-    }
-
     try {
-      await recording.stopAndUnloadAsync();
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-      });
+      if (!VoiceHelper.isAvailable()) {
+        setIsTranscribing(false);
+        setIsVoiceInput(false);
+        Alert.alert(
+          'Speech Recognition Not Available',
+          'Speech recognition is not available on this device.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
       
-      const uri = recording.getURI();
-      console.log('✅ Recording stopped, URI:', uri);
-      setRecording(null);
-      setIsTranscribing(false);
-      setIsVoiceInput(false);
+      // Stop VoiceHelper
+      await VoiceHelper.stop();
       
-      // For mobile, show helper message
-      Alert.alert(
-        'Voice Recording Complete! 🎤',
-        'For full speech-to-text on mobile, please use the web version or type your question.',
-        [{ text: 'Got it!' }]
-      );
+      // Wait a moment for final processing
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Get transcript from state (set by listener)
+      let transcript = voiceTranscript || '';
+      
+      // Clear the transcript state for next recording
+      setVoiceTranscript('');
+      
+      // Remove listeners
+      VoiceHelper.removeAllListeners();
+      
+      // If no transcript, show message to user
+      if (!transcript || !transcript.trim()) {
+        console.warn('No transcript available');
+        setIsTranscribing(false);
+        setIsVoiceInput(false);
+        Alert.alert(
+          'No Speech Detected',
+          'I didn\'t hear anything. Please try speaking again.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+      
+      if (transcript && transcript.trim()) {
+        console.log('Speech recognized:', transcript);
+        setInputText(transcript);
+        setIsTranscribing(false);
+        setIsVoiceInput(true);
+        
+        // Auto-send the transcribed message
+        setTimeout(() => {
+          sendMessage(transcript, true);
+        }, 100);
+      } else {
+        console.warn('No speech detected');
+        setIsTranscribing(false);
+        setIsVoiceInput(false);
+        Alert.alert(
+          'No Speech Detected',
+          'I didn\'t hear anything. Please try again.',
+          [{ text: 'OK' }]
+        );
+      }
     } catch (error) {
-      console.error('❌ Error stopping recording:', error);
+      console.error('Error stopping speech recognition:', error);
       setIsRecording(false);
       setIsTranscribing(false);
       setIsVoiceInput(false);
-      setRecording(null);
-      Alert.alert(
-        'Error',
-        `Failed to stop recording: ${error.message}`,
-        [{ text: 'OK' }]
-      );
+      
+      // Clean up listeners
+      try {
+        VoiceHelper.removeAllListeners();
+      } catch (e) {
+        // Ignore cleanup errors
+      }
+      
+      // Check if it's a permission error
+      if (error.message && error.message.includes('permission')) {
+        Alert.alert(
+          'Permission Error',
+          'Microphone permission is required for voice input. Please enable it in your device settings.',
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert(
+          'Speech Recognition Error',
+          `Could not transcribe speech: ${error.message || 'Unknown error'}`,
+          [{ text: 'OK' }]
+        );
+      }
     }
   };
 
@@ -1036,27 +1198,24 @@ export default function ImprovedChatScreen({ navigation }) {
           </View>
         </Modal>
 
-        {/* Main Content Area - Only ScrollView adjusts with keyboard */}
-        <KeyboardAvoidingView 
-          style={styles.keyboardAvoidingView}
-          behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'web' ? undefined : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-          enabled={Platform.OS !== 'web'}
+        {/* Main Content Area - ScrollView only, no KeyboardAvoidingView */}
+        <ScrollView 
+          ref={scrollViewRef}
+          style={styles.mainContent}
+          contentContainerStyle={[
+            styles.mainContentInner,
+            { 
+              paddingBottom: Platform.OS === 'web' ? 8 : 120 // Extra padding for fixed input container on mobile
+            }
+          ]}
+          onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          keyboardDismissMode="interactive"
+          {...(Platform.OS === 'web' && {
+            style: [styles.mainContent, { maxHeight: 'calc(100vh - 200px)' }],
+          })}
         >
-          <ScrollView 
-            ref={scrollViewRef}
-            style={styles.mainContent}
-            contentContainerStyle={[
-              styles.mainContentInner,
-              { paddingBottom: 8 }
-            ]}
-            onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-            {...(Platform.OS === 'web' && {
-              style: [styles.mainContent, { maxHeight: 'calc(100vh - 200px)' }],
-            })}
-          >
           {/* Greeting Section - Show when no messages or first message */}
           {messages.length === 0 && (
             <View style={styles.greetingSection}>
@@ -1116,13 +1275,12 @@ export default function ImprovedChatScreen({ navigation }) {
               )}
             </View>
           )}
-          </ScrollView>
-        </KeyboardAvoidingView>
+        </ScrollView>
 
-        {/* Fixed Input Container - Outside KeyboardAvoidingView to stay fixed at bottom */}
+        {/* Input Container - Fixed at bottom, outside ScrollView, does NOT move with keyboard */}
         <View style={[
           styles.geminiInputContainer,
-          { paddingBottom: Platform.OS === 'ios' ? Math.max(insets.bottom, 20) : Math.max(insets.bottom, 12) }
+          { paddingBottom: Platform.OS === 'ios' ? Math.max(insets.bottom, 8) : Math.max(insets.bottom, 8) }
         ]}>
           <View style={styles.geminiInputField}>
             <TextInput
@@ -1196,14 +1354,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8F9FA',
   },
-  keyboardAvoidingView: {
-    flex: 1,
-    flexShrink: 1,
-    minHeight: 0,
-  },
   contentContainer: {
     flex: 1,
     flexDirection: 'column',
+    position: 'relative',
     ...(Platform.OS === 'web' && {
       display: 'flex',
       height: '100%',
@@ -1351,8 +1505,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8F9FA',
     ...(Platform.OS === 'web' && {
-      flexShrink: 1,
-      minHeight: 0,
       overflow: 'auto',
     }),
   },
@@ -1718,13 +1870,17 @@ const styles = StyleSheet.create({
   geminiInputContainer: {
     backgroundColor: '#FFFFFF',
     paddingTop: 12,
-    borderTopWidth: 0,
+    borderTopWidth: 1,
+    borderTopColor: '#E8EAED',
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     zIndex: 10,
     elevation: 5, // For Android shadow
-    flexShrink: 0, // Prevent shrinking when keyboard appears
+    width: '100%',
     ...(Platform.OS === 'web' && {
       position: 'relative',
-      width: '100%',
       boxShadow: '0 -2px 8px rgba(0,0,0,0.1)',
     }),
   },
