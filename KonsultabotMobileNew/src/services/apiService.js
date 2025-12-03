@@ -81,31 +81,19 @@ const getPossibleBackendURLs = () => {
     console.log('🎯 Using Metro bundler IP for backend discovery');
   }
   
-  // For physical devices, prioritize network IPs
+  // For physical devices, prioritize network IPs (fallback only - Ngrok is priority)
   // For emulator, prioritize 10.0.2.2
   if (Platform.OS === 'android') {
-    // Try network IPs (physical device) - prioritize current IP first
+    // Try network IPs (physical device) - FALLBACK ONLY (Ngrok is checked first)
+    // These are only used if Ngrok is not available
     urls.push(
-      'http://192.168.110.57:8000/api',  // Current network IP (PRIORITY)
-      'http://192.168.103.243:8000/api',  // Previous network IP
-      'http://10.143.17.242:8000/api',  // Previous WiFi IP
-      'http://10.143.17.1:8000/api',      // Router IP variation
-      'http://10.143.17.100:8000/api',    // Common range
-      'http://192.168.1.17:8000/api',  // Common home network
-      'http://192.168.0.17:8000/api',  // Alternative home network
-      'http://192.168.100.17:8000/api', // Campus WiFi
-      'http://10.0.0.17:8000/api',     // Alternative
-      'http://172.20.10.2:8000/api',   // Mobile hotspot
-      'http://10.0.2.2:8000/api'       // Android emulator (last resort)
+      'http://10.0.2.2:8000/api',       // Android emulator (for testing)
+      // Note: Local IPs removed - use Ngrok for production APK
     );
   } else if (Platform.OS === 'ios') {
-    // iOS - try network IPs - prioritize current IP first
+    // iOS - minimal fallback (Ngrok is priority)
     urls.push(
-      'http://192.168.110.57:8000/api',  // Current network IP (PRIORITY)
-      'http://192.168.103.243:8000/api',  // Previous network IP
-      'http://10.143.17.242:8000/api',
-      'http://192.168.1.17:8000/api',
-      'http://192.168.0.17:8000/api'
+      'http://localhost:8000/api',     // Local development only
     );
   } else {
     // Web - try current host first (Expo web often runs on same machine)
@@ -118,9 +106,6 @@ const getPossibleBackendURLs = () => {
       `http://${webHost}:8000/api`,      // Current host → backend port 8000
       'http://localhost:8000/api',       // Explicit localhost
       'http://127.0.0.1:8000/api',       // Loopback alternative
-      'http://192.168.110.57:8000/api',  // Recent LAN IPs
-      'http://192.168.103.243:8000/api',
-      'http://10.143.17.242:8000/api'
     );
   }
   
@@ -281,11 +266,15 @@ const discoverBackendURL = async () => {
   if (Platform.OS === 'web') {
     fallbackURL = 'http://localhost:8000/api';  // Localhost for web
   } else if (Platform.OS === 'android') {
-    // For Android, try current IP as last resort
-    fallbackURL = 'http://192.168.110.57:8000/api';
+    // For Android APK, use Ngrok URL as fallback (should be set in app.config.js)
+    fallbackURL = Constants.expoConfig?.extra?.apiUrl || 
+                  Constants.expoConfig?.extra?.ngrokUrl ? `${Constants.expoConfig.extra.ngrokUrl}/api` :
+                  'https://unmutated-nondeprecatively-bonnie.ngrok-free.dev/api';
   } else {
-    // iOS or other
-    fallbackURL = 'http://192.168.103.243:8000/api';
+    // iOS - use Ngrok URL
+    fallbackURL = Constants.expoConfig?.extra?.apiUrl || 
+                  Constants.expoConfig?.extra?.ngrokUrl ? `${Constants.expoConfig.extra.ngrokUrl}/api` :
+                  'https://unmutated-nondeprecatively-bonnie.ngrok-free.dev/api';
   }
   
   console.log('⚠️ No backend found after trying', POSSIBLE_BACKEND_URLS.length, 'URLs');
@@ -303,11 +292,22 @@ const discoverBackendURL = async () => {
 };
 
 // Get initial baseURL - will be updated by discovery
-// For web, talk to backend on the same machine (localhost:8000)
-// For mobile, this is just a placeholder; discoverBackendURL will override it.
-let initialBaseURL = Platform.OS === 'web' 
-  ? 'http://localhost:8000/api'
-  : 'http://192.168.103.243:8000/api'; // Mobile placeholder - will be discovered
+// Priority: Ngrok URL from config > localhost (web) > fallback
+let initialBaseURL;
+if (Platform.OS === 'web') {
+  initialBaseURL = 'http://localhost:8000/api';  // Web uses localhost
+} else {
+  // Mobile: Use Ngrok URL from config (embedded in build)
+  const ngrokUrl = Constants.expoConfig?.extra?.ngrokUrl || 
+                   Constants.expoConfig?.extra?.apiUrl?.replace('/api', '') ||
+                   process.env.EXPO_PUBLIC_NGROK_URL;
+  if (ngrokUrl && (ngrokUrl.includes('ngrok') || ngrokUrl.includes('https://'))) {
+    initialBaseURL = ngrokUrl.endsWith('/api') ? ngrokUrl : `${ngrokUrl}/api`;
+  } else {
+    // Fallback to default Ngrok URL
+    initialBaseURL = 'https://unmutated-nondeprecatively-bonnie.ngrok-free.dev/api';
+  }
+}
 
 // Create Axios instance with longer timeout and retries
 const api = axios.create({
@@ -477,23 +477,22 @@ const getApiUrl = async () => {
   try {
     // Web (browser) - Use localhost
     if (Platform.OS === 'web') {
-      return 'http://192.168.103.243:8000/api';
+      return 'http://localhost:8000/api';
     }
 
-    // Mobile - Use network discovery
-    try {
-      const savedIP = await AsyncStorage.getItem(SERVER_IP_KEY);
-      if (savedIP) {
-        console.log(`Using saved server IP: ${savedIP}`);
-        return `http://${savedIP}:8000/api`;
-      }
-    } catch (storageError) {
-      console.warn('Failed to read saved server IP:', storageError);
+    // Mobile - Prioritize Ngrok URL from config
+    const ngrokUrl = Constants.expoConfig?.extra?.ngrokUrl || 
+                     Constants.expoConfig?.extra?.apiUrl?.replace('/api', '') ||
+                     process.env.EXPO_PUBLIC_NGROK_URL;
+    
+    if (ngrokUrl && (ngrokUrl.includes('ngrok') || ngrokUrl.includes('https://'))) {
+      const ngrokApiUrl = ngrokUrl.endsWith('/api') ? ngrokUrl : `${ngrokUrl}/api`;
+      console.log(`🌐 Using Ngrok URL from config: ${ngrokApiUrl}`);
+      return ngrokApiUrl;
     }
 
     // Try to discover server automatically using the standalone function
     console.log('Attempting server discovery...');
-    // Use the standalone discoverBackendURL function instead
     const discoveredURL = await discoverBackendURL();
     
     if (discoveredURL) {
@@ -501,20 +500,24 @@ const getApiUrl = async () => {
       return discoveredURL;
     }
 
-    // Fallback to default IP
-    const defaultIP = '192.168.103.243';
-    console.warn(`Using default server IP: ${defaultIP}`);
-    return `http://${defaultIP}:8000/api`;
+    // Fallback to default Ngrok URL (from app.config.js)
+    const fallbackUrl = Constants.expoConfig?.extra?.apiUrl || 
+                        'https://unmutated-nondeprecatively-bonnie.ngrok-free.dev/api';
+    console.warn(`Using fallback URL: ${fallbackUrl}`);
+    return fallbackUrl;
   } catch (error) {
     console.error('Error in getApiUrl:', error);
-    // Fallback based on platform
-    const fallbackIP = '192.168.103.243';
-    return `http://${fallbackIP}:8000/api`;
+    // Fallback to Ngrok URL
+    return Constants.expoConfig?.extra?.apiUrl || 
+           'https://unmutated-nondeprecatively-bonnie.ngrok-free.dev/api';
   }
 };
 
-// Initialize with a default URL, will be updated
-let API_BASE_URL = 'http://192.168.103.243:8000/api';
+// Initialize with Ngrok URL from config (will be updated by discovery)
+const defaultNgrokUrl = Constants.expoConfig?.extra?.apiUrl || 
+                         Constants.expoConfig?.extra?.ngrokUrl ? `${Constants.expoConfig.extra.ngrokUrl}/api` :
+                         'https://unmutated-nondeprecatively-bonnie.ngrok-free.dev/api';
+let API_BASE_URL = Platform.OS === 'web' ? 'http://localhost:8000/api' : defaultNgrokUrl;
 
 class ApiService {
   constructor() {
@@ -1176,10 +1179,13 @@ class ApiService {
       // Don't throw - use fallback URL
     }
     
-    // Always ensure we have a baseURL set (fallback)
+    // Always ensure we have a baseURL set (fallback to Ngrok)
     if (!this.api.defaults.baseURL) {
-      const fallbackURL = 'http://192.168.103.243:8000/api';
+      const fallbackURL = Constants.expoConfig?.extra?.apiUrl || 
+                          (Constants.expoConfig?.extra?.ngrokUrl ? `${Constants.expoConfig.extra.ngrokUrl}/api` : null) ||
+                          'https://unmutated-nondeprecatively-bonnie.ngrok-free.dev/api';
       this.api.defaults.baseURL = fallbackURL;
+      API_BASE_URL = fallbackURL;
       console.log('⚠️ Using fallback URL:', fallbackURL);
     }
   }

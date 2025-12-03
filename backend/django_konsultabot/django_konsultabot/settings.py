@@ -84,9 +84,32 @@ ALLOWED_HOSTS = [
     '192.168.0.17',
     '192.168.100.17',
     '192.168.103.243',  # Current network IP
+    '192.168.110.57',  # Recent network IP
     '10.0.0.17',
     '172.20.10.2',  # Mobile hotspot
+    # Ngrok domains (will be added dynamically below)
+    '.ngrok-free.dev',
+    '.ngrok.io',
+    '.ngrok.app',
 ]
+
+# Add Ngrok domains from environment (for global access)
+NGROK_URL = os.getenv('NGROK_URL', '')
+if NGROK_URL:
+    # Extract domain from Ngrok URL
+    ngrok_domain = NGROK_URL.replace('https://', '').replace('http://', '').split('/')[0]
+    if ngrok_domain and ngrok_domain not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(ngrok_domain)
+    # Add base domain patterns for subdomains
+    if '.ngrok-free.dev' in ngrok_domain:
+        if '.ngrok-free.dev' not in ALLOWED_HOSTS:
+            ALLOWED_HOSTS.append('.ngrok-free.dev')
+    if '.ngrok.io' in ngrok_domain:
+        if '.ngrok.io' not in ALLOWED_HOSTS:
+            ALLOWED_HOSTS.append('.ngrok.io')
+    if '.ngrok.app' in ngrok_domain:
+        if '.ngrok.app' not in ALLOWED_HOSTS:
+            ALLOWED_HOSTS.append('.ngrok.app')
 
 # Application definition
 INSTALLED_APPS = [
@@ -145,17 +168,23 @@ CSRF_TRUSTED_ORIGINS = [
     'http://10.0.2.2:8000',  # Android emulator
     'http://localhost:8081',  # Expo web dev server
     'http://127.0.0.1:8081',  # Expo web dev server
+    # Ngrok wildcard patterns (Django doesn't support wildcards, but we'll add specific domains)
+    'https://*.ngrok-free.dev',
+    'https://*.ngrok.io',
+    'https://*.ngrok.app',
 ]
 
-# Add Ngrok URLs from environment (for global access)
-NGROK_URL = os.getenv('NGROK_URL', '')
+# Add specific Ngrok URL from environment (for global access)
+# Note: Django doesn't support wildcards in CSRF_TRUSTED_ORIGINS, so we add the specific domain
 if NGROK_URL:
-    # Add both http and https versions
+    # Add both http and https versions of the specific domain
     ngrok_domain = NGROK_URL.replace('https://', '').replace('http://', '').split('/')[0]
-    CSRF_TRUSTED_ORIGINS.extend([
-        f'https://{ngrok_domain}',
-        f'http://{ngrok_domain}',
-    ])
+    if ngrok_domain:
+        # Add specific domain
+        if f'https://{ngrok_domain}' not in CSRF_TRUSTED_ORIGINS:
+            CSRF_TRUSTED_ORIGINS.append(f'https://{ngrok_domain}')
+        if f'http://{ngrok_domain}' not in CSRF_TRUSTED_ORIGINS:
+            CSRF_TRUSTED_ORIGINS.append(f'http://{ngrok_domain}')
 
 # Note: Django doesn't support wildcards in CSRF_TRUSTED_ORIGINS
 # We'll add specific ngrok domains dynamically when they're detected
@@ -233,13 +262,61 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'django_konsultabot.wsgi.application'
 
-# Database
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'konsultabot_advanced.db',
+# Database configuration with PostgreSQL support
+# Priority: DATABASE_URL > DB_* env vars > SQLite fallback
+try:
+    import dj_database_url
+    DATABASE_URL = os.getenv('DATABASE_URL', '')
+    
+    if DATABASE_URL:
+        try:
+            # Parse DATABASE_URL (PostgreSQL/MySQL)
+            DATABASES = {
+                'default': dj_database_url.parse(DATABASE_URL, conn_max_age=600)
+            }
+            print(f"✅ Using database from DATABASE_URL: {DATABASES['default'].get('ENGINE', 'unknown')}")
+        except Exception as e:
+            print(f"⚠️ DATABASE_URL parsing failed: {e}")
+            print("⚠️ Falling back to SQLite")
+            DATABASES = {
+                'default': {
+                    'ENGINE': 'django.db.backends.sqlite3',
+                    'NAME': BASE_DIR / 'konsultabot_advanced.db',
+                }
+            }
+    elif os.getenv('DB_ENGINE'):
+        # Use DB_* environment variables
+        DATABASES = {
+            'default': {
+                'ENGINE': os.getenv('DB_ENGINE', 'django.db.backends.sqlite3'),
+                'NAME': os.getenv('DB_NAME', BASE_DIR / 'konsultabot_advanced.db'),
+                'USER': os.getenv('DB_USER', ''),
+                'PASSWORD': os.getenv('DB_PASSWORD', ''),
+                'HOST': os.getenv('DB_HOST', 'localhost'),
+                'PORT': os.getenv('DB_PORT', ''),
+            }
+        }
+        # Remove empty values
+        DATABASES['default'] = {k: v for k, v in DATABASES['default'].items() if v}
+        print(f"✅ Using database from DB_* env vars: {DATABASES['default'].get('ENGINE', 'unknown')}")
+    else:
+        # Default to SQLite
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': BASE_DIR / 'konsultabot_advanced.db',
+            }
+        }
+        print("ℹ️ Using SQLite (no DATABASE_URL or DB_* env vars set)")
+except ImportError:
+    # dj-database-url not installed, use SQLite
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'konsultabot_advanced.db',
+        }
     }
-}
+    print("ℹ️ Using SQLite (dj-database-url not installed)")
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [

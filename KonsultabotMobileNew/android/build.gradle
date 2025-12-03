@@ -18,6 +18,37 @@ allprojects {
     mavenCentral()
     maven { url 'https://www.jitpack.io' }
   }
+  
+  // Force AndroidX for all subprojects (React Native modules)
+  configurations.all {
+    resolutionStrategy {
+      // Force AndroidX versions
+      force 'androidx.core:core:1.16.0'
+      force 'androidx.core:core-ktx:1.16.0'
+      force 'androidx.appcompat:appcompat:1.7.0'
+      force 'androidx.versionedparcelable:versionedparcelable:1.1.1'
+      
+      // Automatically convert old support libraries to AndroidX
+      eachDependency { details ->
+        if (details.requested.group == 'com.android.support') {
+          def newGroup = 'androidx'
+          def newName = details.requested.name
+            .replace('support-v4', 'core')
+            .replace('support-compat', 'core')
+            .replace('support-core-utils', 'core')
+            .replace('support-core-ui', 'core')
+            .replace('support-fragment', 'fragment')
+            .replace('support-annotations', 'annotation')
+            .replace('versionedparcelable', 'versionedparcelable')
+          
+          details.useTarget "${newGroup}.${newName}:${details.requested.version}"
+        }
+      }
+    }
+    
+    // Exclude old support libraries globally
+    exclude group: 'com.android.support'
+  }
 }
 
 apply plugin: "expo-root-project"

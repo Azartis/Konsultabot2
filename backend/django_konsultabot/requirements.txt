@@ -33,6 +33,11 @@ cryptography==41.0.7
 python-dateutil==2.8.2
 pytz==2023.3
 
+# Database support
+psycopg2-binary==2.9.9  # PostgreSQL support
+dj-database-url==2.1.0  # DATABASE_URL parsing
+mysqlclient==2.2.0  # MySQL support (optional)
+
 # File Processing
 Pillow==10.0.1
 python-magic==0.4.27
