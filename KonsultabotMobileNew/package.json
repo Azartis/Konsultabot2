@@ -3,9 +3,10 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "npx expo start",
+    "start": "npx expo start --dev-client",
     "start:go": "npx expo start --go",
-    "start:dev": "npx expo start",
+    "start:dev": "npx expo start --dev-client",
+    "start:web": "npx expo start --web",
     "android": "npx expo run:android",
     "ios": "npx expo run:ios",
     "web": "npx expo start --web",
@@ -15,7 +16,10 @@
     "global:access": "npm run build:web && node global-access.js",
     "build:android": "eas build --platform android",
     "build:android:preview": "eas build --platform android --profile preview",
-    "build:android:production": "eas build --platform android --profile production"
+    "build:android:production": "eas build --platform android --profile production",
+    "dev:build": "powershell -ExecutionPolicy Bypass -File ./scripts/dev-build.ps1",
+    "native:build": "powershell -ExecutionPolicy Bypass -File ./scripts/native-build.ps1",
+    "start:full": "powershell -ExecutionPolicy Bypass -File ./scripts/start-full-app.ps1"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
@@ -23,7 +27,7 @@
     "@google/generative-ai": "^0.24.1",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-native-community/netinfo": "11.4.1",
-    "@react-native-voice/voice": "^3.1.5",
+    "@react-native-voice/voice": "3.2.4",
     "@react-navigation/bottom-tabs": "^7.4.7",
     "@react-navigation/native": "^7.1.17",
     "@react-navigation/stack": "^7.4.8",
@@ -60,6 +64,12 @@
     "@react-native/babel-preset": "^0.82.1",
     "express": "^5.1.0",
     "metro-react-native-babel-preset": "^0.77.0"
+  },
+  "resolutions": {
+    "@react-native-voice/voice": "3.2.4"
+  },
+  "overrides": {
+    "@react-native-voice/voice": "3.2.4"
   },
   "private": true
 }

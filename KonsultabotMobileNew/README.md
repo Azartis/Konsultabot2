@@ -53,17 +53,144 @@ npm run build:web
 deploy.bat
 ```
 
-### **For Development:**
+### **For Development (Optimized Workflow):**
+
+#### **📱 First Time Setup (One-Time)**
 ```bash
 # Install dependencies
 npm install
 
-# Start development server
-npm start
-
-# Start with tunnel (global access)
-npx expo start --web --tunnel
+# Build native code (only needed once or when native modules change)
+npm run native:build
 ```
+
+#### **🔄 Daily Development (Fast - No Rebuild)**
+```bash
+# Start dev client (NO native rebuild - fast!)
+npm start
+# or
+npm run dev:build
+
+# This uses: npx expo start --dev-client
+# - Preserves android/ folder
+# - No prebuild needed
+# - Fast startup (~10-30 seconds)
+```
+
+#### **⚙️ When Native Code Changes**
+Only run this when:
+- Adding/removing native modules (e.g., @react-native-voice/voice)
+- Changing app.config.js plugins
+- Updating Android/iOS native code
+
+```bash
+npm run native:build
+# or manually:
+npx expo prebuild
+npx expo run:android
+```
+
+---
+
+## ⚡ **Optimized Build Workflow**
+
+### **🎯 When to Use Each Command**
+
+| Command | When to Use | Build Time | Rebuilds Native? |
+|---------|-------------|------------|------------------|
+| `npm start` | **Daily development** | ~10-30s | ❌ No |
+| `npm run dev:build` | **Daily development** (with .env) | ~10-30s | ❌ No |
+| `npm run native:build` | **Native code changes** | ~5-15 min | ✅ Yes |
+| `npx expo prebuild --clean` | **Only when absolutely necessary** | ~2-5 min | ✅ Yes |
+
+### **✅ Best Practices**
+
+1. **Use `npm start` for 99% of development**
+   - Fast startup
+   - Preserves build cache
+   - No unnecessary rebuilds
+
+2. **Only rebuild native code when:**
+   - Adding new native modules
+   - Changing app.config.js plugins
+   - Android/iOS native code changes
+
+3. **Avoid `--clean` flag unless:**
+   - Build is completely broken
+   - Native module linking issues
+   - Gradle cache corruption
+
+### **🔧 JDK Requirements**
+
+**Required:** JDK 17 (Temurin recommended)
+
+1. **Download:** https://adoptium.net/temurin/releases/
+2. **Install** with "Add to PATH" checked
+3. **Set JAVA_HOME:**
+   ```powershell
+   # PowerShell (run as Administrator)
+   [Environment]::SetEnvironmentVariable("JAVA_HOME", "C:\Program Files\Eclipse Adoptium\jdk-17.0.x-hotspot", "User")
+   ```
+4. **Verify:**
+   ```bash
+   java -version  # Should show version 17
+   echo $env:JAVA_HOME  # Should show JDK 17 path
+   ```
+
+### **🚀 Performance Optimizations**
+
+#### **Windows Defender Exclusions (30-50% faster builds)**
+
+Add these to Windows Defender exclusions:
+- `C:\Users\<YourUsername>\.gradle`
+- `C:\Users\<YourUsername>\AppData\Local\Android`
+- `C:\Users\<YourUsername>\AppData\Local\npm-cache`
+
+**Quick Setup:**
+```powershell
+# Run PowerShell as Administrator
+Add-MpPreference -ExclusionPath @(
+    "$env:USERPROFILE\.gradle",
+    "$env:LOCALAPPDATA\Android",
+    "$env:LOCALAPPDATA\npm-cache"
+)
+```
+
+**Full Guide:** See [docs/WINDOWS_DEFENDER_OPTIMIZATION.md](docs/WINDOWS_DEFENDER_OPTIMIZATION.md)
+
+#### **Gradle Optimizations (Already Applied)**
+
+The project includes:
+- ✅ Gradle build cache enabled
+- ✅ Parallel builds enabled
+- ✅ Increased JVM memory (4GB)
+- ✅ AndroidX/Jetifier configured
+- ✅ Java toolchain locked to prevent auto-downloads
+
+### **🎤 Voice Module Troubleshooting**
+
+If voice recognition shows "Native module is null":
+
+1. **Verify you're using a development build:**
+   ```bash
+   # NOT Expo Go - requires native build
+   npm run native:build
+   ```
+
+2. **Check voice module is pinned:**
+   - Package.json uses `@react-native-voice/voice: 3.2.4`
+   - Resolutions/overrides configured
+
+3. **Verify Android permissions:**
+   - Check `android/app/src/main/AndroidManifest.xml`
+   - Should have `RECORD_AUDIO` permission
+
+4. **Rebuild if needed:**
+   ```bash
+   npm run native:build
+   ```
+
+**Note:** Voice recognition requires a development build, NOT Expo Go.
 
 ---
 
