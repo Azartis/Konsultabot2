@@ -60,17 +60,39 @@ try {
 
 export const VoiceHelper = {
   isAvailable: () => {
-    const available = isVoiceAvailable && Voice !== null;
-    if (!available) {
-      console.log('VoiceHelper not available - Voice:', Voice, 'isVoiceAvailable:', isVoiceAvailable);
-    } else {
-      // Double-check that Voice methods are actually callable
-      if (Voice && typeof Voice.start !== 'function') {
-        console.warn('⚠️ Voice object exists but start method is not a function');
-        return false;
-      }
+    // First check if Voice is null or undefined
+    if (Voice === null || Voice === undefined) {
+      console.log('VoiceHelper not available - Voice is null/undefined (native module not linked)');
+      return false;
     }
-    return available;
+    
+    // Check if Voice is actually an object
+    if (typeof Voice !== 'object') {
+      console.log('VoiceHelper not available - Voice is not an object:', typeof Voice);
+      return false;
+    }
+    
+    // Check if required methods exist
+    if (typeof Voice.start !== 'function' || typeof Voice.stop !== 'function') {
+      console.warn('⚠️ Voice object exists but missing required methods');
+      return false;
+    }
+    
+    // Check if native module is actually linked (not just the JS wrapper)
+    try {
+      // Try to access a property that would only exist if native module is linked
+      if (Voice._nativeModule === null || Voice._nativeModule === undefined) {
+        // This might still work, so we'll try to call isAvailable if it exists
+        // But we won't throw - we'll just return false
+        console.log('⚠️ Voice native module may not be linked');
+      }
+    } catch (e) {
+      // If accessing _nativeModule throws, native module definitely isn't linked
+      console.log('⚠️ Cannot access Voice native module:', e.message);
+      return false;
+    }
+    
+    return isVoiceAvailable && Voice !== null;
   },
   
   // Check if native module is actually linked
@@ -150,6 +172,14 @@ export const VoiceHelper = {
   },
 
   async start(locale = 'en-US') {
+    // Strict null check first
+    if (Voice === null || Voice === undefined) {
+      console.warn('❌ Voice recognition not available - native module is null');
+      console.warn('💡 This requires a development build, not Expo Go.');
+      console.warn('💡 Run: npx expo prebuild --clean && npx expo run:android');
+      return false;
+    }
+    
     if (!this.isAvailable()) {
       console.warn('❌ Voice recognition not available');
       return false;
@@ -197,8 +227,14 @@ export const VoiceHelper = {
       }
       
       // Verify Voice object is still valid before starting
-      if (!Voice || typeof Voice.start !== 'function') {
-        throw new Error('Voice module is not properly initialized. Native module may not be linked.');
+      if (Voice === null || Voice === undefined) {
+        console.error('❌ Voice is null - native module not linked');
+        return false;
+      }
+      
+      if (typeof Voice.start !== 'function') {
+        console.error('❌ Voice.start is not a function - native module may not be linked');
+        return false;
       }
       
       // Start recognition
@@ -209,57 +245,101 @@ export const VoiceHelper = {
         return true;
       } catch (startError) {
         // If error mentions null or startSpeech, native module isn't linked
-        if (startError.message && (startError.message.includes('null') || startError.message.includes('startSpeech'))) {
-          throw new Error('Native module not linked. This requires a development build, not Expo Go. Run: npx expo prebuild --clean && npx expo run:android');
+        if (startError && startError.message && (startError.message.includes('null') || startError.message.includes('startSpeech'))) {
+          console.error('❌ Native module not linked - requires development build');
+          console.error('💡 Run: npx expo prebuild --clean && npx expo run:android');
+          return false;
         }
-        throw startError;
+        // Don't throw - just return false
+        console.error('❌ Failed to start voice recognition:', startError.message);
+        return false;
       }
     } catch (error) {
+      // Check if it's a null error - this is expected when native module isn't linked
+      if (error && error.message && error.message.includes('null')) {
+        console.warn('⚠️ Native module is null - voice recognition requires a development build');
+        console.warn('💡 This is expected if using Expo Go. Run: npx expo prebuild --clean && npx expo run:android');
+        return false;
+      }
+      
       console.error('❌ Voice start error:', error);
-      console.error('Error message:', error.message);
-      console.error('Error name:', error.name);
-      console.error('Error stack:', error.stack);
-      // Try to stringify error for more details
-      try {
-        console.error('Error details:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
-      } catch (e) {
-        console.error('Could not stringify error');
+      if (error && error.message) {
+        console.error('Error message:', error.message);
       }
       return false;
     }
   },
 
   async stop() {
+    // Strict null check first
+    if (Voice === null || Voice === undefined) {
+      return false;
+    }
+    
     if (!this.isAvailable()) {
       return false;
     }
+    
     try {
+      // Double-check Voice is still not null
+      if (Voice === null || Voice === undefined) {
+        return false;
+      }
+      
       await Voice.stop();
       return true;
     } catch (error) {
+      // Check if error is about null
+      if (error && error.message && error.message.includes('null')) {
+        console.log('ℹ️ Voice stop: native module is null (expected if not using development build)');
+        return false;
+      }
       console.error('Voice stop error:', error);
       return false;
     }
   },
 
   async destroy() {
+    // Strict null check first
+    if (Voice === null || Voice === undefined) {
+      return;
+    }
+    
     if (!this.isAvailable()) {
       return;
     }
+    
     try {
+      // Double-check Voice is still not null
+      if (Voice === null || Voice === undefined) {
+        return;
+      }
+      
       await Voice.cancel?.();
       await Voice.destroy?.();
       Voice.removeAllListeners?.();
     } catch (error) {
+      // Check if error is about null - this is expected
+      if (error && error.message && error.message.includes('null')) {
+        console.log('ℹ️ Voice destroy: native module is null (expected if not using development build)');
+        return;
+      }
       console.error('Voice destroy error:', error);
     }
   },
 
   on(event, callback) {
-    if (!this.isAvailable() || !Voice) {
+    // Strict null check first
+    if (Voice === null || Voice === undefined) {
+      console.warn(`⚠️ Cannot add listener for ${event} - Voice is null (native module not linked)`);
+      return;
+    }
+    
+    if (!this.isAvailable()) {
       console.warn(`⚠️ Cannot add listener for ${event} - Voice not available`);
       return;
     }
+    
     try {
       // Map event names to Voice event handler properties
       const eventMap = {
@@ -271,6 +351,12 @@ export const VoiceHelper = {
         'SpeechPartialResults': 'onSpeechPartialResults',
       };
       const voiceEvent = eventMap[event] || `on${event.charAt(0).toUpperCase() + event.slice(1)}`;
+      
+      // Double-check Voice is still not null before setting properties
+      if (Voice === null || Voice === undefined) {
+        console.warn(`⚠️ Voice became null while setting listener for ${event}`);
+        return;
+      }
       
       // Set the event handler directly on Voice object
       if (Voice[voiceEvent] !== undefined) {
@@ -286,27 +372,58 @@ export const VoiceHelper = {
         }
       }
     } catch (error) {
+      // Check if error is about null
+      if (error && error.message && error.message.includes('null')) {
+        console.warn(`⚠️ Cannot set listener for ${event} - native module is null`);
+        return;
+      }
       console.error(`❌ Voice on ${event} error:`, error);
     }
   },
 
   removeAllListeners() {
-    if (!this.isAvailable() || !Voice) {
+    // Strict null check first - this is the main issue
+    if (Voice === null || Voice === undefined) {
+      // Silently return - this is expected when native module isn't linked
       return;
     }
+    
+    if (!this.isAvailable()) {
+      return;
+    }
+    
     try {
+      // Double-check Voice is still not null
+      if (Voice === null || Voice === undefined) {
+        return;
+      }
+      
       if (typeof Voice.removeAllListeners === 'function') {
         Voice.removeAllListeners();
       } else {
-        // Manually remove listeners
-        Voice.onSpeechStart = null;
-        Voice.onSpeechEnd = null;
-        Voice.onSpeechResults = null;
-        Voice.onSpeechError = null;
-        Voice.onSpeechRecognized = null;
-        Voice.onSpeechPartialResults = null;
+        // Manually remove listeners - but check Voice is not null before each assignment
+        try {
+          if (Voice !== null && Voice !== undefined) Voice.onSpeechStart = null;
+          if (Voice !== null && Voice !== undefined) Voice.onSpeechEnd = null;
+          if (Voice !== null && Voice !== undefined) Voice.onSpeechResults = null;
+          if (Voice !== null && Voice !== undefined) Voice.onSpeechError = null;
+          if (Voice !== null && Voice !== undefined) Voice.onSpeechRecognized = null;
+          if (Voice !== null && Voice !== undefined) Voice.onSpeechPartialResults = null;
+        } catch (assignError) {
+          // If setting properties fails (e.g., Voice became null), just log and continue
+          if (assignError && assignError.message && assignError.message.includes('null')) {
+            console.log('ℹ️ Voice became null during listener removal (expected if native module not linked)');
+            return;
+          }
+          throw assignError;
+        }
       }
     } catch (error) {
+      // Check if error is about null - this is expected when native module isn't linked
+      if (error && error.message && error.message.includes('null')) {
+        console.log('ℹ️ Voice removeAllListeners: native module is null (expected if not using development build)');
+        return;
+      }
       console.error('Voice removeAllListeners error:', error);
     }
   },
