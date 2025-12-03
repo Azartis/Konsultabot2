@@ -11,9 +11,11 @@ import {
   Text,
   TextInput,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Speech from 'expo-speech';
+import { VoiceHelper } from '../../utils/voiceHelper';
 
 const { width, height } = Dimensions.get('window');
 
@@ -23,6 +25,10 @@ export default function SimpleChatScreen() {
   const [loading, setLoading] = useState(false);
   const [language, setLanguage] = useState('english');
   const [isTyping, setIsTyping] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [voiceTranscript, setVoiceTranscript] = useState('');
+  const [speechRecognition, setSpeechRecognition] = useState(null);
   const scrollViewRef = useRef();
 
   const languageOptions = [
@@ -43,11 +49,102 @@ export default function SimpleChatScreen() {
     // Add welcome message
     const welcomeMessage = {
       id: 'welcome',
-      text: `Hello! I'm KonsultaBot 🤖\n\nI'm your AI assistant for EVSU Dulag campus. I can help you with:\n\n• Campus information and programs\n• Technical support issues\n• Multi-language conversations\n• Offline assistance\n\nWhat would you like to know today?`,
+      text: `Hello! I'm KonsultaBot 🤖\n\nI'm your AI assistant for EVSU Dulag campus. I can help you with:\n\n• Campus information and programs\n• Technical support issues\n• Multi-language conversations\n• Offline assistance\n• Voice input 🎤\n\nWhat would you like to know today?`,
       isBot: true,
       timestamp: new Date(),
     };
     setMessages([welcomeMessage]);
+
+    // Initialize Web Speech API for web platform
+    if (Platform.OS === 'web') {
+      const WebSpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (WebSpeechRecognition) {
+        const recognition = new WebSpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        recognition.lang = 'en-US';
+        
+        recognition.onresult = (event) => {
+          const transcript = event.results[0][0].transcript;
+          console.log('🎤 Speech recognized:', transcript);
+          setInputText(transcript);
+          setVoiceTranscript(transcript);
+          setIsTranscribing(false);
+          setIsRecording(false);
+        };
+        
+        recognition.onerror = (event) => {
+          console.error('❌ Speech recognition error:', event.error);
+          setIsTranscribing(false);
+          setIsRecording(false);
+          Alert.alert(
+            'Speech Recognition Error',
+            `Could not recognize speech: ${event.error}`,
+            [{ text: 'OK' }]
+          );
+        };
+        
+        recognition.onend = () => {
+          console.log('🎤 Speech recognition ended');
+          setIsTranscribing(false);
+          setIsRecording(false);
+        };
+        
+        setSpeechRecognition(recognition);
+        console.log('✅ Web Speech Recognition initialized');
+      }
+    }
+
+    // Initialize voice recognition listeners for mobile
+    if (Platform.OS !== 'web' && VoiceHelper.isAvailable()) {
+      VoiceHelper.on('SpeechPartialResults', (event) => {
+        if (event && event.value && Array.isArray(event.value) && event.value.length > 0) {
+          const partialTranscript = event.value[0];
+          if (partialTranscript && typeof partialTranscript === 'string' && partialTranscript.trim()) {
+            setVoiceTranscript(partialTranscript);
+            setInputText(partialTranscript);
+          }
+        }
+      });
+      
+      VoiceHelper.on('SpeechResults', (event) => {
+        if (event && event.value && Array.isArray(event.value) && event.value.length > 0) {
+          const transcript = event.value[0];
+          if (transcript && typeof transcript === 'string' && transcript.trim()) {
+            setVoiceTranscript(transcript);
+            setInputText(transcript);
+          }
+        }
+      });
+      
+      VoiceHelper.on('SpeechError', (error) => {
+        console.error('❌ Speech recognition error:', error);
+        setIsRecording(false);
+        setIsTranscribing(false);
+        setVoiceTranscript('');
+        Alert.alert(
+          'Speech Recognition Error',
+          'Could not recognize speech. Please try again.',
+          [{ text: 'OK' }]
+        );
+      });
+      
+      VoiceHelper.on('SpeechEnd', () => {
+        setIsRecording(false);
+      });
+      
+      VoiceHelper.on('SpeechStart', () => {
+        setIsRecording(true);
+      });
+    }
+
+    return () => {
+      // Clean up voice recognition
+      if (Platform.OS !== 'web' && VoiceHelper.isAvailable()) {
+        VoiceHelper.removeAllListeners();
+        VoiceHelper.destroy();
+      }
+    };
   }, []);
 
   const sendMessage = async (messageText = inputText) => {
@@ -160,6 +257,177 @@ export default function SimpleChatScreen() {
       pitch: 1.0,
       rate: 0.8,
     });
+  };
+
+  const startRecording = async () => {
+    if (recording || isTranscribing) {
+      return;
+    }
+
+    try {
+      // Web Speech API for web platform
+      if (Platform.OS === 'web') {
+        if (!speechRecognition) {
+          Alert.alert(
+            'Speech Recognition Not Available',
+            'Your browser does not support speech recognition. Please try Chrome, Edge, or Safari.',
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+        
+        try {
+          speechRecognition.start();
+          setIsRecording(true);
+          setIsTranscribing(false);
+          setVoiceTranscript('');
+          console.log('✅ Speech recognition started - speak now!');
+        } catch (error) {
+          console.error('❌ Failed to start speech recognition:', error);
+          setIsRecording(false);
+          Alert.alert(
+            'Microphone Error',
+            'Could not access microphone. Please allow microphone permissions in your browser.',
+            [{ text: 'OK' }]
+          );
+        }
+        return;
+      }
+      
+      // Mobile: Use VoiceHelper
+      if (!VoiceHelper.isAvailable()) {
+        Alert.alert(
+          'Speech Recognition Not Available',
+          'Speech recognition requires a development build. Please use a development build instead of Expo Go.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+      
+      VoiceHelper.removeAllListeners();
+      setVoiceTranscript('');
+      
+      // Set up listeners
+      VoiceHelper.on('SpeechPartialResults', (event) => {
+        if (event && event.value && Array.isArray(event.value) && event.value.length > 0) {
+          const partialTranscript = event.value[0];
+          if (partialTranscript && typeof partialTranscript === 'string' && partialTranscript.trim()) {
+            setVoiceTranscript(partialTranscript);
+            setInputText(partialTranscript);
+          }
+        }
+      });
+      
+      VoiceHelper.on('SpeechResults', (event) => {
+        if (event && event.value && Array.isArray(event.value) && event.value.length > 0) {
+          const transcript = event.value[0];
+          if (transcript && typeof transcript === 'string' && transcript.trim()) {
+            setVoiceTranscript(transcript);
+            setInputText(transcript);
+          }
+        }
+      });
+      
+      VoiceHelper.on('SpeechError', (error) => {
+        console.error('❌ Speech recognition error:', error);
+        setIsRecording(false);
+        setIsTranscribing(false);
+        setVoiceTranscript('');
+        Alert.alert(
+          'Speech Recognition Error',
+          'Could not recognize speech. Please try again.',
+          [{ text: 'OK' }]
+        );
+      });
+      
+      VoiceHelper.on('SpeechEnd', () => {
+        setIsRecording(false);
+      });
+      
+      VoiceHelper.on('SpeechStart', () => {
+        setIsRecording(true);
+      });
+      
+      const started = await VoiceHelper.start('en-US');
+      if (started) {
+        setIsRecording(true);
+        console.log('✅ Mobile speech recognition started - speak now!');
+      } else {
+        throw new Error('Failed to start voice recognition');
+      }
+    } catch (error) {
+      console.error('Failed to start VoiceHelper:', error);
+      setIsRecording(false);
+      setIsTranscribing(false);
+      Alert.alert(
+        'Speech Recognition Error',
+        `Could not start speech recognition: ${error.message || 'Unknown error'}`,
+        [{ text: 'OK' }]
+      );
+    }
+  };
+
+  const stopRecording = async () => {
+    // Web Speech API
+    if (Platform.OS === 'web' && speechRecognition) {
+      try {
+        speechRecognition.stop();
+        setIsTranscribing(true);
+        setIsRecording(false);
+      } catch (error) {
+        console.error('❌ Error stopping speech recognition:', error);
+        setIsRecording(false);
+        setIsTranscribing(false);
+      }
+      return;
+    }
+    
+    setIsRecording(false);
+    setIsTranscribing(true);
+    
+    try {
+      if (!VoiceHelper.isAvailable()) {
+        setIsTranscribing(false);
+        return;
+      }
+      
+      await VoiceHelper.stop();
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      let transcript = voiceTranscript || inputText || '';
+      setVoiceTranscript('');
+      VoiceHelper.removeAllListeners();
+      
+      if (!transcript || !transcript.trim()) {
+        setIsTranscribing(false);
+        Alert.alert(
+          'No Speech Detected',
+          'I didn\'t hear anything. Please try speaking again.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+      
+      if (transcript && transcript.trim()) {
+        setInputText(transcript);
+        setIsTranscribing(false);
+      } else {
+        setIsTranscribing(false);
+      }
+    } catch (error) {
+      console.error('Error stopping speech recognition:', error);
+      setIsRecording(false);
+      setIsTranscribing(false);
+      VoiceHelper.removeAllListeners();
+    }
+  };
+
+  const toggleRecording = () => {
+    if (recording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
   };
 
   const renderMessage = (message, index) => {
@@ -287,20 +555,40 @@ export default function SimpleChatScreen() {
             maxLength={500}
           />
           
-          <TouchableOpacity
-            style={[
-              styles.sendButton,
-              inputText.trim() ? styles.sendButtonActive : styles.sendButtonInactive
-            ]}
-            onPress={() => sendMessage()}
-            disabled={loading || !inputText.trim()}
-          >
-            <Ionicons 
-              name="send" 
-              size={20} 
-              color={inputText.trim() ? "#fff" : "#999"} 
-            />
-          </TouchableOpacity>
+          {!inputText.trim() && (
+            <TouchableOpacity
+              style={styles.voiceButton}
+              onPress={toggleRecording}
+              disabled={isTranscribing}
+            >
+              {isTranscribing ? (
+                <ActivityIndicator size="small" color="#1976d2" />
+              ) : (
+                <Ionicons 
+                  name={isRecording ? "stop-circle" : "mic"} 
+                  size={20} 
+                  color={isRecording ? "#f44336" : "#1976d2"} 
+                />
+              )}
+            </TouchableOpacity>
+          )}
+          
+          {inputText.trim() && (
+            <TouchableOpacity
+              style={[
+                styles.sendButton,
+                inputText.trim() ? styles.sendButtonActive : styles.sendButtonInactive
+              ]}
+              onPress={() => sendMessage()}
+              disabled={loading || !inputText.trim()}
+            >
+              <Ionicons 
+                name="send" 
+                size={20} 
+                color={inputText.trim() ? "#fff" : "#999"} 
+              />
+            </TouchableOpacity>
+          )}
         </View>
       </KeyboardAvoidingView>
     </View>
@@ -508,5 +796,14 @@ const styles = StyleSheet.create({
   },
   sendButtonInactive: {
     backgroundColor: '#f0f0f0',
+  },
+  voiceButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
+    marginRight: 4,
   },
 });
