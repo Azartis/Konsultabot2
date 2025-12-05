@@ -1,0 +1,46 @@
+{
+  "cli": {
+    "version": ">= 5.2.0"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": {
+        "gradleCommand": ":app:assembleDebug",
+        "buildType": "apk"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk",
+        "image": "latest"
+      },
+      "env": {
+        "EXPO_PUBLIC_ENV": "preview",
+        "EXPO_PUBLIC_NGROK_URL": "https://unmutated-nondeprecatively-bonnie.ngrok-free.dev"
+      }
+    },
+    "production": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk",
+        "image": "latest"
+      },
+      "env": {
+        "EXPO_PUBLIC_ENV": "production",
+        "EXPO_PUBLIC_NGROK_URL": "https://unmutated-nondeprecatively-bonnie.ngrok-free.dev"
+      }
+    },
+    "development": {
+      "env": {
+        "EXPO_PUBLIC_NGROK_URL": "https://unmutated-nondeprecatively-bonnie.ngrok-free.dev"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}
+
