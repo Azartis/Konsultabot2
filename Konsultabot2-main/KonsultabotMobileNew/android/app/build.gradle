@@ -126,10 +126,26 @@ android {
             def enableLegacyPackaging = findProperty('expo.useLegacyPackaging') ?: 'false'
             useLegacyPackaging enableLegacyPackaging.toBoolean()
         }
+        // Handle duplicate classes between AndroidX and old Support Library
+        pickFirst '**/libc++_shared.so'
+        pickFirst '**/libfbjni.so'
     }
+    
     androidResources {
         ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:!CVS:!thumbs.db:!picasa.ini:!*~'
     }
+}
+
+// Handle duplicate classes by excluding old Support Library and forcing AndroidX
+configurations.all {
+    resolutionStrategy {
+        force 'androidx.core:core:1.16.0'
+        force 'androidx.versionedparcelable:versionedparcelable:1.1.1'
+    }
+    // Exclude old support library from all configurations
+    exclude group: 'com.android.support', module: 'support-compat'
+    exclude group: 'com.android.support', module: 'support-v4'
+    exclude group: 'com.android.support', module: 'versionedparcelable'
 }
 
 // Apply static values from `gradle.properties` to the `android.packagingOptions`
@@ -179,4 +195,8 @@ dependencies {
     } else {
         implementation jscFlavor
     }
+    
+    // Force AndroidX dependencies to avoid conflicts with old Support Library
+    implementation 'androidx.core:core:1.16.0'
+    implementation 'androidx.versionedparcelable:versionedparcelable:1.1.1'
 }
