@@ -34,7 +34,7 @@
     "axios": "^1.12.2",
     "axios-retry": "^4.5.0",
     "babel-preset-expo": "~54.0.0",
-    "expo": "54.0.23",
+    "expo": "~54.0.27",
     "expo-audio": "~1.0.14",
     "expo-av": "~16.0.7",
     "expo-build-properties": "~1.0.9",

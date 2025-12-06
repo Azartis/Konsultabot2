@@ -91,6 +91,7 @@ ALLOWED_HOSTS = [
     '.ngrok-free.dev',
     '.ngrok.io',
     '.ngrok.app',
+    'https://unmutated-nondeprecatively-bonnie.ngrok-free.dev'
 ]
 
 # Add Ngrok domains from environment (for global access)
@@ -160,46 +161,20 @@ CORS_ALLOW_HEADERS = [
     'x-client-version',
     'x-client-platform',
 ]
-# CSRF Trusted Origins - Add Ngrok URLs dynamically
-CSRF_TRUSTED_ORIGINS = [
-    'http://127.0.0.1:8000',
-    'http://localhost:8000',
-    'http://0.0.0.0:8000',
-    'http://10.0.2.2:8000',  # Android emulator
-    'http://localhost:8081',  # Expo web dev server
-    'http://127.0.0.1:8081',  # Expo web dev server
-    # Ngrok wildcard patterns (Django doesn't support wildcards, but we'll add specific domains)
-    'https://*.ngrok-free.dev',
-    'https://*.ngrok.io',
-    'https://*.ngrok.app',
-]
+# CSRF - Disabled for API (public access)
+# CSRF is disabled via DisableCSRFForAPI middleware for all /api/ routes
+# Empty list is valid - middleware handles CSRF exemption
+CSRF_TRUSTED_ORIGINS = []
+CSRF_COOKIE_SECURE = False
+CSRF_USE_SESSIONS = False
+USE_X_FORWARDED_HOST = True
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
-# Add specific Ngrok URL from environment (for global access)
-# Note: Django doesn't support wildcards in CSRF_TRUSTED_ORIGINS, so we add the specific domain
-if NGROK_URL:
-    # Add both http and https versions of the specific domain
-    ngrok_domain = NGROK_URL.replace('https://', '').replace('http://', '').split('/')[0]
-    if ngrok_domain:
-        # Add specific domain
-        if f'https://{ngrok_domain}' not in CSRF_TRUSTED_ORIGINS:
-            CSRF_TRUSTED_ORIGINS.append(f'https://{ngrok_domain}')
-        if f'http://{ngrok_domain}' not in CSRF_TRUSTED_ORIGINS:
-            CSRF_TRUSTED_ORIGINS.append(f'http://{ngrok_domain}')
-
-# Note: Django doesn't support wildcards in CSRF_TRUSTED_ORIGINS
-# We'll add specific ngrok domains dynamically when they're detected
-# For now, CORS_ALLOW_ALL_ORIGINS = True handles CORS, and we exempt CSRF for API views
-USE_X_FORWARDED_HOST = False
-SECURE_PROXY_SSL_HEADER = None
-
-# REST Framework settings
+# REST Framework settings - Public API (no authentication required)
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
-        'rest_framework.authentication.SessionAuthentication',
-    ],
+    'DEFAULT_AUTHENTICATION_CLASSES': [],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticatedOrReadOnly',
+        'rest_framework.permissions.AllowAny',
     ],
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
@@ -209,10 +184,7 @@ REST_FRAMEWORK = {
     ],
     'EXCEPTION_HANDLER': 'rest_framework.views.exception_handler',
     'DEFAULT_THROTTLE_CLASSES': [],
-    'DEFAULT_THROTTLE_RATES': {
-        'chat': '100/hour',
-        'voice': '50/hour',
-    }
+    'DEFAULT_THROTTLE_RATES': {},
 }
 
 # JWT Settings
@@ -237,9 +209,11 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
+    'django_konsultabot.middleware.DisableCSRFForAPI',  # Disable CSRF for API routes
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
+    'django_konsultabot.middleware.RequestLoggingMiddleware',  # Request logging
 ]
 
 ROOT_URLCONF = 'django_konsultabot.urls'
@@ -271,13 +245,51 @@ try:
     if DATABASE_URL:
         try:
             # Parse DATABASE_URL (PostgreSQL/MySQL)
+            db_config = dj_database_url.parse(DATABASE_URL, conn_max_age=600)
             DATABASES = {
-                'default': dj_database_url.parse(DATABASE_URL, conn_max_age=600)
+                'default': db_config
             }
-            print(f"✅ Using database from DATABASE_URL: {DATABASES['default'].get('ENGINE', 'unknown')}")
+            
+            # Test database connection before using it (only for PostgreSQL)
+            if db_config.get('ENGINE') == 'django.db.backends.postgresql':
+                try:
+                    import psycopg2
+                    import socket
+                    # First, test if host is reachable via DNS
+                    host = db_config.get('HOST', 'localhost')
+                    port = db_config.get('PORT', 5432)
+                    
+                    # Quick DNS resolution test
+                    try:
+                        socket.gethostbyname(host)
+                    except socket.gaierror:
+                        raise Exception(f"Host '{host}' cannot be resolved")
+                    
+                    # Try to connect to test if host is reachable
+                    test_conn = psycopg2.connect(
+                        host=host,
+                        port=port,
+                        user=db_config.get('USER', ''),
+                        password=db_config.get('PASSWORD', ''),
+                        database=db_config.get('NAME', ''),
+                        connect_timeout=2
+                    )
+                    test_conn.close()
+                    print(f"[OK] Using database from DATABASE_URL: {db_config.get('ENGINE', 'unknown')}")
+                except (psycopg2.OperationalError, psycopg2.Error, socket.gaierror, Exception) as e:
+                    print(f"[WARN] Database connection test failed: {str(e)[:100]}")
+                    print("[WARN] Falling back to SQLite")
+                    DATABASES = {
+                        'default': {
+                            'ENGINE': 'django.db.backends.sqlite3',
+                            'NAME': BASE_DIR / 'konsultabot_advanced.db',
+                        }
+                    }
+            else:
+                print(f"[OK] Using database from DATABASE_URL: {db_config.get('ENGINE', 'unknown')}")
         except Exception as e:
-            print(f"⚠️ DATABASE_URL parsing failed: {e}")
-            print("⚠️ Falling back to SQLite")
+            print(f"[WARN] DATABASE_URL parsing failed: {e}")
+            print("[WARN] Falling back to SQLite")
             DATABASES = {
                 'default': {
                     'ENGINE': 'django.db.backends.sqlite3',
@@ -298,7 +310,7 @@ try:
         }
         # Remove empty values
         DATABASES['default'] = {k: v for k, v in DATABASES['default'].items() if v}
-        print(f"✅ Using database from DB_* env vars: {DATABASES['default'].get('ENGINE', 'unknown')}")
+        print(f"[OK] Using database from DB_* env vars: {DATABASES['default'].get('ENGINE', 'unknown')}")
     else:
         # Default to SQLite
         DATABASES = {
@@ -343,8 +355,10 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+# Only include static directories that exist
 STATICFILES_DIRS = [
-    BASE_DIR / 'static',
+    dir_path for dir_path in [BASE_DIR / 'static']
+    if dir_path.exists()
 ]
 
 # Media files
@@ -357,26 +371,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Custom user model for RBAC
 AUTH_USER_MODEL = 'user_account.User'
 
-# REST Framework settings
-REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
-        'rest_framework.authentication.SessionAuthentication',
-    ],
-    'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticatedOrReadOnly',
-    ],
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 20,
-    'DEFAULT_THROTTLE_CLASSES': [
-        'rest_framework.throttling.AnonRateThrottle',
-        'rest_framework.throttling.UserRateThrottle'
-    ],
-    'DEFAULT_THROTTLE_RATES': {
-        'anon': '100/hour',
-        'user': '1000/hour'
-    }
-}
+# REST Framework settings - Public API (no authentication required)
+# Note: This is a duplicate - using the one defined earlier
 
 # JWT Configuration
 from datetime import timedelta

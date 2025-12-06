@@ -6,9 +6,24 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from django.views.generic import TemplateView
+from django.http import JsonResponse
 from .views import health_redirect, api_health
 
+def api_root(request):
+    return JsonResponse({
+        "message": "Konsultabot API is running",
+        "endpoints": {
+            "health": "/api/health/",
+            "auth": "/api/auth/",
+            "chat": "/api/v1/chat/",
+            "knowledge": "/api/v1/knowledge/",
+            "analytics": "/api/v1/analytics/",
+            "admin": "/api/v1/admin/"
+        }
+    })
+
 urlpatterns = [
+    path('api/', api_root, name='api_root'),
     # Admin interface
     path('admin/', admin.site.urls),
     
@@ -25,11 +40,8 @@ urlpatterns = [
     path('api/v1/analytics/', include('analytics.urls')),
     path('api/v1/admin/', include('admin_panel.urls')),
     
-    # Admin dashboard (legacy)
-    path('dashboard/', include('adminpanel.urls')),
-    
-    # Root redirect to admin dashboard
-    path('', TemplateView.as_view(template_name='index.html'), name='home'),
+    # Root redirect to API
+    path('', api_root, name='home'),
 ]
 
 # Serve media files in development

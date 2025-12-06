@@ -10,32 +10,47 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '../../context/AuthContext';
 import { theme } from '../../theme/cleanTheme';
 
 export default function SimpleHistoryScreen() {
+  const { user } = useAuth();
   const [conversations, setConversations] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [userData, setUserData] = useState(null);
 
+  // Get storage key based on current user ID
+  const getStorageKey = () => {
+    if (!user || !user.id) {
+      return 'chat_history_guest'; // Fallback for guest users
+    }
+    return `chat_history_${user.id}`;
+  };
+
   useEffect(() => {
     loadHistory();
-  }, []);
+  }, [user?.id]); // Reload when user changes
 
   const loadHistory = async () => {
     try {
       setIsLoading(true);
       
-      // Load user data
-      const userDataString = await AsyncStorage.getItem('user_data');
+      // Load user data from AsyncStorage (fallback)
+      const userDataString = await AsyncStorage.getItem('user');
       if (userDataString) {
         setUserData(JSON.parse(userDataString));
+      } else if (user) {
+        setUserData(user);
       }
 
-      // Load conversation history from AsyncStorage
-      const historyString = await AsyncStorage.getItem('chat_history');
+      // Load conversation history from AsyncStorage (user-specific)
+      const storageKey = getStorageKey();
+      const historyString = await AsyncStorage.getItem(storageKey);
       if (historyString) {
         const history = JSON.parse(historyString);
         setConversations(history.slice(-20)); // Show last 20 conversations
+      } else {
+        setConversations([]); // No history for this user
       }
     } catch (error) {
       console.error('Error loading history:', error);
@@ -55,7 +70,8 @@ export default function SimpleHistoryScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await AsyncStorage.removeItem('chat_history');
+              const storageKey = getStorageKey();
+              await AsyncStorage.removeItem(storageKey);
               setConversations([]);
               Alert.alert('Success', 'Chat history cleared');
             } catch (error) {

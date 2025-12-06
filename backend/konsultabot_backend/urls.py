@@ -11,6 +11,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
+from chat import views as chat_views
 
 @csrf_exempt
 @require_http_methods(["GET"])
@@ -56,4 +57,7 @@ urlpatterns = [
     path('api/auth/', include('user_account.urls')),  # User auth endpoints
     path('api/', include('api.urls')),  # API endpoints
     path('api/chat/', include('chat.urls')),  # Chat endpoints
+    
+    # API v1 endpoints
+    path('api/v1/chat/', chat_views.v1_chat_endpoint, name='v1_chat'),  # Simple chat endpoint
 ]

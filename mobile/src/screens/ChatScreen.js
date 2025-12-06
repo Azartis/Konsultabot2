@@ -293,7 +293,7 @@ const ChatScreen = ({ navigation }) => {
       console.log('🚀 Starting voice recognition...');
       const started = await VoiceHelper.start('en-US');
       if (started) {
-        setRecording(true);
+      setRecording(true);
         console.log('✅ Mobile speech recognition started - speak now!');
       } else {
         throw new Error('Failed to start voice recognition - start() returned false');
@@ -549,11 +549,11 @@ const ChatScreen = ({ navigation }) => {
           {isTranscribing ? (
             <ActivityIndicator size="small" color="#007AFF" />
           ) : (
-            <Icon
-              name={recording ? "stop-circle" : "mic"}
-              size={24}
-              color={recording ? "#FF3B30" : "#007AFF"}
-            />
+          <Icon
+            name={recording ? "stop-circle" : "mic"}
+            size={24}
+            color={recording ? "#FF3B30" : "#007AFF"}
+          />
           )}
         </TouchableOpacity>
         <TouchableOpacity

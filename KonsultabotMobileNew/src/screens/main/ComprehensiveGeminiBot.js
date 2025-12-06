@@ -30,7 +30,7 @@ import StarryBackground from '../../components/StarryBackground';
 const { width, height } = Dimensions.get('window');
 
 export default function ComprehensiveGeminiBot({ navigation }) {
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const { 
     currentChatId, 
     getCurrentChat, 
@@ -48,6 +48,14 @@ export default function ComprehensiveGeminiBot({ navigation }) {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [userData, setUserData] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
+
+  // Get storage key based on current user ID
+  const getStorageKey = () => {
+    if (!user || !user.id) {
+      return 'chat_history_guest'; // Fallback for guest users
+    }
+    return `chat_history_${user.id}`;
+  };
   const scrollViewRef = useRef();
 
   useEffect(() => {
@@ -245,15 +253,16 @@ export default function ComprehensiveGeminiBot({ navigation }) {
         userId: userData?.id || 'anonymous'
       };
 
-      // Get existing history
-      const existingHistoryString = await AsyncStorage.getItem('chat_history');
+      // Get existing history (user-specific)
+      const storageKey = getStorageKey();
+      const existingHistoryString = await AsyncStorage.getItem(storageKey);
       const existingHistory = existingHistoryString ? JSON.parse(existingHistoryString) : [];
 
       // Add new item and keep only last 100 conversations
       const updatedHistory = [...existingHistory, historyItem].slice(-100);
 
-      // Save back to storage
-      await AsyncStorage.setItem('chat_history', JSON.stringify(updatedHistory));
+      // Save back to storage (user-specific)
+      await AsyncStorage.setItem(storageKey, JSON.stringify(updatedHistory));
       
       console.log('💾 Conversation saved to history:', {
         user: String(userMessage).substring(0, 50),

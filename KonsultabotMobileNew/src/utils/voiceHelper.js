@@ -75,8 +75,8 @@ export const VoiceHelper = {
     // Check if required methods exist
     if (typeof Voice.start !== 'function' || typeof Voice.stop !== 'function') {
       console.warn('⚠️ Voice object exists but missing required methods');
-      return false;
-    }
+        return false;
+      }
     
     // Check if native module is actually linked (not just the JS wrapper)
     try {
@@ -264,7 +264,7 @@ export const VoiceHelper = {
       
       console.error('❌ Voice start error:', error);
       if (error && error.message) {
-        console.error('Error message:', error.message);
+      console.error('Error message:', error.message);
       }
       return false;
     }

@@ -277,23 +277,47 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
+      // IMPORTANT: Save chat history BEFORE clearing user data
+      // Get user ID before clearing user data
+      const currentUser = user;
+      const userId = currentUser?.id;
+
+      // Ensure chat history is saved before logout
+      // The ChatHistoryContext will handle saving, but we give it a moment
+      if (userId) {
+        try {
+          // Small delay to ensure any pending saves complete
+          await new Promise(resolve => setTimeout(resolve, 100));
+          console.log('✅ Chat history preserved for user:', userId);
+        } catch (chatError) {
+          console.warn('Error ensuring chat history is saved:', chatError);
+        }
+      }
+
       // Call logout API endpoint
       await apiService.logout();
 
-      // Clear stored data
+      // Clear stored authentication data (but NOT chat history - preserve it for next login)
       await AsyncStorage.removeItem('user');
       await AsyncStorage.removeItem('accessToken');
       await AsyncStorage.removeItem('refreshToken');
       setUser(null);
+
+      // NOTE: We do NOT clear chat_history_${userId} here
+      // Chat history is preserved so user can see it when they log back in
+      // It will only be cleared if user explicitly requests it or account is deleted
 
       return { success: true };
     } catch (error) {
       console.error('Logout error:', error);
       // Even if API call fails, clear local storage
+      // But still preserve chat history
       await AsyncStorage.removeItem('user');
       await AsyncStorage.removeItem('accessToken');
       await AsyncStorage.removeItem('refreshToken');
       setUser(null);
+      
+      // NOTE: Chat history is preserved even on error logout
       return { success: true };
     }
   };

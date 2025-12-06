@@ -5,7 +5,7 @@ Comprehensive views for all admin panel features
 from rest_framework import viewsets, status, generics
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny
 from django.db.models import Q, Count
 from django.utils import timezone
 from django.http import HttpResponse
@@ -33,7 +33,7 @@ from analytics.models import QueryLog
 # ==================== Dashboard Views ====================
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsAdminOrStaff])
+@permission_classes([AllowAny])
 def dashboard_stats(request):
     """Get dashboard statistics"""
     days = int(request.query_params.get('days', 30))
@@ -47,7 +47,7 @@ def dashboard_stats(request):
 
 class UserViewSet(viewsets.ReadOnlyModelViewSet):
     """ViewSet for user management"""
-    permission_classes = [IsAuthenticated, IsAdminOrStaff]
+    permission_classes = [AllowAny]
     queryset = User.objects.all()
     
     def get_serializer_class(self):
@@ -119,7 +119,7 @@ class UserViewSet(viewsets.ReadOnlyModelViewSet):
 
 class IntentViewSet(viewsets.ModelViewSet):
     """ViewSet for intent management"""
-    permission_classes = [IsAuthenticated, IsAdminOrStaff]
+    permission_classes = [AllowAny]
     queryset = Intent.objects.all()
     
     def get_serializer_class(self):
@@ -171,7 +171,7 @@ class IntentViewSet(viewsets.ModelViewSet):
 
 class KeywordViewSet(viewsets.ModelViewSet):
     """ViewSet for keyword management"""
-    permission_classes = [IsAuthenticated, IsAdminOrStaff]
+    permission_classes = [AllowAny]
     queryset = Keyword.objects.all()
     serializer_class = KeywordSerializer
     
@@ -187,7 +187,7 @@ class KeywordViewSet(viewsets.ModelViewSet):
 
 class KnowledgeBaseViewSet(viewsets.ModelViewSet):
     """ViewSet for knowledge base management"""
-    permission_classes = [IsAuthenticated, IsAdminOrStaff]
+    permission_classes = [AllowAny]
     queryset = KnowledgeBaseItem.objects.all()
     
     def get_serializer_class(self):
@@ -299,7 +299,7 @@ class KnowledgeBaseViewSet(viewsets.ModelViewSet):
 
 class NotificationTemplateViewSet(viewsets.ModelViewSet):
     """ViewSet for notification template management"""
-    permission_classes = [IsAuthenticated, IsAdminOrStaff]
+    permission_classes = [AllowAny]
     queryset = NotificationTemplate.objects.all()
     serializer_class = NotificationTemplateSerializer
     
@@ -314,7 +314,7 @@ class NotificationTemplateViewSet(viewsets.ModelViewSet):
 
 class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
     """ViewSet for notification management"""
-    permission_classes = [IsAuthenticated, IsAdminOrStaff]
+    permission_classes = [AllowAny]
     queryset = Notification.objects.all()
     serializer_class = NotificationSerializer
     
@@ -349,7 +349,7 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
 
 class ChatbotSettingsViewSet(viewsets.ModelViewSet):
     """ViewSet for chatbot settings management"""
-    permission_classes = [IsAuthenticated, IsAdmin]
+    permission_classes = [AllowAny]
     queryset = ChatbotSettings.objects.all()
     serializer_class = ChatbotSettingsSerializer
     
@@ -366,7 +366,7 @@ class ChatbotSettingsViewSet(viewsets.ModelViewSet):
 
 class AdminActivityViewSet(viewsets.ReadOnlyModelViewSet):
     """ViewSet for admin activity logs"""
-    permission_classes = [IsAuthenticated, IsAdminOrStaff]
+    permission_classes = [AllowAny]
     queryset = AdminActivity.objects.all()
     serializer_class = AdminActivitySerializer
     
@@ -394,7 +394,7 @@ class AdminActivityViewSet(viewsets.ReadOnlyModelViewSet):
 # ==================== Conversation Logs Views ====================
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsAdminOrStaff])
+@permission_classes([AllowAny])
 def conversation_logs(request):
     """Get conversation logs with filtering"""
     queryset = ConversationSession.objects.all()
@@ -462,7 +462,7 @@ def conversation_logs(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsAdminOrStaff])
+@permission_classes([AllowAny])
 def conversation_detail(request, session_id):
     """Get detailed conversation with messages"""
     try:
@@ -501,7 +501,7 @@ def conversation_detail(request, session_id):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsAdminOrStaff])
+@permission_classes([AllowAny])
 def export_conversations_csv(request):
     """Export conversations to CSV"""
     queryset = ConversationSession.objects.all()

@@ -12,56 +12,108 @@ Write-Host ""
 # Check if ngrok is installed
 $ngrokPath = Get-Command ngrok -ErrorAction SilentlyContinue
 if (-not $ngrokPath) {
-    Write-Host "❌ ngrok not found in PATH" -ForegroundColor Red
-    Write-Host "   Install ngrok: https://ngrok.com/download" -ForegroundColor Yellow
-    exit 1
+    Write-Host "[WARN] ngrok not found in PATH" -ForegroundColor Yellow
+    Write-Host "   Install ngrok: https://ngrok.com/download" -ForegroundColor Gray
+    Write-Host "   Or start Django only (without ngrok)" -ForegroundColor Gray
+    Write-Host ""
+    $startNgrok = $false
+} else {
+    $startNgrok = $true
 }
 
 # Check if Django is in virtual environment
 $djangoPath = "backend\django_konsultabot"
 if (-not (Test-Path $djangoPath)) {
-    Write-Host "❌ Django project not found at $djangoPath" -ForegroundColor Red
+    Write-Host "[ERROR] Django project not found at $djangoPath" -ForegroundColor Red
     exit 1
 }
 
+# Find Python executable
+$pythonExe = $null
+$pythonPaths = @(
+    "C:\Users\Ace Ziegfred Culapas\AppData\Local\Programs\Python\Python314\python.exe",
+    "python",
+    "py",
+    "python3"
+)
+
+foreach ($path in $pythonPaths) {
+    if ($path -match "^[A-Z]:") {
+        if (Test-Path $path) {
+            $pythonExe = $path
+            break
+        }
+    } else {
+        $cmd = Get-Command $path -ErrorAction SilentlyContinue
+        if ($cmd) {
+            $pythonExe = $cmd.Source
+            break
+        }
+    }
+}
+
+if (-not $pythonExe) {
+    Write-Host "[ERROR] Python not found. Please install Python 3.8+" -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "[INFO] Using Python: $pythonExe" -ForegroundColor Gray
+Write-Host ""
 Write-Host "Step 1: Starting Django server on 0.0.0.0:8000..." -ForegroundColor Yellow
 Write-Host ""
 
 # Start Django in background
 $djangoJob = Start-Job -ScriptBlock {
     Set-Location $using:djangoPath
-    python manage.py runserver 0.0.0.0:8000
+    & $using:pythonExe manage.py runserver 0.0.0.0:8000
 }
 
 Start-Sleep -Seconds 3
 
 # Check if Django started
-if ($djangoJob.State -eq 'Running') {
-    Write-Host "✅ Django server started" -ForegroundColor Green
+Start-Sleep -Seconds 5
+$djangoOutput = Receive-Job $djangoJob -ErrorAction SilentlyContinue
+if ($djangoJob.State -eq 'Running' -or $djangoOutput -match "Starting development server") {
+    Write-Host "[OK] Django server started" -ForegroundColor Green
 } else {
-    Write-Host "⚠️  Django server may not have started. Check logs." -ForegroundColor Yellow
+    Write-Host "[WARN] Django server may not have started. Check logs." -ForegroundColor Yellow
+    Write-Host "Output: $djangoOutput" -ForegroundColor Gray
 }
 
-Write-Host ""
-Write-Host "Step 2: Starting ngrok tunnel..." -ForegroundColor Yellow
-Write-Host ""
+if ($startNgrok) {
+    Write-Host ""
+    Write-Host "Step 2: Starting ngrok tunnel..." -ForegroundColor Yellow
+    Write-Host ""
+    
+    # Start ngrok
+    Start-Process ngrok -ArgumentList "http", "8000" -NoNewWindow
+    
+    Start-Sleep -Seconds 3
+    
+    Write-Host "[OK] Ngrok started" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "========================================" -ForegroundColor Cyan
+    Write-Host "  Setup Complete!" -ForegroundColor Green
+    Write-Host "========================================" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "Next steps:" -ForegroundColor Yellow
+    Write-Host "  1. Get ngrok URL from: http://localhost:4040" -ForegroundColor Gray
+    Write-Host "  2. Update URL: .\scripts\update-ngrok-url.ps1" -ForegroundColor Gray
+    Write-Host "  3. Rebuild APK with new URL" -ForegroundColor Gray
+    Write-Host ""
+} else {
+    Write-Host ""
+    Write-Host "========================================" -ForegroundColor Cyan
+    Write-Host "  Django Server Running!" -ForegroundColor Green
+    Write-Host "========================================" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "Django is running at: http://localhost:8000" -ForegroundColor Gray
+    Write-Host "API Health: http://localhost:8000/api/health/" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "Note: ngrok is not installed. Install it to expose the server publicly." -ForegroundColor Yellow
+    Write-Host ""
+}
 
-# Start ngrok
-Start-Process ngrok -ArgumentList "http", "8000" -NoNewWindow
-
-Start-Sleep -Seconds 3
-
-Write-Host "✅ Ngrok started" -ForegroundColor Green
-Write-Host ""
-Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "  Setup Complete!" -ForegroundColor Green
-Write-Host "========================================" -ForegroundColor Cyan
-Write-Host ""
-Write-Host "Next steps:" -ForegroundColor Yellow
-Write-Host "  1. Get ngrok URL from: http://localhost:4040" -ForegroundColor Gray
-Write-Host "  2. Update URL: .\scripts\update-ngrok-url.ps1" -ForegroundColor Gray
-Write-Host "  3. Rebuild APK with new URL" -ForegroundColor Gray
-Write-Host ""
 Write-Host "Press Ctrl+C to stop Django server" -ForegroundColor Yellow
 Write-Host ""
 

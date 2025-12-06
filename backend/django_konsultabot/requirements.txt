@@ -19,13 +19,14 @@ seaborn==0.12.2
 
 # Audio Processing
 pydub==0.25.1
-speechrecognition==3.10.0
+SpeechRecognition==3.10.0
 pyttsx3==2.90
 
 # NLP & Text Processing
 nltk==3.8.1
 textblob==0.17.1
 spacy==3.7.2
+googletrans==4.0.0rc1
 
 # Utilities & Security
 requests==2.31.0

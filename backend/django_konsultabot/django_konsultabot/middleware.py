@@ -4,8 +4,21 @@ Logs all incoming requests for debugging ngrok connectivity
 """
 import logging
 from django.utils.deprecation import MiddlewareMixin
+from django.views.decorators.csrf import csrf_exempt
 
 logger = logging.getLogger('konsultabot.requests')
+
+class DisableCSRFForAPI(MiddlewareMixin):
+    """
+    Disables CSRF protection for all /api/ routes
+    Makes API publicly accessible without CSRF tokens
+    """
+    def process_request(self, request):
+        """Exempt API routes from CSRF"""
+        if request.path.startswith('/api/'):
+            setattr(request, '_dont_enforce_csrf_checks', True)
+        return None
+
 
 class RequestLoggingMiddleware(MiddlewareMixin):
     """

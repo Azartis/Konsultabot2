@@ -68,7 +68,6 @@ else:
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
-@throttle_classes([ChatRateThrottle])
 def gemini_chat(request):
     if not GEMINI_ENABLED or model is None:
         return Response({
@@ -120,8 +119,7 @@ def gemini_chat(request):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticatedOrReadOnly])
-@throttle_classes([ChatRateThrottle])
+@permission_classes([AllowAny])
 def gemini_translate(request):
     if not GEMINI_ENABLED or model is None:
         return Response({

@@ -70,10 +70,10 @@ CORS_ALLOWED_ORIGINS = [
     "exp://192.168.1.14:8081",  # Expo Go app
 ]
 CSRF_TRUSTED_ORIGINS = [
-    'http://127.0.0.1:8000',
-    'http://localhost:8000',
-    'http://0.0.0.0:8000',
-    'http://10.0.2.2:8000',  # Android emulator
+    'http://127.0.0.1:80',
+    'http://localhost:80',
+    'http://0.0.0.0:80',
+    'http://10.0.2.2:80',  # Android emulator
 ]
 
 # Application definition

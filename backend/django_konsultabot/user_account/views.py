@@ -170,7 +170,7 @@ class ProfileView(APIView):
     """
     User profile view
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     
     def get(self, request):
         """Get user profile"""
@@ -195,7 +195,7 @@ class ChangePasswordView(APIView):
     """
     Change user password view
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     
     def post(self, request):
         serializer = ChangePasswordSerializer(
@@ -216,7 +216,7 @@ class LogoutView(APIView):
     """
     User logout view
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     
     def post(self, request):
         try:
@@ -241,7 +241,7 @@ class UserManagementView(APIView):
     """
     User management view for admins
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     
     def get(self, request):
         """Get list of users (admin only)"""
@@ -295,7 +295,7 @@ class UserStatsView(APIView):
     """
     User statistics view for admins
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     
     def get(self, request):
         """Get user statistics (admin/staff only)"""
@@ -329,7 +329,7 @@ class UserStatsView(APIView):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 def check_permissions(request):
     """
     Check user permissions

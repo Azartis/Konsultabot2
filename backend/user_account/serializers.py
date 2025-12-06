@@ -31,42 +31,62 @@ class UserSerializer(serializers.ModelSerializer):
 
 class LoginSerializer(serializers.Serializer):
     """
-    Serializer for user login
+    Serializer for user login - accepts email and password
     """
-    username = serializers.CharField(max_length=150)
+    email = serializers.EmailField(required=False, allow_blank=True)
     password = serializers.CharField(write_only=True, style={'input_type': 'password'})
+    # Support username for backward compatibility
+    username = serializers.CharField(required=False, allow_blank=True, max_length=150)
     
     def validate(self, data):
-        username = data.get('username')
+        email = data.get('email', '').strip()
+        username = data.get('username', '').strip()
         password = data.get('password')
         
-        if username and password:
+        if not password:
+            raise serializers.ValidationError(
+                'Password is required.',
+                code='missing_password'
+            )
+        
+        # Support both email and username login
+        if email:
+            # Try to find user by email
+            try:
+                user = User.objects.get(email=email)
+                # Authenticate using username (Django's authenticate uses username)
+                user = authenticate(username=user.username, password=password)
+            except User.DoesNotExist:
+                user = None
+        elif username:
+            # Authenticate using username
             user = authenticate(username=username, password=password)
-            
-            if not user:
-                raise serializers.ValidationError(
-                    'Invalid credentials. Please check your username and password.',
-                    code='invalid_credentials'
-                )
-            
-            if not user.is_active:
-                raise serializers.ValidationError(
-                    'User account is disabled.',
-                    code='account_disabled'
-                )
-            
-            data['user'] = user
-            return data
         else:
             raise serializers.ValidationError(
-                'Both username and password are required.',
+                'Either email or username is required.',
                 code='missing_credentials'
             )
+        
+        if not user:
+            raise serializers.ValidationError(
+                'Invalid credentials. Please check your email/username and password.',
+                code='invalid_credentials'
+            )
+        
+        if not user.is_active:
+            raise serializers.ValidationError(
+                'User account is disabled.',
+                code='account_disabled'
+            )
+        
+        data['user'] = user
+        return data
 
 
 class RegisterSerializer(serializers.ModelSerializer):
     """
     Serializer for user registration
+    Auto-populates email from username if username is an email address
     """
     password = serializers.CharField(
         write_only=True,
@@ -77,6 +97,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         write_only=True,
         style={'input_type': 'password'}
     )
+    email = serializers.EmailField(required=False, allow_blank=True)
     
     class Meta:
         model = User
@@ -87,6 +108,21 @@ class RegisterSerializer(serializers.ModelSerializer):
         ]
     
     def validate(self, data):
+        # Auto-populate email from username if email is not provided and username looks like an email
+        email = data.get('email', '').strip() if data.get('email') else ''
+        username = data.get('username', '').strip() if data.get('username') else ''
+        
+        if not email and '@' in username:
+            # If username looks like an email and email is not provided, use username as email
+            data['email'] = username
+        
+        # Ensure email is provided (either explicitly or from username)
+        if not data.get('email'):
+            raise serializers.ValidationError(
+                "Email is required. Provide email field or use email address as username.",
+                code='missing_email'
+            )
+        
         if data['password'] != data['password_confirm']:
             raise serializers.ValidationError(
                 "Passwords don't match.",

@@ -1,11 +1,13 @@
 from rest_framework import status, generics
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from django.utils import timezone
 from django.db import models
+from django.views.decorators.csrf import csrf_exempt
 import uuid
 import logging
+import json
 
 from .models import KnowledgeBase, CampusInfo, Conversation, ChatSession
 from .serializers import (
@@ -631,3 +633,115 @@ def server_info(request):
         },
         'status': 'success'
     })
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+@csrf_exempt
+def v1_chat_endpoint(request):
+    """
+    Simple chat endpoint at /api/v1/chat/
+    
+    Accepts POST requests with JSON body:
+    {
+        "query": "Your question here",
+        "language": "english"  // optional
+    }
+    
+    Returns:
+    {
+        "response": "AI response text",
+        "status": "success"
+    }
+    """
+    try:
+        # Parse request data - support multiple methods:
+        # 1. JSON body (request.data from DRF)
+        # 2. Raw JSON body (request.body)
+        # 3. Query parameters (for simple GET/POST requests)
+        data = {}
+        
+        # Method 1: Try DRF's parsed data (from JSON body)
+        if hasattr(request, 'data') and request.data:
+            data = request.data
+        # Method 2: Try parsing raw body
+        elif request.body:
+            try:
+                body_str = request.body.decode('utf-8')
+                if body_str.strip():
+                    data = json.loads(body_str)
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                # If JSON parsing fails, treat as form data or empty
+                pass
+        
+        # Method 3: Fallback to query parameters (GET/POST params)
+        # This allows: ?message=hello&language=english
+        query_params = request.GET if hasattr(request, 'GET') else {}
+        if not data or (not data.get('query') and not data.get('message')):
+            # If no body data, check query parameters
+            if query_params.get('message') or query_params.get('query'):
+                data = {
+                    'query': query_params.get('query') or query_params.get('message', ''),
+                    'language': query_params.get('language', 'english')
+                }
+        
+        # If still no data, return error
+        if not data:
+            return Response({
+                'status': 'error',
+                'message': 'Request body or query parameters required. Send JSON body with "query" or "message" field, or use query parameters: ?message=your_message&language=english',
+                'code': 'MISSING_BODY',
+                'help': {
+                    'method1': 'POST with JSON body: {"query": "your message", "language": "english"}',
+                    'method2': 'POST/GET with query params: ?message=your_message&language=english'
+                }
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Extract query (support both 'query' and 'message' fields)
+        query = data.get('query', '') or data.get('message', '')
+        if isinstance(query, str):
+            query = query.strip()
+        else:
+            query = str(query).strip() if query else ''
+        
+        if not query:
+            return Response({
+                'status': 'error',
+                'message': 'Query or message is required. Provide "query" or "message" in body or as query parameter.',
+                'code': 'MISSING_QUERY'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get language (optional, default to english)
+        language = data.get('language', 'english')
+        if isinstance(language, str):
+            language = language.lower()
+        else:
+            language = 'english'
+        
+        if language not in ['english', 'tagalog', 'bisaya', 'waray']:
+            language = 'english'
+        
+        # Get response using Gemini
+        gemini_result = get_gemini_response(query, language)
+        
+        if gemini_result and gemini_result.get('response'):
+            return Response({
+                'status': 'success',
+                'response': gemini_result['response'],
+                'language': language,
+                'mode': gemini_result.get('mode', 'online')
+            }, status=status.HTTP_200_OK)
+        else:
+            # Fallback response if Gemini fails
+            return Response({
+                'status': 'error',
+                'message': 'Unable to generate response. Please try again.',
+                'code': 'RESPONSE_GENERATION_FAILED'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+    except Exception as e:
+        logger.error(f"Error in v1_chat_endpoint: {e}")
+        return Response({
+            'status': 'error',
+            'message': 'Internal server error',
+            'error': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

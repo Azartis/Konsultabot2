@@ -65,12 +65,29 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
 class LoginView(APIView):
     """
-    User login view
+    User login view - accepts email/password in body or query parameters
     """
     permission_classes = [AllowAny]
     
     def post(self, request):
-        serializer = LoginSerializer(data=request.data)
+        # Support both request body and query parameters
+        data = {}
+        
+        # Method 1: Try request body (DRF's parsed data)
+        if hasattr(request, 'data') and request.data:
+            data = request.data
+        # Method 2: Fallback to query parameters
+        elif hasattr(request, 'GET') and (request.GET.get('email') or request.GET.get('username') or request.GET.get('password')):
+            data = {
+                'email': request.GET.get('email', '').strip(),
+                'username': request.GET.get('username', '').strip(),
+                'password': request.GET.get('password', '')
+            }
+        else:
+            # If no data in body or query params, try to use request.data anyway
+            data = request.data if hasattr(request, 'data') else {}
+        
+        serializer = LoginSerializer(data=data)
         serializer.is_valid(raise_exception=True)
         
         user = serializer.validated_data['user']
@@ -92,6 +109,12 @@ class LoginView(APIView):
             'message': 'Login successful'
         }, status=status.HTTP_200_OK)
     
+    def get(self, request):
+        """
+        Support GET requests with query parameters for login
+        """
+        return self.post(request)
+    
     def get_client_ip(self, request):
         """Get client IP address"""
         x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
@@ -104,12 +127,35 @@ class LoginView(APIView):
 
 class RegisterView(APIView):
     """
-    User registration view
+    User registration view - accepts data in body or query parameters
     """
     permission_classes = [AllowAny]
     
     def post(self, request):
-        serializer = RegisterSerializer(data=request.data)
+        # Support both request body and query parameters
+        data = {}
+        
+        # Method 1: Try request body (DRF's parsed data)
+        if hasattr(request, 'data') and request.data:
+            data = request.data
+        # Method 2: Fallback to query parameters
+        elif hasattr(request, 'GET') and request.GET:
+            data = {
+                'username': request.GET.get('username', '').strip(),
+                'email': request.GET.get('email', '').strip(),
+                'password': request.GET.get('password', ''),
+                'password_confirm': request.GET.get('password_confirm', ''),
+                'first_name': request.GET.get('first_name', '').strip(),
+                'last_name': request.GET.get('last_name', '').strip(),
+                'department': request.GET.get('department', '').strip(),
+                'student_id': request.GET.get('student_id', '').strip(),
+                'phone_number': request.GET.get('phone_number', '').strip()
+            }
+        else:
+            # If no data in body or query params, try to use request.data anyway
+            data = request.data if hasattr(request, 'data') else {}
+        
+        serializer = RegisterSerializer(data=data)
         serializer.is_valid(raise_exception=True)
         
         user = serializer.save()
@@ -126,6 +172,12 @@ class RegisterView(APIView):
             'user': UserSerializer(user).data,
             'message': 'Registration successful'
         }, status=status.HTTP_201_CREATED)
+    
+    def get(self, request):
+        """
+        Support GET requests with query parameters for registration
+        """
+        return self.post(request)
 
 
 class ProfileView(APIView):

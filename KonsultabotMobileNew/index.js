@@ -1,4 +1,18 @@
 import 'react-native-gesture-handler';
+
+// Conditionally import react-native-reanimated (only works in development builds, not Expo Go)
+// This prevents Worklets version mismatch errors when using Expo Go
+try {
+  // Check if reanimated is available and properly linked
+  require('react-native-reanimated');
+} catch (error) {
+  // Reanimated not available (likely using Expo Go)
+  // This is OK - the app will work without it, just without reanimated animations
+  if (__DEV__) {
+    console.log('⚠️ react-native-reanimated not available (Expo Go mode)');
+  }
+}
+
 import { registerRootComponent } from 'expo';
 import { LogBox } from 'react-native';
 

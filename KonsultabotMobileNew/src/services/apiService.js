@@ -120,18 +120,24 @@ let cachedBackendURL = null;
 const discoverBackendURL = async () => {
   // PRIORITY 1: Check for Ngrok URL from environment/config (highest priority for global access)
   try {
-    const ngrokUrl = Constants.expoConfig?.extra?.ngrokUrl || 
-                     (Constants.expoConfig?.extra?.apiUrl && typeof Constants.expoConfig.extra.apiUrl === 'string' 
-                       ? Constants.expoConfig.extra.apiUrl.replace('/api', '') 
-                       : null) ||
-                     process.env.EXPO_PUBLIC_NGROK_URL;
+    // Check app.json extra.apiUrl first (most reliable)
+    let ngrokUrl = process.env.EXPO_PUBLIC_BACKEND_URL;
+    
+    // Clean up the URL (remove trailing slash, remove /api if present)
+    if (ngrokUrl && typeof ngrokUrl === 'string') {
+      ngrokUrl = ngrokUrl.trim().replace(/\/api\/?$/, '').replace(/\/$/, '');
+    }
     
     if (ngrokUrl && typeof ngrokUrl === 'string' && (ngrokUrl.includes('ngrok.io') || ngrokUrl.includes('ngrok-free.dev') || ngrokUrl.includes('ngrok.app'))) {
-      const ngrokApiUrl = ngrokUrl.endsWith('/api') ? ngrokUrl : `${ngrokUrl}/api`;
+      const ngrokApiUrl = `${ngrokUrl}/api`;
       try {
-        const testResponse = await axios.get(`${ngrokUrl}/api/health/`, {
+        // Test the health endpoint
+        const testResponse = await axios.get(`${ngrokApiUrl}/health/`, {
           timeout: 10000,
-          headers: { 'Accept': 'application/json' }
+          headers: { 
+            'Accept': 'application/json',
+            'ngrok-skip-browser-warning': 'true' // Skip ngrok browser warning
+          }
         });
         if (testResponse.status === 200) {
           console.log('🌐 Using Ngrok URL for global access:', ngrokApiUrl);
@@ -140,7 +146,12 @@ const discoverBackendURL = async () => {
           return ngrokApiUrl;
         }
       } catch (e) {
-        console.log('⚠️ Ngrok URL not responding, trying other options...');
+        // Even if health check fails, use ngrok URL as it might be a temporary issue
+        console.log('⚠️ Ngrok health check failed, but using ngrok URL anyway:', ngrokApiUrl);
+        console.log('   Error:', e.message);
+        cachedBackendURL = ngrokApiUrl;
+        await AsyncStorage.setItem('backend_url', ngrokApiUrl);
+        return ngrokApiUrl;
       }
     }
   } catch (error) {
@@ -298,11 +309,20 @@ if (Platform.OS === 'web') {
   initialBaseURL = 'http://localhost:8000/api';  // Web uses localhost
 } else {
   // Mobile: Use Ngrok URL from config (embedded in build)
-  const ngrokUrl = Constants.expoConfig?.extra?.ngrokUrl || 
-                   Constants.expoConfig?.extra?.apiUrl?.replace('/api', '') ||
-                   process.env.EXPO_PUBLIC_NGROK_URL;
+  let ngrokUrl = Constants.expoConfig?.extra?.apiUrl || 
+                 Constants.manifest?.extra?.apiUrl ||
+                 Constants.expoConfig?.extra?.ngrokUrl ||
+                 Constants.manifest?.extra?.ngrokUrl ||
+                 process.env.EXPO_PUBLIC_NGROK_URL ||
+                 process.env.EXPO_PUBLIC_BACKEND_URL;
+  
+  // Clean up the URL (remove trailing slash, remove /api if present)
+  if (ngrokUrl && typeof ngrokUrl === 'string') {
+    ngrokUrl = ngrokUrl.trim().replace(/\/api\/?$/, '').replace(/\/$/, '');
+  }
+  
   if (ngrokUrl && (ngrokUrl.includes('ngrok') || ngrokUrl.includes('https://'))) {
-    initialBaseURL = ngrokUrl.endsWith('/api') ? ngrokUrl : `${ngrokUrl}/api`;
+    initialBaseURL = `${ngrokUrl}/api`;
   } else {
     // Fallback to default Ngrok URL
     initialBaseURL = 'https://unmutated-nondeprecatively-bonnie.ngrok-free.dev/api';
@@ -317,7 +337,8 @@ const api = axios.create({
     'Content-Type': 'application/json',
     'Accept': 'application/json',
     'X-Client-Version': '1.0.0',
-    'X-Client-Platform': Platform.OS
+    'X-Client-Platform': Platform.OS,
+    'ngrok-skip-browser-warning': 'true' // Skip ngrok browser warning for all requests
   },
   validateStatus: status => status >= 200 && status < 500 // Don't reject if status is < 500
 });
@@ -628,15 +649,17 @@ class ApiService {
   }
 
   // Auth endpoints
-  async login(email, password) {
+  async login(username, password) {
     try {
       // Ensure backend URL is discovered
       await this.ensureBackendURL();
       
       // Clean and prepare login data
-      const username = email.trim().toLowerCase();
+      // Backend accepts both 'email' and 'username' fields
+      const emailClean = username.trim().toLowerCase();
       const loginData = {
-        username: username,
+        email: emailClean,  // Use email field (matches backend API)
+        username: emailClean, // Also include username for compatibility
         password: password
       };
       
@@ -649,6 +672,7 @@ class ApiService {
       const response = await this.api.post('/auth/login/', loginData, {
         headers: {
           'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true', // Skip ngrok browser warning
         },
         timeout: 30000, // 30 second timeout
       });
@@ -900,8 +924,9 @@ class ApiService {
 
   // Direct Django V1 chat endpoint (uses backend 3-mode router)
   async sendV1ChatMessage(query, language = 'english', sessionId = null, additionalData = {}) {
+    // Backend expects 'message' field, not 'query'
     const payload = {
-      query,
+      message: query, // Use 'message' to match backend API
       language,
       ...additionalData,
     };
@@ -909,11 +934,46 @@ class ApiService {
       payload.session_id = sessionId;
     }
     try {
+      // Ensure backend URL is discovered (uses ngrok URL from app.json)
+      await this.ensureBackendURL();
+      
       // For web, always talk to backend on localhost:8000 to avoid stale LAN IPs
       if (Platform.OS === 'web') {
         this.api.defaults.baseURL = 'http://localhost:8000/api';
       }
-      return await this.api.post('/v1/chat/', payload);
+      
+      console.log('💬 Sending chat message to:', this.api.defaults.baseURL + '/v1/chat/');
+      const response = await this.api.post('/v1/chat/', payload);
+      
+      // Transform response to match expected format
+      // Backend returns: {status, response, language, mode}
+      // Frontend expects: {text, message, data: {...}}
+      if (response.data) {
+        // If response is in new format {status, response, language, mode}
+        if (response.data.status && response.data.response) {
+          return {
+            ...response,
+            data: {
+              ...response.data,
+              text: response.data.response, // Map 'response' to 'text' for compatibility
+              message: response.data.response, // Also map to 'message'
+              // Preserve original fields
+              status: response.data.status,
+              language: response.data.language || language,
+              mode: response.data.mode || 'online',
+            }
+          };
+        }
+        // If response already has 'text' or 'message', ensure both are present
+        if (response.data.text && !response.data.message) {
+          response.data.message = response.data.text;
+        }
+        if (response.data.message && !response.data.text) {
+          response.data.text = response.data.message;
+        }
+      }
+      
+      return response;
     } catch (error) {
       // If the cached backend URL is dead, clear it and attempt rediscovery once
       if (error?.code === 'ERR_NETWORK') {
@@ -928,7 +988,24 @@ class ApiService {
           if (newUrl) {
             this.api.defaults.baseURL = newUrl;
             console.log('🔁 Retrying chat request using discovered backend:', newUrl);
-            return await this.api.post('/v1/chat/', payload);
+            const retryResponse = await this.api.post('/v1/chat/', payload);
+            
+            // Transform response if needed
+            if (retryResponse.data?.status && retryResponse.data?.response) {
+              return {
+                ...retryResponse,
+                data: {
+                  ...retryResponse.data,
+                  text: retryResponse.data.response,
+                  message: retryResponse.data.response,
+                  status: retryResponse.data.status,
+                  language: retryResponse.data.language || language,
+                  mode: retryResponse.data.mode || 'online',
+                }
+              };
+            }
+            
+            return retryResponse;
           }
         } catch (discoverErr) {
           console.warn('Backend discovery failed after network error:', discoverErr?.message || discoverErr);

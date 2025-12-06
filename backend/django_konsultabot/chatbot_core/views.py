@@ -13,7 +13,7 @@ from django.utils import timezone
 from django.conf import settings
 from django.views import View
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
-from rest_framework.permissions import IsAuthenticatedOrReadOnly
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.throttling import UserRateThrottle, AnonRateThrottle
@@ -22,7 +22,13 @@ import os
 
 from .ai_handler import multilingual_ai_handler
 from .mode_router import ChatMode, detect_mode
-from .utils.speech_processor import speech_processor
+try:
+    from .utils.speech_processor import speech_processor
+except (ImportError, ModuleNotFoundError) as e:
+    import logging
+    logger = logging.getLogger('konsultabot.views')
+    logger.warning(f"Speech processor not available: {e}")
+    speech_processor = None
 from .utils.translation_service import translation_service
 from .models import ConversationSession, ChatMessage
 from analytics.models import QueryLog
@@ -537,6 +543,8 @@ def chat_endpoint(request):
         # Add voice response if requested
         if voice_response and ai_response['message']:
             try:
+                if speech_processor is None:
+                    raise ImportError("Speech processor not available")
                 tts_result = speech_processor.text_to_speech(
                     ai_response['message'],
                     ai_response.get('response_language', 'english')
@@ -573,8 +581,7 @@ def chat_endpoint(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticatedOrReadOnly])
-@throttle_classes([ChatRateThrottle])
+@permission_classes([AllowAny])
 def gemini_chat(request):
     """
     Process chat messages through Gemini AI
@@ -621,8 +628,7 @@ def gemini_chat(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticatedOrReadOnly])
-@throttle_classes([ChatRateThrottle])
+@permission_classes([AllowAny])
 def gemini_translate(request):
     """
     Translate text using Gemini AI
@@ -661,8 +667,7 @@ def gemini_translate(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticatedOrReadOnly])
-@throttle_classes([ChatRateThrottle])
+@permission_classes([AllowAny])
 def gemini_image_gen(request):
     """
     Generate images using Gemini AI
@@ -699,8 +704,7 @@ def gemini_image_gen(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticatedOrReadOnly])
-@throttle_classes([VoiceRateThrottle])
+@permission_classes([AllowAny])
 def speech_to_text_endpoint(request):
     """
     Convert uploaded audio to text with language detection
@@ -737,6 +741,12 @@ def speech_to_text_endpoint(request):
         audio_data = audio_file.read()
         
         # Process speech to text
+        if speech_processor is None:
+            return Response({
+                'error': 'Speech recognition not available. Please install SpeechRecognition package.',
+                'code': 'SPEECH_NOT_AVAILABLE'
+            }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        
         stt_result = speech_processor.speech_to_text(
             audio_data=audio_data,
             language=language,
@@ -768,7 +778,7 @@ def speech_to_text_endpoint(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticatedOrReadOnly])
+@permission_classes([AllowAny])
 def text_to_speech_endpoint(request):
     """
     Convert text to speech audio
@@ -799,6 +809,12 @@ def text_to_speech_endpoint(request):
             }, status=status.HTTP_400_BAD_REQUEST)
         
         # Generate speech
+        if speech_processor is None:
+            return Response({
+                'error': 'Text-to-speech not available. Please install SpeechRecognition package.',
+                'code': 'TTS_NOT_AVAILABLE'
+            }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        
         tts_result = speech_processor.text_to_speech(
             text=text,
             language=language,
@@ -828,7 +844,7 @@ def text_to_speech_endpoint(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticatedOrReadOnly])
+@permission_classes([AllowAny])
 def translate_endpoint(request):
     """
     Translate text between supported languages
@@ -876,7 +892,7 @@ def translate_endpoint(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticatedOrReadOnly])
+@permission_classes([AllowAny])
 def feedback_endpoint(request):
     """
     Submit feedback for a chat response
