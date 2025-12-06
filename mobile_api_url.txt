@@ -1,0 +1,25 @@
+# ============================================
+# Mobile API URL Configuration
+# ============================================
+# This file contains the active ngrok URL for the mobile app
+# Update this file whenever ngrok URL changes
+# Both backend and mobile build process reference this file
+# ============================================
+
+# Active Ngrok URL (HTTPS only - required for Android)
+# Format: https://your-ngrok-url.ngrok-free.dev
+# Example: https://abc123.ngrok-free.dev
+
+NGROK_URL=https://unmutated-nondeprecatively-bonnie.ngrok-free.devcd
+
+# Backend API Base URL (auto-generated from NGROK_URL above)
+# This is what the mobile app will use
+API_BASE_URL=https://unmutated-nondeprecatively-bonnie.ngrok-free.devcd/api
+
+# Instructions:
+# 1. Start ngrok: ngrok http 8000
+# 2. Copy the HTTPS URL (not HTTP) from ngrok dashboard
+# 3. Update NGROK_URL above
+# 4. API_BASE_URL will be automatically set to: ${NGROK_URL}/api
+# 5. Rebuild APK: npm run build:apk
+
