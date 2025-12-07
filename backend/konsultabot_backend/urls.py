@@ -59,5 +59,5 @@ urlpatterns = [
     path('api/chat/', include('chat.urls')),  # Chat endpoints
     
     # API v1 endpoints
-    path('api/v1/chat/', chat_views.v1_chat_endpoint, name='v1_chat'),  # Simple chat endpoint
+    path('api/v1/chat/', include('chat.urls')),  # Chat endpoints including v1_chat_endpoint
 ]

@@ -79,8 +79,14 @@ export const VoiceHelper = {
       }
     
     // Check if native module is actually linked (not just the JS wrapper)
+    // First ensure Voice is not null before accessing any properties
+    if (Voice === null || Voice === undefined) {
+      return false;
+    }
+    
     try {
       // Try to access a property that would only exist if native module is linked
+      // Use optional chaining to safely access _nativeModule
       if (Voice._nativeModule === null || Voice._nativeModule === undefined) {
         // This might still work, so we'll try to call isAvailable if it exists
         // But we won't throw - we'll just return false
@@ -97,47 +103,71 @@ export const VoiceHelper = {
   
   // Check if native module is actually linked
   checkNativeModule: async () => {
+    // First check if Voice is null - this is the most common issue
+    if (Voice === null || Voice === undefined) {
+      console.warn('⚠️ VoiceHelper not available - Voice is null (native module not linked)');
+      return false;
+    }
+    
     if (!this.isAvailable()) {
       console.warn('⚠️ VoiceHelper not available for native module check');
       return false;
     }
     
     try {
+      // Double-check Voice is still not null before accessing properties
+      if (Voice === null || Voice === undefined) {
+        return false;
+      }
+      
       // Try to check if native module is available
+      // Use optional chaining to safely check if isAvailable exists
       if (Voice && typeof Voice.isAvailable === 'function') {
         try {
           const available = await Voice.isAvailable();
           console.log('✅ Native module availability check:', available);
           return available;
         } catch (isAvailError) {
-          // If isAvailable throws an error about null, the native module isn't linked
-          if (isAvailError.message && isAvailError.message.includes('null')) {
-            console.error('❌ Native module is null - not properly linked');
+          // If isAvailable throws an error about null or undefined, the native module isn't linked
+          const errorMsg = isAvailError?.message || String(isAvailError);
+          if (errorMsg.includes('null') || errorMsg.includes('undefined') || errorMsg.includes('Cannot read property')) {
+            console.warn('⚠️ Native module is not properly linked (isAvailable check failed)');
             return false;
           }
+          // Re-throw if it's a different error
           throw isAvailError;
         }
       }
       // If isAvailable doesn't exist, try a simple property check
       // Check if Voice has the native module by trying to access a native property
-      if (Voice && Voice._nativeModule) {
-        console.log('✅ Native module detected via _nativeModule property');
-        return true;
+      try {
+        // Use optional chaining to safely access _nativeModule
+        if (Voice && Voice._nativeModule !== null && Voice._nativeModule !== undefined) {
+          console.log('✅ Native module detected via _nativeModule property');
+          return true;
+        }
+      } catch (propError) {
+        // If accessing _nativeModule throws, native module isn't linked
+        console.warn('⚠️ Cannot access _nativeModule property:', propError?.message);
+        return false;
       }
       // Last resort: assume available if Voice object exists and has start method
-      if (Voice && typeof Voice.start === 'function') {
+      if (typeof Voice.start === 'function') {
         console.log('⚠️ Assuming native module is available (cannot verify)');
         return true;
       }
       return false;
     } catch (error) {
-      console.error('❌ Native module check failed:', error);
-      // If error mentions null, native module definitely isn't linked
-      if (error.message && error.message.includes('null')) {
+      // Handle any errors gracefully
+      const errorMsg = error?.message || String(error);
+      // Only log as warning if it's not a null/undefined error (which is expected in Expo Go)
+      if (errorMsg.includes('null') || errorMsg.includes('undefined') || errorMsg.includes('Cannot read property')) {
+        // This is expected in Expo Go - don't log as error
+        console.log('ℹ️ Native module not available (expected in Expo Go - requires development build)');
         return false;
       }
-      // Otherwise, assume it might work
-      return true;
+      console.warn('⚠️ Native module check failed:', errorMsg);
+      return false;
     }
   },
 

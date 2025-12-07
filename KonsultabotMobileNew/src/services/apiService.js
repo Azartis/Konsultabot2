@@ -1138,7 +1138,7 @@ class ApiService {
   }
 
   async getConversationHistory() {
-    return this.api.get('/chat/history/');
+    return this.api.get('/v1/chat/history/');
   }
 
   async getChatSessions() {

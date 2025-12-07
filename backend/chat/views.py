@@ -745,3 +745,12 @@ def v1_chat_endpoint(request):
             'message': 'Internal server error',
             'error': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+from django.http import JsonResponse
+
+@csrf_exempt
+def chat_history_view(request):
+    if request.method == 'GET':
+        # TODO: fetch real history for logged-in user
+        return JsonResponse({'messages': []}, safe=False)
+    return JsonResponse({'error': 'Method not allowed'}, status=405)

@@ -2,8 +2,9 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+    path('', views.v1_chat_endpoint, name='v1_chat'),  # Root v1 chat endpoint
     path('send/', views.send_message, name='send_message'),
-    path('history/', views.conversation_history, name='conversation_history'),
+    path('history/', views.chat_history_view, name='v1_chat_history'),
     path('sessions/', views.chat_sessions, name='chat_sessions'),
     path('sessions/end/', views.end_session, name='end_session'),
     path('knowledge/', views.knowledge_base, name='knowledge_base'),

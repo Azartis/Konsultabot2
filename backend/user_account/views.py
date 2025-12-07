@@ -69,6 +69,17 @@ class LoginView(APIView):
     """
     permission_classes = [AllowAny]
     
+    def options(self, request, *args, **kwargs):
+        """
+        Handle CORS preflight requests
+        """
+        response = Response(status=status.HTTP_200_OK)
+        response['Access-Control-Allow-Origin'] = '*'
+        response['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+        response['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+        response['Access-Control-Max-Age'] = '86400'
+        return response
+    
     def post(self, request):
         # Support both request body and query parameters
         data = {}
@@ -76,38 +87,87 @@ class LoginView(APIView):
         # Method 1: Try request body (DRF's parsed data)
         if hasattr(request, 'data') and request.data:
             data = request.data
-        # Method 2: Fallback to query parameters
-        elif hasattr(request, 'GET') and (request.GET.get('email') or request.GET.get('username') or request.GET.get('password')):
+        # Method 2: Try parsing raw body if request.data is empty
+        elif hasattr(request, 'body') and request.body:
+            try:
+                import json
+                body_str = request.body.decode('utf-8')
+                if body_str.strip():
+                    data = json.loads(body_str)
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                pass
+        # Method 3: Fallback to query parameters
+        if not data and hasattr(request, 'GET') and (request.GET.get('email') or request.GET.get('username') or request.GET.get('password')):
             data = {
                 'email': request.GET.get('email', '').strip(),
                 'username': request.GET.get('username', '').strip(),
                 'password': request.GET.get('password', '')
             }
-        else:
-            # If no data in body or query params, try to use request.data anyway
-            data = request.data if hasattr(request, 'data') else {}
         
-        serializer = LoginSerializer(data=data)
-        serializer.is_valid(raise_exception=True)
+        # Log the login attempt
+        logger.info(f"Login attempt - Data received: {bool(data)}, Keys: {list(data.keys()) if data else 'none'}")
         
-        user = serializer.validated_data['user']
+        if not data:
+            return Response({
+                'error': 'Email/username and password are required',
+                'detail': 'Please provide email/username and password in the request body or as query parameters'
+            }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Update last login IP
-        user.last_login_ip = self.get_client_ip(request)
-        user.save(update_fields=['last_login_ip'])
-        
-        # Generate tokens
-        refresh = RefreshToken.for_user(user)
-        
-        # Log successful login
-        logger.info(f"User {user.username} logged in successfully")
-        
-        return Response({
-            'refresh': str(refresh),
-            'access': str(refresh.access_token),
-            'user': UserSerializer(user).data,
-            'message': 'Login successful'
-        }, status=status.HTTP_200_OK)
+        try:
+            serializer = LoginSerializer(data=data)
+            serializer.is_valid(raise_exception=True)
+            
+            user = serializer.validated_data['user']
+            
+            # Update last login IP
+            user.last_login_ip = self.get_client_ip(request)
+            user.save(update_fields=['last_login_ip'])
+            
+            # Generate tokens
+            refresh = RefreshToken.for_user(user)
+            
+            # Log successful login
+            logger.info(f"User {user.username} logged in successfully")
+            
+            response = Response({
+                'refresh': str(refresh),
+                'access': str(refresh.access_token),
+                'user': UserSerializer(user).data,
+                'message': 'Login successful'
+            }, status=status.HTTP_200_OK)
+            
+            # Add CORS headers
+            response['Access-Control-Allow-Origin'] = '*'
+            response['Access-Control-Allow-Credentials'] = 'true'
+            
+            return response
+        except Exception as e:
+            logger.error(f"Login error: {str(e)}")
+            error_message = str(e)
+            if hasattr(e, 'detail'):
+                if isinstance(e.detail, dict):
+                    for field, errors in e.detail.items():
+                        if isinstance(errors, list) and len(errors) > 0:
+                            error_message = errors[0]
+                            break
+                        elif isinstance(errors, str):
+                            error_message = errors
+                            break
+                elif isinstance(e.detail, list) and len(e.detail) > 0:
+                    error_message = e.detail[0]
+                elif isinstance(e.detail, str):
+                    error_message = e.detail
+            
+            response = Response({
+                'error': error_message,
+                'detail': error_message
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Add CORS headers even for errors
+            response['Access-Control-Allow-Origin'] = '*'
+            response['Access-Control-Allow-Credentials'] = 'true'
+            
+            return response
     
     def get(self, request):
         """
