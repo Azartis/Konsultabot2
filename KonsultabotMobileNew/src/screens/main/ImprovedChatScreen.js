@@ -28,15 +28,19 @@ import { lumaTheme } from '../../theme/lumaTheme';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
 import { useChatHistory } from '../../context/ChatHistoryContext';
+import { useTheme } from '../../context/ThemeContext';
 import SpeechWaves from '../../components/SpeechWaves';
 import { useNetworkStatus } from '../../utils/networkUtils';
 import HolographicOrb from '../../components/HolographicOrb';
 import GlitchText from '../../components/GlitchText';
+import { useOfflineChat } from '../../hooks/useOfflineChat';
+import { initializeKnowledgeBase, getOfflineAnswer } from '../../../utils/offlineKnowledgeBase';
 
 const { width, height } = Dimensions.get('window');
 
 export default function ImprovedChatScreen({ navigation }) {
   const { user, logout } = useAuth();
+  const { theme, isDark } = useTheme();
   const { 
     currentChatId, 
     getCurrentChat, 
@@ -50,6 +54,15 @@ export default function ImprovedChatScreen({ navigation }) {
   
   // Network status detection
   const { isOnline, isBackendOnline, checkConnectivity } = useNetworkStatus();
+  
+  // Offline chat storage - use currentChatId or create one
+  const chatId = currentChatId || `chat_${user?.id || 'guest'}_${Date.now()}`;
+  const { 
+    saveMessageOffline, 
+    loadOfflineMessages,
+    syncNow,
+    isSyncing 
+  } = useOfflineChat(chatId);
   
   // Get safe area insets for proper spacing on mobile devices
   const insets = useSafeAreaInsets();
@@ -79,6 +92,9 @@ export default function ImprovedChatScreen({ navigation }) {
   const carouselRef = useRef();
   const prevUserRef = useRef(user);
 
+  // Create theme-aware styles
+  const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
+
   const buildFullName = (profile) => {
     if (!profile) return null;
     const parts = [
@@ -101,7 +117,31 @@ export default function ImprovedChatScreen({ navigation }) {
     initializeChat();
     initializeSpeechRecognition();
     initializeWakeWordDetection();
-  }, []);
+    
+    // Initialize offline knowledge base
+    initializeKnowledgeBase().catch(err => {
+      console.error('Failed to initialize offline KB:', err);
+    });
+    
+    // Load offline messages if available
+    if (user?.id && chatId) {
+      loadOfflineMessages().then(offlineMessages => {
+        if (offlineMessages && offlineMessages.length > 0) {
+          // Merge with existing messages (avoid duplicates)
+          setMessages(prev => {
+            const existingIds = new Set(prev.map(m => m.id));
+            const newMessages = offlineMessages.filter(m => !existingIds.has(m.id));
+            return [...prev, ...newMessages].sort((a, b) => 
+              new Date(a.timestamp) - new Date(b.timestamp)
+            );
+          });
+        }
+      }).catch(err => {
+        console.error('Error loading offline messages:', err);
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentChatId, user?.id, chatId]);
 
   // Detect login: when user changes from null/undefined to a user object
   useEffect(() => {
@@ -474,6 +514,13 @@ export default function ImprovedChatScreen({ navigation }) {
 
       setMessages(prev => [...prev, botMessage]);
       
+      // Save to offline storage (always save, even if from backend)
+      if (user?.id) {
+        saveMessageOffline(text.trim(), answerText, 'english').catch(err => {
+          console.error('Error saving message offline:', err);
+        });
+      }
+      
       // Store last bot message for feedback tracking
       setLastBotMessage({
         ...botMessage,
@@ -514,13 +561,56 @@ export default function ImprovedChatScreen({ navigation }) {
       
     } catch (error) {
       console.error('❌ Error in sendMessage:', error);
-      // Show error as warning (not as chat message)
-      setWarningMessage({
-        type: 'error',
-        message: "I couldn't reach the online assistant. Please check your internet connection or make sure the backend server is running, then try again.",
-      });
-      // Auto-hide warning after 8 seconds
-      setTimeout(() => setWarningMessage(null), 8000);
+      console.log('📴 Falling back to offline mode...');
+      
+      // Fallback to offline knowledge base
+      try {
+        const offlineAnswer = await getOfflineAnswer(text.trim(), 'english');
+        const offlineBotMessage = {
+          id: Date.now() + 1,
+          text: offlineAnswer,
+          sender: 'bot',
+          timestamp: new Date(),
+          confidence: 0.8,
+          source: 'offline',
+          mode: 'offline',
+          kb_source: true,
+          question_count: questionCount + 1,
+          userQuery: text.trim(),
+          satisfied: null,
+        };
+
+        setMessages(prev => [...prev, offlineBotMessage]);
+        
+        // Save to offline storage
+        if (user?.id) {
+          saveMessageOffline(text.trim(), offlineAnswer, 'english').catch(err => {
+            console.error('Error saving offline message:', err);
+          });
+        }
+        
+        // Store last bot message for feedback tracking
+        setLastBotMessage({
+          ...offlineBotMessage,
+          userQuery: text.trim(),
+        });
+        
+        // Show info message (not error) since offline mode is working
+        setWarningMessage({
+          type: 'info',
+          message: "📴 Offline Mode: Using local knowledge base. Your message will sync when online.",
+        });
+        setTimeout(() => setWarningMessage(null), 5000);
+      } catch (offlineError) {
+        console.error('❌ Offline mode also failed:', offlineError);
+        // Show error as warning (not as chat message)
+        setWarningMessage({
+          type: 'error',
+          message: "I couldn't reach the online assistant and offline mode failed. Please check your connection and try again.",
+        });
+        // Auto-hide warning after 8 seconds
+        setTimeout(() => setWarningMessage(null), 8000);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -1005,8 +1095,8 @@ export default function ImprovedChatScreen({ navigation }) {
   return (
     <View style={[styles.container, Platform.OS === 'web' && { height: '100vh', maxHeight: '100vh' }]}>
       <StatusBar 
-        barStyle="dark-content" 
-        backgroundColor={Platform.OS === 'android' ? 'transparent' : '#FFFFFF'}
+        barStyle={isDark ? "light-content" : "dark-content"} 
+        backgroundColor={Platform.OS === 'android' ? 'transparent' : (isDark ? theme.colors.surface : '#FFFFFF')}
         translucent={Platform.OS === 'android'}
       />
       <SafeAreaView 
@@ -1183,7 +1273,13 @@ export default function ImprovedChatScreen({ navigation }) {
               </View>
               
               {/* Settings & Help */}
-              <TouchableOpacity style={styles.sideMenuSettings}>
+              <TouchableOpacity 
+                style={styles.sideMenuSettings}
+                onPress={() => {
+                  setShowSideMenu(false);
+                  navigation.navigate('Settings');
+                }}
+              >
                 <MaterialIcons name="settings" size={20} color="#5F6368" />
                 <Text style={styles.sideMenuSettingsText}>Settings & help</Text>
               </TouchableOpacity>
@@ -1340,10 +1436,19 @@ export default function ImprovedChatScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+// Create theme-aware styles
+const createStyles = (theme, isDark) => {
+  const bgColor = isDark ? theme.colors.background : '#F8F9FA';
+  const surfaceColor = isDark ? theme.colors.surface : '#FFFFFF';
+  const textColor = isDark ? theme.colors.text : '#202124';
+  const textSecondary = isDark ? (theme.colors.textSecondary || theme.colors.textMuted || '#A0A0A0') : '#5F6368';
+  const borderColor = isDark ? (theme.colors.border || theme.colors.outline || '#2A2A2A') : '#E8EAED';
+  const dividerColor = isDark ? (theme.colors.divider || theme.colors.border || '#1E1E1E') : '#E8EAED';
+  
+  return StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: bgColor,
     ...(Platform.OS === 'web' && {
       height: '100vh',
       maxHeight: '100vh',
@@ -1352,7 +1457,7 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: bgColor,
   },
   contentContainer: {
     flex: 1,
@@ -1374,7 +1479,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: surfaceColor,
     borderBottomWidth: 0,
   },
   menuButton: {
@@ -1387,7 +1492,7 @@ const styles = StyleSheet.create({
   geminiTitle: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#202124',
+    color: textColor,
     letterSpacing: 0.5,
   },
   profileButton: {
@@ -1470,7 +1575,7 @@ const styles = StyleSheet.create({
   greetingText: {
     fontSize: 32,
     fontWeight: '400',
-    color: '#1A73E8',
+    color: isDark ? theme.colors.primary : '#1A73E8',
     letterSpacing: 0,
   },
   // Action Chips
@@ -1497,13 +1602,13 @@ const styles = StyleSheet.create({
   },
   actionChipText: {
     fontSize: 14,
-    color: '#202124',
+    color: textColor,
     fontWeight: '400',
   },
   // Main Content
   mainContent: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: bgColor,
     ...(Platform.OS === 'web' && {
       overflow: 'auto',
     }),
@@ -1520,7 +1625,7 @@ const styles = StyleSheet.create({
     zIndex: 10000,
   },
   recordingContainer: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: surfaceColor,
     borderRadius: 24,
     padding: 32,
     alignItems: 'center',
@@ -1533,7 +1638,7 @@ const styles = StyleSheet.create({
     }),
   },
   recordingText: {
-    color: '#202124',
+    color: textColor,
     fontSize: 16,
     fontWeight: '500',
     textAlign: 'center',
@@ -1566,7 +1671,7 @@ const styles = StyleSheet.create({
   sideMenuContainer: {
     width: width * 0.85,
     maxWidth: 360,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: surfaceColor,
     paddingTop: 16,
     paddingBottom: 20,
   },
@@ -1577,7 +1682,7 @@ const styles = StyleSheet.create({
   sideMenuSearch: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F1F3F4',
+    backgroundColor: isDark ? theme.colors.surfaceVariant || theme.colors.surface : '#F1F3F4',
     marginHorizontal: 16,
     marginBottom: 16,
     paddingHorizontal: 12,
@@ -1588,7 +1693,7 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 8,
     fontSize: 14,
-    color: '#202124',
+    color: textColor,
   },
   sideMenuNewChat: {
     flexDirection: 'row',
@@ -1601,7 +1706,7 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 16,
     fontSize: 14,
-    color: '#202124',
+    color: textColor,
     fontWeight: '400',
   },
   sideMenuNewChatIcon: {
@@ -1621,7 +1726,7 @@ const styles = StyleSheet.create({
   sideMenuSectionTitle: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#202124',
+    color: textColor,
   },
   sideMenuChatsList: {
     maxHeight: 300,
@@ -1631,17 +1736,17 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   sideMenuChatItemActive: {
-    backgroundColor: '#E8F0FE',
+    backgroundColor: isDark ? 'rgba(79, 142, 255, 0.2)' : '#E8F0FE',
   },
   sideMenuChatTitle: {
     fontSize: 14,
-    color: '#5F6368',
+    color: textSecondary,
   },
   sideMenuEmptyChats: {
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 14,
-    color: '#9AA0A6',
+    color: textSecondary,
     fontStyle: 'italic',
   },
   sideMenuSettings: {
@@ -1651,17 +1756,17 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     marginTop: 'auto',
     borderTopWidth: 1,
-    borderTopColor: '#E8EAED',
+    borderTopColor: dividerColor,
   },
   sideMenuSettingsText: {
     marginLeft: 16,
     fontSize: 14,
-    color: '#202124',
+    color: textColor,
   },
   sideMenuUpgrade: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F1F3F4',
+    backgroundColor: isDark ? theme.colors.surfaceVariant || theme.colors.surface : '#F1F3F4',
     marginHorizontal: 16,
     marginTop: 12,
     paddingHorizontal: 16,
@@ -1681,7 +1786,7 @@ const styles = StyleSheet.create({
   sideMenuUpgradeText: {
     flex: 1,
     fontSize: 14,
-    color: '#202124',
+    color: textColor,
     fontWeight: '500',
   },
   headerOrb: {
@@ -1697,7 +1802,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: width > 768 ? 22 : 18,
     fontWeight: 'bold',
-    color: lumaTheme.colors.text,
+    color: textColor,
     letterSpacing: 0.5,
   },
   statusBadge: {
@@ -1724,7 +1829,7 @@ const styles = StyleSheet.create({
   },
   headerSubtitle: {
     fontSize: width > 768 ? 12 : 11,
-    color: lumaTheme.colors.textSecondary,
+    color: textSecondary,
     marginTop: 4,
   },
   headerButton: {
@@ -1776,12 +1881,13 @@ const styles = StyleSheet.create({
     borderRadius: 18,
   },
   botBlock: {
-    backgroundColor: '#E8F0FE',
+    backgroundColor: isDark ? (theme.colors.surfaceVariant || theme.colors.surface) : '#E8F0FE',
     borderTopLeftRadius: 4,
   },
   userBlock: {
-    backgroundColor: '#F1F3F4',
+    backgroundColor: isDark ? theme.colors.primary : '#F1F3F4',
     borderTopRightRadius: 4,
+    opacity: isDark ? 0.3 : 1,
   },
   messageMenu: {
     padding: 8,
@@ -1797,28 +1903,28 @@ const styles = StyleSheet.create({
   senderLabel: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#5F6368',
+    color: textSecondary,
     marginBottom: 6,
   },
   botSenderLabel: {
-    color: '#5F6368',
+    color: textSecondary,
   },
   userSenderLabel: {
-    color: '#5F6368',
+    color: textSecondary,
     textAlign: 'right',
   },
   messageTimestamp: {
     marginTop: 8,
     fontSize: 11,
-    color: '#9AA0A6',
+    color: textSecondary,
   },
   messageText: {
     fontSize: 15,
     lineHeight: 22,
-    color: '#202124',
+    color: textColor,
   },
   userMessageText: {
-    color: '#202124',
+    color: isDark ? theme.colors.text : '#202124',
   },
   confidenceNote: {
     marginTop: 10,
@@ -1837,7 +1943,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginLeft: 8,
-    color: lumaTheme.colors.textMuted,
+    color: textSecondary,
   },
   carousel: {
     maxHeight: 100,
@@ -1847,9 +1953,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   suggestionCard: {
-    backgroundColor: 'rgba(30, 30, 40, 0.8)',
+    backgroundColor: isDark ? 'rgba(30, 30, 40, 0.8)' : 'rgba(255, 255, 255, 0.9)',
     borderWidth: 1.5,
-    borderColor: 'rgba(147, 51, 234, 0.4)',
+    borderColor: isDark ? 'rgba(147, 51, 234, 0.4)' : 'rgba(79, 142, 255, 0.3)',
     paddingHorizontal: 20,
     paddingVertical: 14,
     borderRadius: 20,
@@ -1857,10 +1963,10 @@ const styles = StyleSheet.create({
     width: width * 0.7,
     justifyContent: 'center',
     alignItems: 'center',
-    ...lumaTheme.shadows.medium,
+    ...(isDark ? lumaTheme.shadows.medium : {}),
   },
   suggestionText: {
-    color: lumaTheme.colors.text,
+    color: textColor,
     fontSize: 14,
     fontWeight: '500',
     textAlign: 'center',
@@ -1868,10 +1974,10 @@ const styles = StyleSheet.create({
   },
   // Gemini Input Styles
   geminiInputContainer: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: surfaceColor,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#E8EAED',
+    borderTopColor: dividerColor,
     position: 'absolute',
     bottom: 0,
     left: 0,
@@ -1887,7 +1993,7 @@ const styles = StyleSheet.create({
   geminiInputField: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    backgroundColor: '#F1F3F4',
+    backgroundColor: isDark ? (theme.colors.surfaceVariant || theme.colors.surface) : '#F1F3F4',
     marginHorizontal: 16,
     borderRadius: 24,
     paddingHorizontal: 4,
@@ -1895,7 +2001,7 @@ const styles = StyleSheet.create({
     minHeight: 56,
     maxHeight: 120,
     borderWidth: 1,
-    borderColor: '#E8EAED',
+    borderColor: borderColor,
     ...(Platform.OS === 'web' && {
       width: '100%',
       maxWidth: '100%',
@@ -1905,7 +2011,7 @@ const styles = StyleSheet.create({
   geminiTextInput: {
     flex: 1,
     fontSize: 16,
-    color: '#202124',
+    color: textColor,
     paddingVertical: 12,
     paddingHorizontal: 8,
     maxHeight: 120,
@@ -1928,7 +2034,7 @@ const styles = StyleSheet.create({
   },
   geminiDisclaimer: {
     fontSize: 11,
-    color: '#9AA0A6',
+    color: textSecondary,
     textAlign: 'center',
     marginTop: 8,
     paddingHorizontal: 16,
@@ -2013,7 +2119,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   historyContainer: {
-    backgroundColor: lumaTheme.colors.surface,
+    backgroundColor: surfaceColor,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: height * 0.7,
@@ -2025,12 +2131,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: lumaTheme.colors.border,
+    borderBottomColor: borderColor,
   },
   historyTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: lumaTheme.colors.text,
+    color: textColor,
   },
   historyList: {
     flex: 1,
@@ -2038,23 +2144,24 @@ const styles = StyleSheet.create({
   historyItem: {
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: lumaTheme.colors.border,
+    borderBottomColor: borderColor,
   },
   activeHistoryItem: {
-    backgroundColor: 'rgba(100, 100, 255, 0.1)',
+    backgroundColor: isDark ? 'rgba(79, 142, 255, 0.2)' : 'rgba(100, 100, 255, 0.1)',
   },
   historyItemTitle: {
     fontSize: 16,
-    color: lumaTheme.colors.text,
+    color: textColor,
     marginBottom: 4,
   },
   historyItemDate: {
     fontSize: 12,
-    color: lumaTheme.colors.textMuted,
+    color: textSecondary,
   },
   emptyHistory: {
     textAlign: 'center',
     padding: 40,
-    color: lumaTheme.colors.textMuted,
+    color: textSecondary,
   },
 });
+};

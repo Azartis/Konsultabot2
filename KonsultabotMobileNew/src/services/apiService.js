@@ -842,6 +842,20 @@ class ApiService {
     return this.api.put('/auth/profile/', profileData);
   }
 
+  async changePassword(oldPassword, newPassword) {
+    try {
+      await this.ensureBackendURL();
+      const response = await this.api.post('/auth/change-password/', {
+        old_password: oldPassword,
+        new_password: newPassword,
+      });
+      return response;
+    } catch (error) {
+      console.error('Change password error:', error);
+      throw error;
+    }
+  }
+
   // NEW: Hybrid chat endpoint (Gemini + Knowledge Base)
   // Using simple-gemini endpoint (no auth required for demo)
   async sendChatMessage(query) {

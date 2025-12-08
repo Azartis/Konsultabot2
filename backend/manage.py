@@ -3,6 +3,13 @@
 import os
 import sys
 
+# Import compatibility fix for Python 3.14 and Django 4.2.7
+# This must be done before Django is imported
+try:
+    import konsultabot_backend.compat
+except ImportError:
+    pass
+
 
 def main():
     """Run administrative tasks."""

@@ -6,6 +6,13 @@ from pathlib import Path
 import os
 from dotenv import load_dotenv
 
+# Apply Python 3.14 compatibility patch for Django 4.2.7
+try:
+    from .compat import apply_django_patch
+    apply_django_patch()
+except ImportError:
+    pass
+
 # Load environment variables
 load_dotenv()
 
@@ -36,7 +43,29 @@ ALLOWED_HOSTS = [
     '192.168.110.17',
     '10.0.0.17',
     '172.20.10.2',  # Mobile hotspot
+    # Ngrok domains (will be added dynamically below)
+    '.ngrok-free.dev',
+    '.ngrok.io',
+    '.ngrok.app',
 ]
+
+# Add Ngrok domains from environment (for global access)
+NGROK_URL = os.getenv('NGROK_URL', '')
+if NGROK_URL:
+    # Extract domain from Ngrok URL
+    ngrok_domain = NGROK_URL.replace('https://', '').replace('http://', '').split('/')[0]
+    if ngrok_domain and ngrok_domain not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(ngrok_domain)
+    # Add base domain patterns for subdomains
+    if '.ngrok-free.dev' in ngrok_domain:
+        if '.ngrok-free.dev' not in ALLOWED_HOSTS:
+            ALLOWED_HOSTS.append('.ngrok-free.dev')
+    if '.ngrok.io' in ngrok_domain:
+        if '.ngrok.io' not in ALLOWED_HOSTS:
+            ALLOWED_HOSTS.append('.ngrok.io')
+    if '.ngrok.app' in ngrok_domain:
+        if '.ngrok.app' not in ALLOWED_HOSTS:
+            ALLOWED_HOSTS.append('.ngrok.app')
 
 # CORS settings
 CORS_ALLOW_ALL_ORIGINS = True  # For development only
@@ -60,6 +89,15 @@ CORS_ALLOW_HEADERS = [
     'x-csrftoken',
     'x-requested-with',
 ]
+
+# CSRF settings - Disable for API routes (handled by middleware)
+# For admin panel through ngrok, we need to trust the ngrok domain
+CSRF_COOKIE_SECURE = False  # Set to False for HTTP (ngrok can be HTTP or HTTPS)
+CSRF_USE_SESSIONS = False
+CSRF_COOKIE_HTTPONLY = False
+# Allow CSRF cookie to be sent over ngrok
+CSRF_COOKIE_SAMESITE = 'Lax'  # Allows cross-origin requests from ngrok
+
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:8081",
     "http://127.0.0.1:8081",
@@ -74,7 +112,15 @@ CSRF_TRUSTED_ORIGINS = [
     'http://localhost:80',
     'http://0.0.0.0:80',
     'http://10.0.2.2:80',  # Android emulator
+    # Add ngrok domains (specific domain - wildcards don't work)
+    'https://unmutated-nondeprecatively-bonnie.ngrok-free.dev',
 ]
+
+# Add ngrok URL from environment to CSRF_TRUSTED_ORIGINS
+if NGROK_URL:
+    ngrok_url_clean = NGROK_URL.rstrip('/')
+    if ngrok_url_clean not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(ngrok_url_clean)
 
 # Application definition
 INSTALLED_APPS = [

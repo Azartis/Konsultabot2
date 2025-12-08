@@ -1,12 +1,24 @@
 /**
  * Offline Knowledge Base System for KonsultaBot
  * SQLite-based local IT support database with multilingual support
+ * Web fallback: Uses AsyncStorage when SQLite is not available
  */
-import * as SQLite from 'expo-sqlite';
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Initialize database
-const db = SQLite.openDatabase('konsultabot_kb.db');
+// Initialize database (SQLite for mobile, AsyncStorage for web)
+let db = null;
+let isWeb = Platform.OS === 'web';
+
+if (!isWeb) {
+  try {
+    const SQLite = require('expo-sqlite');
+    db = SQLite.openDatabase('konsultabot_kb.db');
+  } catch (error) {
+    console.warn('SQLite not available, using AsyncStorage fallback:', error);
+    isWeb = true; // Fallback to web mode
+  }
+}
 
 // Knowledge base data structure
 const KNOWLEDGE_BASE_DATA = {
@@ -345,7 +357,17 @@ export const initializeKnowledgeBase = async () => {
 
 const createTables = () => {
   return new Promise((resolve, reject) => {
+    // Web platform: Use AsyncStorage, no tables needed
+    if (isWeb || !db) {
+      console.log('Using AsyncStorage for web platform');
+      resolve();
+      return;
+    }
+
     db.transaction(tx => {
+      let tablesCreated = 0;
+      const totalTables = 4;
+
       // Create knowledge base table
       tx.executeSql(
         `CREATE TABLE IF NOT EXISTS knowledge_base (
@@ -357,11 +379,17 @@ const createTables = () => {
           answer TEXT NOT NULL,
           confidence REAL DEFAULT 0.8,
           usage_count INTEGER DEFAULT 0,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          synced_at DATETIME,
+          backend_id INTEGER,
+          is_synced INTEGER DEFAULT 0
         );`,
         [],
         () => {
           console.log('Knowledge base table created');
+          tablesCreated++;
+          if (tablesCreated === totalTables) resolve();
         },
         (_, error) => {
           console.error('Error creating knowledge base table:', error);
@@ -383,10 +411,67 @@ const createTables = () => {
         [],
         () => {
           console.log('User queries table created');
-          resolve();
+          tablesCreated++;
+          if (tablesCreated === totalTables) resolve();
         },
         (_, error) => {
           console.error('Error creating user queries table:', error);
+          return false;
+        }
+      );
+
+      // Create chat messages table for offline storage
+      tx.executeSql(
+        `CREATE TABLE IF NOT EXISTS chat_messages (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          chat_id TEXT NOT NULL,
+          user_id INTEGER,
+          message TEXT NOT NULL,
+          response TEXT,
+          language TEXT DEFAULT 'english',
+          timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+          is_user INTEGER DEFAULT 1,
+          source TEXT DEFAULT 'offline',
+          confidence REAL,
+          synced_at DATETIME,
+          backend_id INTEGER,
+          is_synced INTEGER DEFAULT 0,
+          session_id TEXT
+        );`,
+        [],
+        () => {
+          console.log('Chat messages table created');
+          tablesCreated++;
+          if (tablesCreated === totalTables) resolve();
+        },
+        (_, error) => {
+          console.error('Error creating chat messages table:', error);
+          return false;
+        }
+      );
+
+      // Create chat sessions table
+      tx.executeSql(
+        `CREATE TABLE IF NOT EXISTS chat_sessions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          session_id TEXT UNIQUE NOT NULL,
+          user_id INTEGER,
+          title TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          message_count INTEGER DEFAULT 0,
+          synced_at DATETIME,
+          backend_id INTEGER,
+          is_synced INTEGER DEFAULT 0
+        );`,
+        [],
+        () => {
+          console.log('Chat sessions table created');
+          tablesCreated++;
+          if (tablesCreated === totalTables) resolve();
+        },
+        (_, error) => {
+          console.error('Error creating chat sessions table:', error);
           reject(error);
           return false;
         }
@@ -396,7 +481,34 @@ const createTables = () => {
 };
 
 const populateKnowledgeBase = () => {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
+    // Web platform: Store in AsyncStorage
+    if (isWeb || !db) {
+      try {
+        const kbData = {};
+        Object.keys(KNOWLEDGE_BASE_DATA).forEach(category => {
+          Object.keys(KNOWLEDGE_BASE_DATA[category]).forEach(language => {
+            const categoryData = KNOWLEDGE_BASE_DATA[category][language];
+            const key = `kb_${category}_${language}`;
+            kbData[key] = {
+              category,
+              language,
+              keywords: categoryData.keywords,
+              responses: categoryData.responses,
+            };
+          });
+        });
+        await AsyncStorage.setItem('knowledge_base_data', JSON.stringify(kbData));
+        console.log('Knowledge base populated in AsyncStorage');
+        resolve();
+        return;
+      } catch (error) {
+        console.error('Error populating KB in AsyncStorage:', error);
+        reject(error);
+        return;
+      }
+    }
+
     db.transaction(tx => {
       let insertCount = 0;
       let totalInserts = 0;
@@ -440,9 +552,60 @@ const populateKnowledgeBase = () => {
 
 // Search knowledge base for answers
 export const getOfflineAnswer = async (query, language = 'english') => {
+  const queryLower = query.toLowerCase();
+  
+  // Web platform: Search in AsyncStorage
+  if (isWeb || !db) {
+    try {
+      const kbDataStr = await AsyncStorage.getItem('knowledge_base_data');
+      if (!kbDataStr) {
+        // Fallback to generic response
+        return getGenericResponse(language);
+      }
+      
+      const kbData = JSON.parse(kbDataStr);
+      let bestMatch = null;
+      let bestScore = 0;
+      
+      // Search through all categories and languages
+      Object.keys(kbData).forEach(key => {
+        const entry = kbData[key];
+        if (entry.language === language || (language !== 'english' && entry.language === 'english')) {
+          entry.responses.forEach(response => {
+            const keywords = entry.keywords || [];
+            let score = 0;
+            
+            keywords.forEach(keyword => {
+              if (queryLower.includes(keyword.toLowerCase())) {
+                score += 1;
+              }
+            });
+            
+            const normalizedScore = score / Math.max(keywords.length, 1);
+            if (normalizedScore > bestScore && normalizedScore > 0.3) {
+              bestScore = normalizedScore;
+              bestMatch = response;
+            }
+          });
+        }
+      });
+      
+      if (bestMatch) {
+        return bestMatch.answer;
+      } else {
+        // Try fallback with English if not English
+        if (language !== 'english') {
+          return await getOfflineAnswer(query, 'english');
+        }
+        return getGenericResponse(language);
+      }
+    } catch (error) {
+      console.error('Error searching KB in AsyncStorage:', error);
+      return getGenericResponse(language);
+    }
+  }
+  
   return new Promise((resolve, reject) => {
-    const queryLower = query.toLowerCase();
-    
     db.transaction(tx => {
       // First, try exact category match
       tx.executeSql(
@@ -581,7 +744,39 @@ Sulayi pangutana bahin sa specific nga problema sama sa "WiFi dili molihok".`
 };
 
 // Get knowledge base statistics
-export const getKnowledgeBaseStats = () => {
+export const getKnowledgeBaseStats = async () => {
+  // Web platform: Use AsyncStorage
+  if (isWeb || !db) {
+    try {
+      const kbDataStr = await AsyncStorage.getItem('knowledge_base_data');
+      if (!kbDataStr) {
+        return { total_entries: 0, categories: 0, languages: 0, total_usage: 0 };
+      }
+      
+      const kbData = JSON.parse(kbDataStr);
+      const categories = new Set();
+      const languages = new Set();
+      let totalEntries = 0;
+      
+      Object.keys(kbData).forEach(key => {
+        const entry = kbData[key];
+        categories.add(entry.category);
+        languages.add(entry.language);
+        totalEntries += entry.responses?.length || 0;
+      });
+      
+      return {
+        total_entries: totalEntries,
+        categories: categories.size,
+        languages: languages.size,
+        total_usage: 0, // Not tracked in web version
+      };
+    } catch (error) {
+      console.error('Error getting KB stats from AsyncStorage:', error);
+      return { total_entries: 0, categories: 0, languages: 0, total_usage: 0 };
+    }
+  }
+
   return new Promise((resolve, reject) => {
     db.transaction(tx => {
       tx.executeSql(
@@ -655,10 +850,784 @@ export const clearKnowledgeBase = async () => {
   });
 };
 
+// ==================== CHAT STORAGE FUNCTIONS ====================
+
+// Save chat message to offline storage
+export const saveChatMessage = async (chatId, userId, message, response, language = 'english', sessionId = null, source = 'offline', confidence = null) => {
+  // Web platform: Use AsyncStorage
+  if (isWeb || !db) {
+    try {
+      const key = `chat_messages_${chatId}_${userId}`;
+      const existing = await AsyncStorage.getItem(key);
+      const messages = existing ? JSON.parse(existing) : [];
+      
+      const userMsg = {
+        id: Date.now(),
+        chatId,
+        userId,
+        message,
+        language,
+        timestamp: new Date().toISOString(),
+        isUser: true,
+        source,
+        sessionId: sessionId || chatId,
+      };
+      
+      messages.push(userMsg);
+      
+      if (response) {
+        const botMsg = {
+          id: Date.now() + 1,
+          chatId,
+          userId,
+          message: response,
+          language,
+          timestamp: new Date().toISOString(),
+          isUser: false,
+          source,
+          confidence,
+          sessionId: sessionId || chatId,
+        };
+        messages.push(botMsg);
+      }
+      
+      await AsyncStorage.setItem(key, JSON.stringify(messages));
+      
+      // Also save session
+      const sessionKey = `chat_session_${sessionId || chatId}_${userId}`;
+      const session = {
+        sessionId: sessionId || chatId,
+        userId,
+        title: message.substring(0, 50),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        messageCount: messages.length,
+      };
+      await AsyncStorage.setItem(sessionKey, JSON.stringify(session));
+      
+      console.log('Chat messages saved to AsyncStorage');
+      return { userMessageId: userMsg.id, botMessageId: response ? botMsg.id : null };
+    } catch (error) {
+      console.error('Error saving chat message to AsyncStorage:', error);
+      throw error;
+    }
+  }
+
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      // First, ensure session exists
+      tx.executeSql(
+        `INSERT OR IGNORE INTO chat_sessions (session_id, user_id, title, created_at, updated_at)
+         VALUES (?, ?, ?, datetime('now'), datetime('now'));`,
+        [sessionId || chatId, userId, message.substring(0, 50)],
+        () => {
+          // Save user message
+          tx.executeSql(
+            `INSERT INTO chat_messages (chat_id, user_id, message, language, is_user, source, session_id)
+             VALUES (?, ?, ?, ?, 1, ?, ?);`,
+            [chatId, userId, message, language, source, sessionId || chatId],
+            (_, userResult) => {
+              // Save bot response if provided
+              if (response) {
+                tx.executeSql(
+                  `INSERT INTO chat_messages (chat_id, user_id, message, response, language, is_user, source, confidence, session_id)
+                   VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?);`,
+                  [chatId, userId, message, response, language, source, confidence, sessionId || chatId],
+                  (_, botResult) => {
+                    // Update session message count
+                    tx.executeSql(
+                      `UPDATE chat_sessions 
+                       SET message_count = message_count + 2, 
+                           updated_at = datetime('now')
+                       WHERE session_id = ?;`,
+                      [sessionId || chatId],
+                      () => {
+                        console.log('Chat messages saved offline');
+                        resolve({ userMessageId: userResult.insertId, botMessageId: botResult.insertId });
+                      },
+                      (_, error) => {
+                        console.error('Error updating session:', error);
+                        resolve({ userMessageId: userResult.insertId }); // Still resolve with partial success
+                      }
+                    );
+                  },
+                  (_, error) => {
+                    console.error('Error saving bot message:', error);
+                    resolve({ userMessageId: userResult.insertId }); // Still resolve with partial success
+                  }
+                );
+              } else {
+                // Update session message count for user message only
+                tx.executeSql(
+                  `UPDATE chat_sessions 
+                   SET message_count = message_count + 1, 
+                       updated_at = datetime('now')
+                   WHERE session_id = ?;`,
+                  [sessionId || chatId],
+                  () => {
+                    console.log('Chat message saved offline');
+                    resolve({ userMessageId: userResult.insertId });
+                  },
+                  (_, error) => {
+                    console.error('Error updating session:', error);
+                    resolve({ userMessageId: userResult.insertId });
+                  }
+                );
+              }
+            },
+            (_, error) => {
+              console.error('Error saving chat message:', error);
+              reject(error);
+            }
+          );
+        },
+        (_, error) => {
+          console.error('Error creating session:', error);
+          reject(error);
+        }
+      );
+    });
+  });
+};
+
+// Load chat messages for a session
+export const loadChatMessages = async (chatId, userId = null) => {
+  // Web platform: Use AsyncStorage
+  if (isWeb || !db) {
+    try {
+      if (!userId) {
+        return [];
+      }
+      
+      const key = `chat_messages_${chatId}_${userId}`;
+      const data = await AsyncStorage.getItem(key);
+      
+      if (!data) {
+        return [];
+      }
+      
+      const messages = JSON.parse(data);
+      const formatted = messages.map(msg => ({
+        id: msg.id,
+        chatId: msg.chatId,
+        userId: msg.userId,
+        message: msg.message,
+        response: msg.isUser ? null : msg.message,
+        language: msg.language || 'english',
+        timestamp: new Date(msg.timestamp),
+        isUser: msg.isUser,
+        source: msg.source || 'offline',
+        confidence: msg.confidence,
+        sessionId: msg.sessionId,
+        isSynced: false,
+      }));
+      
+      return formatted;
+    } catch (error) {
+      console.error('Error loading chat messages from AsyncStorage:', error);
+      return [];
+    }
+  }
+
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      let query = `SELECT * FROM chat_messages WHERE chat_id = ?`;
+      let params = [chatId];
+      
+      if (userId) {
+        query += ` AND user_id = ?`;
+        params.push(userId);
+      }
+      
+      query += ` ORDER BY timestamp ASC;`;
+      
+      tx.executeSql(
+        query,
+        params,
+        (_, { rows }) => {
+          const messages = [];
+          for (let i = 0; i < rows.length; i++) {
+            messages.push({
+              id: rows.item(i).id,
+              chatId: rows.item(i).chat_id,
+              userId: rows.item(i).user_id,
+              message: rows.item(i).message,
+              response: rows.item(i).response,
+              language: rows.item(i).language,
+              timestamp: new Date(rows.item(i).timestamp),
+              isUser: rows.item(i).is_user === 1,
+              source: rows.item(i).source,
+              confidence: rows.item(i).confidence,
+              sessionId: rows.item(i).session_id,
+              isSynced: rows.item(i).is_synced === 1,
+            });
+          }
+          resolve(messages);
+        },
+        (_, error) => {
+          console.error('Error loading chat messages:', error);
+          reject(error);
+        }
+      );
+    });
+  });
+};
+
+// Get all chat sessions for a user
+export const getChatSessions = async (userId) => {
+  // Web platform: Use AsyncStorage
+  if (isWeb || !db) {
+    try {
+      const allKeys = await AsyncStorage.getAllKeys();
+      const sessionKeys = allKeys.filter(key => key.startsWith(`chat_session_`) && key.endsWith(`_${userId}`));
+      const sessions = [];
+      
+      for (const key of sessionKeys) {
+        const data = await AsyncStorage.getItem(key);
+        if (data) {
+          const session = JSON.parse(data);
+          sessions.push({
+            id: session.sessionId,
+            sessionId: session.sessionId,
+            userId: session.userId,
+            title: session.title,
+            createdAt: new Date(session.createdAt),
+            updatedAt: new Date(session.updatedAt),
+            messageCount: session.messageCount || 0,
+            isSynced: false,
+          });
+        }
+      }
+      
+      sessions.sort((a, b) => b.updatedAt - a.updatedAt);
+      return sessions;
+    } catch (error) {
+      console.error('Error loading chat sessions from AsyncStorage:', error);
+      return [];
+    }
+  }
+
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        `SELECT * FROM chat_sessions 
+         WHERE user_id = ? 
+         ORDER BY updated_at DESC;`,
+        [userId],
+        (_, { rows }) => {
+          const sessions = [];
+          for (let i = 0; i < rows.length; i++) {
+            sessions.push({
+              id: rows.item(i).id,
+              sessionId: rows.item(i).session_id,
+              userId: rows.item(i).user_id,
+              title: rows.item(i).title,
+              createdAt: new Date(rows.item(i).created_at),
+              updatedAt: new Date(rows.item(i).updated_at),
+              messageCount: rows.item(i).message_count,
+              isSynced: rows.item(i).is_synced === 1,
+            });
+          }
+          resolve(sessions);
+        },
+        (_, error) => {
+          console.error('Error loading chat sessions:', error);
+          reject(error);
+        }
+      );
+    });
+  });
+};
+
+// Delete chat session and messages
+export const deleteChatSession = async (chatId, userId) => {
+  // Web platform: Use AsyncStorage
+  if (isWeb || !db) {
+    try {
+      const messagesKey = `chat_messages_${chatId}_${userId}`;
+      const sessionKey = `chat_session_${chatId}_${userId}`;
+      
+      await AsyncStorage.removeItem(messagesKey);
+      await AsyncStorage.removeItem(sessionKey);
+      
+      console.log('Chat session deleted from AsyncStorage');
+      return;
+    } catch (error) {
+      console.error('Error deleting chat session from AsyncStorage:', error);
+      throw error;
+    }
+  }
+
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      // Delete messages first
+      tx.executeSql(
+        `DELETE FROM chat_messages WHERE chat_id = ? AND user_id = ?;`,
+        [chatId, userId],
+        () => {
+          // Delete session
+          tx.executeSql(
+            `DELETE FROM chat_sessions WHERE session_id = ? AND user_id = ?;`,
+            [chatId, userId],
+            () => {
+              console.log('Chat session deleted');
+              resolve();
+            },
+            (_, error) => {
+              console.error('Error deleting session:', error);
+              reject(error);
+            }
+          );
+        },
+        (_, error) => {
+          console.error('Error deleting messages:', error);
+          reject(error);
+        }
+      );
+    });
+  });
+};
+
+// ==================== SYNC FUNCTIONS ====================
+
+// Sync knowledge base with backend
+export const syncKnowledgeBase = async (apiService) => {
+  try {
+    console.log('🔄 Syncing knowledge base with backend...');
+    
+    // Get unsynced knowledge base entries
+    const unsyncedEntries = await getUnsyncedKBEntries();
+    
+    if (unsyncedEntries.length === 0) {
+      console.log('✅ All knowledge base entries are synced');
+      return { synced: 0, errors: 0 };
+    }
+
+    let synced = 0;
+    let errors = 0;
+
+    // Try to fetch from backend and merge
+    try {
+      const backendKB = await apiService.getKnowledgeBase('english');
+      if (backendKB && backendKB.data) {
+        // Merge backend knowledge base into local
+        for (const entry of backendKB.data) {
+          await mergeKBEntry(entry);
+        }
+      }
+    } catch (error) {
+      console.warn('Could not fetch backend KB:', error.message);
+    }
+
+    // Mark as synced
+    for (const entry of unsyncedEntries) {
+      try {
+        await markKBEntrySynced(entry.id);
+        synced++;
+      } catch (error) {
+        console.error('Error syncing KB entry:', error);
+        errors++;
+      }
+    }
+
+    console.log(`✅ Synced ${synced} knowledge base entries`);
+    return { synced, errors };
+  } catch (error) {
+    console.error('Error syncing knowledge base:', error);
+    return { synced: 0, errors: 1 };
+  }
+};
+
+// Sync chat messages with backend
+export const syncChatMessages = async (apiService, userId) => {
+  try {
+    console.log('🔄 Syncing chat messages with backend...');
+    
+    // Get unsynced messages
+    const unsyncedMessages = await getUnsyncedMessages(userId);
+    
+    if (unsyncedMessages.length === 0) {
+      console.log('✅ All chat messages are synced');
+      return { synced: 0, errors: 0 };
+    }
+
+    let synced = 0;
+    let errors = 0;
+
+    // Try to sync each unsynced message
+    for (const message of unsyncedMessages) {
+      try {
+        // Send to backend
+        const response = await apiService.sendV1ChatMessage(
+          message.message,
+          message.language,
+          message.sessionId
+        );
+
+        if (response && response.data) {
+          // Update local message with backend response
+          await updateMessageWithBackendData(
+            message.id,
+            response.data.response || response.data.text,
+            response.data.confidence || message.confidence
+          );
+          
+          // Mark as synced
+          await markMessageSynced(message.id);
+          synced++;
+        }
+      } catch (error) {
+        console.error('Error syncing message:', error);
+        errors++;
+        // Don't mark as synced if error occurred
+      }
+    }
+
+    // Also fetch latest messages from backend
+    try {
+      const backendHistory = await apiService.getConversationHistory();
+      if (backendHistory && backendHistory.data && backendHistory.data.history) {
+        // Merge backend messages into local storage
+        for (const backendMsg of backendHistory.data.history) {
+          await mergeBackendMessage(backendMsg, userId);
+        }
+      }
+    } catch (error) {
+      console.warn('Could not fetch backend history:', error.message);
+    }
+
+    console.log(`✅ Synced ${synced} chat messages`);
+    return { synced, errors };
+  } catch (error) {
+    console.error('Error syncing chat messages:', error);
+    return { synced: 0, errors: 1 };
+  }
+};
+
+// Helper functions for sync
+const getUnsyncedKBEntries = async () => {
+  // Web platform: Return empty (sync not critical for web)
+  if (isWeb || !db) {
+    return [];
+  }
+
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        `SELECT * FROM knowledge_base WHERE is_synced = 0;`,
+        [],
+        (_, { rows }) => {
+          const entries = [];
+          for (let i = 0; i < rows.length; i++) {
+            entries.push(rows.item(i));
+          }
+          resolve(entries);
+        },
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+
+const getUnsyncedMessages = async (userId) => {
+  // Web platform: Return empty (sync not critical for web)
+  if (isWeb || !db) {
+    return [];
+  }
+
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        `SELECT * FROM chat_messages 
+         WHERE user_id = ? AND is_synced = 0 AND is_user = 1
+         ORDER BY timestamp ASC;`,
+        [userId],
+        (_, { rows }) => {
+          const messages = [];
+          for (let i = 0; i < rows.length; i++) {
+            messages.push(rows.item(i));
+          }
+          resolve(messages);
+        },
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+
+const markKBEntrySynced = async (id) => {
+  // Web platform: No-op (sync not critical for web)
+  if (isWeb || !db) {
+    return;
+  }
+
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        `UPDATE knowledge_base 
+         SET is_synced = 1, synced_at = datetime('now')
+         WHERE id = ?;`,
+        [id],
+        () => resolve(),
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+
+const markMessageSynced = async (id) => {
+  // Web platform: No-op (sync not critical for web)
+  if (isWeb || !db) {
+    return;
+  }
+
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        `UPDATE chat_messages 
+         SET is_synced = 1, synced_at = datetime('now')
+         WHERE id = ?;`,
+        [id],
+        () => resolve(),
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+
+const updateMessageWithBackendData = async (id, response, confidence) => {
+  // Web platform: Update in AsyncStorage (find by id)
+  if (isWeb || !db) {
+    try {
+      const allKeys = await AsyncStorage.getAllKeys();
+      const messageKeys = allKeys.filter(key => key.startsWith('chat_messages_'));
+      
+      for (const key of messageKeys) {
+        const data = await AsyncStorage.getItem(key);
+        if (data) {
+          const messages = JSON.parse(data);
+          const msgIndex = messages.findIndex(m => m.id === id);
+          if (msgIndex >= 0) {
+            messages[msgIndex].response = response;
+            messages[msgIndex].confidence = confidence;
+            await AsyncStorage.setItem(key, JSON.stringify(messages));
+            return;
+          }
+        }
+      }
+      return;
+    } catch (error) {
+      console.error('Error updating message in AsyncStorage:', error);
+      return;
+    }
+  }
+
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        `UPDATE chat_messages 
+         SET response = ?, confidence = ?
+         WHERE id = ?;`,
+        [response, confidence, id],
+        () => resolve(),
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+
+const mergeKBEntry = async (backendEntry) => {
+  // Web platform: Store in AsyncStorage
+  if (isWeb || !db) {
+    try {
+      const kbDataStr = await AsyncStorage.getItem('knowledge_base_data');
+      const kbData = kbDataStr ? JSON.parse(kbDataStr) : {};
+      const key = `kb_${backendEntry.category || 'general'}_${backendEntry.language || 'english'}`;
+      
+      if (!kbData[key]) {
+        kbData[key] = {
+          category: backendEntry.category || 'general',
+          language: backendEntry.language || 'english',
+          keywords: backendEntry.keywords || [],
+          responses: [],
+        };
+      }
+      
+      // Add or update entry
+      const existingIndex = kbData[key].responses.findIndex(r => r.question === (backendEntry.question || backendEntry.title));
+      const newResponse = {
+        question: backendEntry.question || backendEntry.title,
+        answer: backendEntry.answer,
+        confidence: backendEntry.confidence || 0.8,
+      };
+      
+      if (existingIndex >= 0) {
+        kbData[key].responses[existingIndex] = newResponse;
+      } else {
+        kbData[key].responses.push(newResponse);
+      }
+      
+      await AsyncStorage.setItem('knowledge_base_data', JSON.stringify(kbData));
+      return;
+    } catch (error) {
+      console.error('Error merging KB entry in AsyncStorage:', error);
+      return;
+    }
+  }
+
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      // Check if entry already exists
+      tx.executeSql(
+        `SELECT id FROM knowledge_base WHERE backend_id = ?;`,
+        [backendEntry.id],
+        (_, { rows }) => {
+          if (rows.length > 0) {
+            // Update existing
+            tx.executeSql(
+              `UPDATE knowledge_base 
+               SET question = ?, answer = ?, confidence = ?, updated_at = datetime('now')
+               WHERE backend_id = ?;`,
+              [backendEntry.question || backendEntry.title, backendEntry.answer, backendEntry.confidence || 0.8, backendEntry.id],
+              () => resolve(),
+              (_, error) => reject(error)
+            );
+          } else {
+            // Insert new
+            tx.executeSql(
+              `INSERT INTO knowledge_base (category, language, keywords, question, answer, confidence, backend_id, is_synced)
+               VALUES (?, ?, ?, ?, ?, ?, ?, 1);`,
+              [
+                backendEntry.category || 'general',
+                backendEntry.language || 'english',
+                JSON.stringify(backendEntry.keywords || []),
+                backendEntry.question || backendEntry.title,
+                backendEntry.answer,
+                backendEntry.confidence || 0.8,
+                backendEntry.id
+              ],
+              () => resolve(),
+              (_, error) => reject(error)
+            );
+          }
+        },
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+
+const mergeBackendMessage = async (backendMsg, userId) => {
+  // Web platform: Store in AsyncStorage
+  if (isWeb || !db) {
+    try {
+      const sessionId = backendMsg.session?.session_id || `session_${Date.now()}`;
+      const key = `chat_messages_${sessionId}_${userId}`;
+      const existing = await AsyncStorage.getItem(key);
+      const messages = existing ? JSON.parse(existing) : [];
+      
+      // Check if message already exists
+      const exists = messages.some(m => m.id === backendMsg.id || (m.message === backendMsg.message && m.timestamp === backendMsg.timestamp));
+      if (!exists) {
+        const newMsg = {
+          id: backendMsg.id || Date.now(),
+          chatId: sessionId,
+          userId,
+          message: backendMsg.message,
+          response: backendMsg.response,
+          language: backendMsg.language || 'english',
+          timestamp: backendMsg.timestamp,
+          isUser: true,
+          source: 'backend',
+          confidence: backendMsg.confidence,
+          sessionId,
+        };
+        messages.push(newMsg);
+        await AsyncStorage.setItem(key, JSON.stringify(messages));
+      }
+      return;
+    } catch (error) {
+      console.error('Error merging backend message in AsyncStorage:', error);
+      return;
+    }
+  }
+
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      // Check if message already exists
+      tx.executeSql(
+        `SELECT id FROM chat_messages WHERE backend_id = ?;`,
+        [backendMsg.id],
+        (_, { rows }) => {
+          if (rows.length === 0) {
+            // Insert new message
+            const sessionId = backendMsg.session?.session_id || `session_${Date.now()}`;
+            tx.executeSql(
+              `INSERT INTO chat_messages 
+               (chat_id, user_id, message, response, language, timestamp, is_user, source, backend_id, is_synced, session_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?);`,
+              [
+                sessionId,
+                userId,
+                backendMsg.message,
+                backendMsg.response,
+                backendMsg.language || 'english',
+                backendMsg.timestamp,
+                1,
+                'backend',
+                backendMsg.id,
+                sessionId
+              ],
+              () => resolve(),
+              (_, error) => reject(error)
+            );
+          } else {
+            resolve(); // Already exists
+          }
+        },
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+
+// Full sync function (knowledge base + chats)
+export const performFullSync = async (apiService, userId) => {
+  try {
+    console.log('🔄 Starting full sync...');
+    const kbResult = await syncKnowledgeBase(apiService);
+    const chatResult = await syncChatMessages(apiService, userId);
+    
+    return {
+      knowledgeBase: kbResult,
+      chats: chatResult,
+      totalSynced: kbResult.synced + chatResult.synced,
+      totalErrors: kbResult.errors + chatResult.errors,
+    };
+  } catch (error) {
+    console.error('Error performing full sync:', error);
+    return {
+      knowledgeBase: { synced: 0, errors: 1 },
+      chats: { synced: 0, errors: 1 },
+      totalSynced: 0,
+      totalErrors: 2,
+    };
+  }
+};
+
 export default {
   initializeKnowledgeBase,
   getOfflineAnswer,
   getKnowledgeBaseStats,
   addKnowledgeBaseEntry,
-  clearKnowledgeBase
+  clearKnowledgeBase,
+  // Chat storage
+  saveChatMessage,
+  loadChatMessages,
+  getChatSessions,
+  deleteChatSession,
+  // Sync functions
+  syncKnowledgeBase,
+  syncChatMessages,
+  performFullSync,
 };
