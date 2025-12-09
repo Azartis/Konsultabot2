@@ -36,7 +36,7 @@ logger = logging.getLogger('konsultabot.chatbot_flow')
 
 
 PROMPT_TEMPLATE = """
-You are Konsultabot, an adaptive dual-mode AI:
+You are KonsultaBot, an adaptive dual-mode AI:
 Conversational AI
 Senior Technical Support Specialist
 IMPORTANT LANGUAGE RULE: You MUST always respond in English (US) only, regardless of what language the user writes in. Even if the user writes in Spanish, Tagalog, or any other language, you must respond in clear, professional English. This is a strict requirement.
@@ -47,7 +47,7 @@ GENERAL — explanations, tasks, opinions, learning
 CHIT_CHAT — greetings, emotions, small talk
 UNKNOWN — vague, unclear, extremely short inputs
 Persistent Intent & Goal Tracking (Critical Rule)
-Konsultabot must keep track of the user's active goal and must not forget it.
+KonsultaBot must keep track of the user's active goal and must not forget it.
 Stay in the same mode until the goal is solved or the user changes topic.
 NEVER ask the same question twice.
 Use conversation history to interpret vague inputs.
@@ -68,7 +68,7 @@ Update facts as new info comes
 Tailor solutions to the exact setup
 Never overwhelm the user
 Consider likely causes based on prior details
-NEW RULE: Solution-First Troubleshooting (High Priority)
+NEW Rule: Solution-First Troubleshooting (High Priority)
 When in TECH_SUPPORT mode, you must:
 ✔ Always provide an initial actionable solution or fix FIRST
 Even if information is missing.
@@ -116,6 +116,8 @@ Simple questions: 1-2 sentences max
 Tech issues: solution first, then ONE follow-up question
 If user wants to dig deeper: "Want more detail?" or "Need specifics?"
 Never prepend/append filler like "Sure, I'd be happy to help"
+Answer only what is asked; if more info is available, ask:
+"Want more detail?" or "Need the full breakdown?"
 {user_message}
 """
 
@@ -154,7 +156,10 @@ def _handle_message(
     """
     # Step 1: Check Knowledge Base FIRST (always, even when online)
     logger.info(f"Checking Knowledge Base for: {message[:50]}...")
-    kb_match = search_best_match(message, min_score=0.35)
+    
+    # Use lower threshold when offline to be more lenient
+    min_score = 0.20 if not online else 0.35
+    kb_match = search_best_match(message, min_score=min_score)
     
     if kb_match:
         entry, score = kb_match
@@ -185,15 +190,40 @@ def _handle_message(
     
     # Step 3: Use Gemini Flash if online and configured
     if not online or not is_configured():
+        # When offline, try one more time with even lower threshold
+        logger.info("Offline mode: Trying KB with very low threshold...")
+        kb_match_low = search_best_match(message, min_score=0.15)
+        
+        if kb_match_low:
+            entry, score = kb_match_low
+            logger.info(f"KB match found with low threshold: {entry.get('title', 'N/A')} (score: {score:.2f})")
+            return ChatResult(
+                text=entry.get('answer', ''),
+                mode=ChatMode.NORMAL,
+                source="knowledge_base",
+                metadata={
+                    "kb_id": entry.get('id'),
+                    "kb_title": entry.get('title'),
+                    "kb_score": score,
+                    "kb_tags": entry.get('tags', []),
+                },
+            )
+        
+        # If still no match, provide helpful offline response
         text = (
-            "I'm currently unable to connect to Gemini Flash. "
-            "Please check your internet connection and try again."
+            "I'm currently offline and couldn't find a specific answer in my knowledge base. "
+            "Here are some things I can help with when online:\n\n"
+            "• Technical support (WiFi, printers, software issues)\n"
+            "• Academic assistance (study tips, thesis help)\n"
+            "• EVSU information (locations, contacts, enrollment)\n\n"
+            "Please check your internet connection and try again, or rephrase your question. "
+            "I'll do my best to help once I'm back online!"
         )
         return ChatResult(
             text=text,
             mode=ChatMode.NORMAL,
-            source="gemini_error",
-            metadata={"error": "Gemini not configured or offline"},
+            source="offline_fallback",
+            metadata={"error": "Offline mode - no KB match found"},
         )
 
     prompt = PROMPT_TEMPLATE.format(user_message=message)

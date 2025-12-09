@@ -429,8 +429,11 @@ export default function ImprovedChatScreen({ navigation }) {
     }
   };
 
-  const sendMessage = async (text = inputText, fromVoice = false) => {
-    if (!text.trim() || isLoading) return;
+  const sendMessage = async (text = null, fromVoice = false) => {
+    // Capture the current input text before clearing it
+    const messageText = text !== null ? text.trim() : inputText.trim();
+    
+    if (!messageText || isLoading) return;
     
     // Stop any ongoing speech before sending new message
     try {
@@ -440,15 +443,17 @@ export default function ImprovedChatScreen({ navigation }) {
       console.log('No speech to stop');
     }
 
+    // Clear input immediately after capturing text
+    setInputText('');
+
     const userMessage = {
       id: Date.now(),
-      text: text.trim(),
+      text: messageText,
       sender: 'user',
       timestamp: new Date(),
     };
 
     setMessages(prev => [...prev, userMessage]);
-    setInputText('');
     setIsLoading(true);
 
     try {
@@ -467,7 +472,7 @@ export default function ImprovedChatScreen({ navigation }) {
       // Step 2: Always use backend chatbot with KB integration
       console.log('🌐 Calling backend /api/v1/chat/ via apiService...');
       const backendResponse = await apiService.sendV1ChatMessage(
-        text.trim(), 
+        messageText, 
         'english', 
         null, // sessionId
         { is_satisfied: isSatisfied } // additionalData
@@ -509,7 +514,7 @@ export default function ImprovedChatScreen({ navigation }) {
         mode: data.mode || data.metadata?.mode || 'normal',
         kb_source: data.source === 'knowledge_base',
         question_count: data.question_count || questionCount + 1,
-        userQuery: text.trim(), // Store the user's query for feedback
+        userQuery: messageText, // Store the user's query for feedback
         satisfied: null, // Track satisfaction state per message
       };
 
@@ -517,7 +522,7 @@ export default function ImprovedChatScreen({ navigation }) {
       
       // Save to offline storage (always save, even if from backend)
       if (user?.id) {
-        saveMessageOffline(text.trim(), answerText, 'english').catch(err => {
+        saveMessageOffline(messageText, answerText, 'english').catch(err => {
           console.error('Error saving message offline:', err);
         });
       }
@@ -525,7 +530,7 @@ export default function ImprovedChatScreen({ navigation }) {
       // Store last bot message for feedback tracking
       setLastBotMessage({
         ...botMessage,
-        userQuery: text.trim(),
+        userQuery: messageText,
       });
       
       // Speak the bot's response with text-to-speech when from voice input
@@ -566,7 +571,7 @@ export default function ImprovedChatScreen({ navigation }) {
       
       // Fallback to offline knowledge base
       try {
-        const offlineAnswer = await getOfflineAnswer(text.trim(), 'english');
+        const offlineAnswer = await getOfflineAnswer(messageText, 'english');
         const offlineBotMessage = {
           id: Date.now() + 1,
           text: offlineAnswer,
@@ -585,7 +590,7 @@ export default function ImprovedChatScreen({ navigation }) {
         
         // Save to offline storage
         if (user?.id) {
-          saveMessageOffline(text.trim(), offlineAnswer, 'english').catch(err => {
+          saveMessageOffline(messageText, offlineAnswer, 'english').catch(err => {
             console.error('Error saving offline message:', err);
           });
         }
@@ -593,7 +598,7 @@ export default function ImprovedChatScreen({ navigation }) {
         // Store last bot message for feedback tracking
         setLastBotMessage({
           ...offlineBotMessage,
-          userQuery: text.trim(),
+          userQuery: messageText,
         });
         
         // Show info message (not error) since offline mode is working
@@ -655,7 +660,10 @@ export default function ImprovedChatScreen({ navigation }) {
 
   const renderMessage = (item) => {
     const isUser = item.sender === 'user';
-    const isKB = item.kb_source === true;
+    const isKB = item.kb_source === true || item.source === 'user_kb' || item.source === 'knowledge_base';
+    const isOffline = item.source === 'offline';
+    const source = item.source || 'unknown';
+    
     return (
       <View key={item.id} style={[styles.messageRow, isUser ? styles.userRow : styles.botRow]}>
         {!isUser && (
@@ -668,14 +676,35 @@ export default function ImprovedChatScreen({ navigation }) {
             styles.messageBlock,
             isUser ? styles.userBlock : styles.botBlock,
             isKB && styles.kbMessageBlock,
+            isOffline && styles.offlineMessageBlock,
           ]}
         >
-          {isKB && (
-            <View style={styles.kbBadge}>
-              <MaterialIcons name="book" size={12} color="#4285F4" />
-              <Text style={styles.kbBadgeText}>Knowledge Base</Text>
+          {/* Source Badge */}
+          {!isUser && (
+            <View style={styles.messageSourceBadge}>
+              {isKB && (
+                <View style={styles.sourceBadge}>
+                  <MaterialIcons name="book" size={12} color="#4285F4" />
+                  <Text style={styles.sourceBadgeText}>
+                    {source === 'user_kb' ? 'Your Knowledge' : 'Knowledge Base'}
+                  </Text>
+                </View>
+              )}
+              {isOffline && (
+                <View style={[styles.sourceBadge, styles.offlineBadge]}>
+                  <MaterialIcons name="cloud-off" size={12} color="#9AA0A6" />
+                  <Text style={[styles.sourceBadgeText, styles.offlineBadgeText]}>Offline</Text>
+                </View>
+              )}
+              {!isKB && !isOffline && source === 'gemini' && (
+                <View style={[styles.sourceBadge, styles.aiBadge]}>
+                  <MaterialIcons name="auto-awesome" size={12} color="#9C27B0" />
+                  <Text style={[styles.sourceBadgeText, styles.aiBadgeText]}>AI Powered</Text>
+                </View>
+              )}
             </View>
           )}
+          
           <Text
             style={[
               styles.messageText,
@@ -684,6 +713,14 @@ export default function ImprovedChatScreen({ navigation }) {
           >
             {item.text}
           </Text>
+          
+          {/* Timestamp */}
+          {item.timestamp && (
+            <Text style={styles.messageTimestamp}>
+              {formatTimestamp(item.timestamp)}
+            </Text>
+          )}
+          
           {!isUser && (
             <View style={styles.satisfactionButtons}>
               <TouchableOpacity
@@ -782,110 +819,120 @@ export default function ImprovedChatScreen({ navigation }) {
         return;
       }
       
-      // Mobile: Use VoiceHelper (which wraps @react-native-voice/voice)
+      // Mobile: Try VoiceHelper first, fallback to ExpoVoiceHelper
       console.log('Starting mobile speech recognition...');
       
-      if (!VoiceHelper.isAvailable()) {
-        Alert.alert(
-          'Speech Recognition Not Available',
-          'Speech recognition requires a native module that is not available in Expo Go.\n\nPlease create a development build:\n\n1. Run: npx expo prebuild --clean\n2. Run: npx expo run:android\n\nOr use EAS Build to create a development build.',
-          [{ text: 'OK' }]
-        );
-        return;
-      }
-      
-      // Check if native module is actually available (if method exists)
-      if (typeof VoiceHelper.checkNativeModule === 'function') {
-        try {
-          const nativeAvailable = await VoiceHelper.checkNativeModule();
-          if (nativeAvailable === false) {
-            Alert.alert(
-              'Native Module Not Linked',
-              'The voice recognition native module is not properly linked.\n\nThis requires a development build, not Expo Go.\n\nSteps:\n1. npx expo prebuild --clean\n2. npx expo run:android',
-              [{ text: 'OK' }]
-            );
-            return;
+      // First, try VoiceHelper (native speech recognition)
+      if (VoiceHelper.isAvailable()) {
+        // Check if native module is actually available (if method exists)
+        let useVoiceHelper = true;
+        if (typeof VoiceHelper.checkNativeModule === 'function') {
+          try {
+            const nativeAvailable = await VoiceHelper.checkNativeModule();
+            if (nativeAvailable === false) {
+              console.log('⚠️ Native module not linked, falling back to ExpoVoiceHelper');
+              useVoiceHelper = false;
+            }
+          } catch (checkError) {
+            console.warn('Native module check failed, falling back to ExpoVoiceHelper:', checkError);
+            useVoiceHelper = false;
           }
-        } catch (checkError) {
-          console.warn('Native module check failed:', checkError);
-          // Continue anyway - might still work
+        }
+        
+        if (useVoiceHelper) {
+          try {
+            // Clean up any existing listeners first
+            VoiceHelper.removeAllListeners();
+            setVoiceTranscript('');
+            
+            // Set up event listeners BEFORE starting
+            // Set up partial results listener for real-time transcription
+            VoiceHelper.on('SpeechPartialResults', (event) => {
+              console.log('📝 SpeechPartialResults event:', event);
+              if (event && event.value && Array.isArray(event.value) && event.value.length > 0) {
+                const partialTranscript = event.value[0];
+                if (partialTranscript && typeof partialTranscript === 'string' && partialTranscript.trim()) {
+                  console.log('✅ Partial speech recognized:', partialTranscript);
+                  setVoiceTranscript(partialTranscript);
+                  setInputText(partialTranscript);
+                }
+              }
+            });
+            
+            // Set up final result listener
+            VoiceHelper.on('SpeechResults', (event) => {
+              console.log('✅ SpeechResults event:', event);
+              // @react-native-voice/voice provides event.value as array of strings
+              if (event && event.value && Array.isArray(event.value) && event.value.length > 0) {
+                const transcript = event.value[0];
+                if (transcript && typeof transcript === 'string' && transcript.trim()) {
+                  console.log('✅ Final speech recognized:', transcript);
+                  setVoiceTranscript(transcript);
+                  setInputText(transcript);
+                }
+              }
+            });
+            
+            VoiceHelper.on('SpeechError', (error) => {
+              console.error('❌ Speech recognition error:', error);
+              setIsRecording(false);
+              setIsTranscribing(false);
+              setIsVoiceInput(false);
+              setVoiceTranscript('');
+              const errorMsg = error?.error?.message || error?.message || error?.error || 'Unknown error';
+              Alert.alert(
+                'Speech Recognition Error',
+                `Could not recognize speech: ${errorMsg}`,
+                [{ text: 'OK' }]
+              );
+            });
+            
+            VoiceHelper.on('SpeechEnd', () => {
+              console.log('🛑 Speech recognition ended');
+              setIsRecording(false);
+            });
+            
+            VoiceHelper.on('SpeechStart', () => {
+              console.log('🎤 Speech recognition started');
+              setIsRecording(true);
+            });
+            
+            // Now start recognition
+            console.log('🚀 Starting voice recognition with VoiceHelper...');
+            const started = await VoiceHelper.start('en-US');
+            if (started) {
+              setIsRecording(true);
+              setIsVoiceInput(true);
+              console.log('✅ Mobile speech recognition started - speak now!');
+              return; // Success, exit early
+            } else {
+              throw new Error('Failed to start voice recognition - start() returned false');
+            }
+          } catch (error) {
+            console.error('Failed to start VoiceHelper, falling back to ExpoVoiceHelper:', error);
+            // Fall through to ExpoVoiceHelper
+          }
         }
       }
       
+      // Fallback: Use ExpoVoiceHelper (expo-av recording + backend transcription)
+      console.log('🎤 Using ExpoVoiceHelper as fallback...');
       try {
-        // Clean up any existing listeners first
-        VoiceHelper.removeAllListeners();
-        setVoiceTranscript('');
-        
-        // Set up event listeners BEFORE starting
-        // Set up partial results listener for real-time transcription
-        VoiceHelper.on('SpeechPartialResults', (event) => {
-          console.log('📝 SpeechPartialResults event:', event);
-          if (event && event.value && Array.isArray(event.value) && event.value.length > 0) {
-            const partialTranscript = event.value[0];
-            if (partialTranscript && typeof partialTranscript === 'string' && partialTranscript.trim()) {
-              console.log('✅ Partial speech recognized:', partialTranscript);
-              setVoiceTranscript(partialTranscript);
-              setInputText(partialTranscript);
-            }
-          }
-        });
-        
-        // Set up final result listener
-        VoiceHelper.on('SpeechResults', (event) => {
-          console.log('✅ SpeechResults event:', event);
-          // @react-native-voice/voice provides event.value as array of strings
-          if (event && event.value && Array.isArray(event.value) && event.value.length > 0) {
-            const transcript = event.value[0];
-            if (transcript && typeof transcript === 'string' && transcript.trim()) {
-              console.log('✅ Final speech recognized:', transcript);
-              setVoiceTranscript(transcript);
-              setInputText(transcript);
-            }
-          }
-        });
-        
-        VoiceHelper.on('SpeechError', (error) => {
-          console.error('❌ Speech recognition error:', error);
-          setIsRecording(false);
-          setIsTranscribing(false);
-          setIsVoiceInput(false);
-          setVoiceTranscript('');
-          const errorMsg = error?.error?.message || error?.message || error?.error || 'Unknown error';
-          Alert.alert(
-            'Speech Recognition Error',
-            `Could not recognize speech: ${errorMsg}`,
-            [{ text: 'OK' }]
-          );
-        });
-        
-        VoiceHelper.on('SpeechEnd', () => {
-          console.log('🛑 Speech recognition ended');
-          setIsRecording(false);
-        });
-        
-        VoiceHelper.on('SpeechStart', () => {
-          console.log('🎤 Speech recognition started');
-          setIsRecording(true);
-        });
-        
-        // Now start recognition
-        console.log('🚀 Starting voice recognition...');
-        const started = await VoiceHelper.start('en-US');
+        const started = await ExpoVoiceHelper.start();
         if (started) {
           setIsRecording(true);
           setIsVoiceInput(true);
-          console.log('✅ Mobile speech recognition started - speak now!');
+          console.log('✅ Audio recording started with ExpoVoiceHelper - speak now!');
         } else {
-          throw new Error('Failed to start voice recognition - start() returned false');
+          throw new Error('Failed to start audio recording');
         }
       } catch (error) {
-        console.error('Failed to start VoiceHelper:', error);
+        console.error('Failed to start ExpoVoiceHelper:', error);
         setIsRecording(false);
         setIsVoiceInput(false);
         Alert.alert(
-          'Speech Recognition Error',
-          `Could not start speech recognition: ${error.message || 'Unknown error'}`,
+          'Microphone Error',
+          `Could not access microphone: ${error.message || 'Please check microphone permissions in your device settings.'}`,
           [{ text: 'OK' }]
         );
       }
@@ -993,11 +1040,21 @@ export default function ImprovedChatScreen({ navigation }) {
             }
           } catch (transcribeError) {
             console.error('❌ Transcription error:', transcribeError);
-            Alert.alert(
-              'Transcription Error',
-              'Could not transcribe audio. Please try typing your message instead.',
-              [{ text: 'OK' }]
-            );
+            // Check if offline - provide helpful message
+            const isOffline = !navigator.onLine || (typeof NetInfo !== 'undefined' && !NetInfo.isConnected);
+            if (isOffline) {
+              Alert.alert(
+                'Offline Mode',
+                'Voice transcription requires internet connection. Please connect to the internet or type your message instead.',
+                [{ text: 'OK' }]
+              );
+            } else {
+              Alert.alert(
+                'Transcription Error',
+                'Could not transcribe audio. Please try typing your message instead.',
+                [{ text: 'OK' }]
+              );
+            }
             setIsTranscribing(false);
             setIsVoiceInput(false);
             return;
@@ -1203,7 +1260,33 @@ export default function ImprovedChatScreen({ navigation }) {
             <GlitchText style={styles.geminiTitle}>Konsultabot</GlitchText>
           </View>
           
-          <TouchableOpacity 
+          {/* Network Status Indicator and Profile - Right side */}
+          <View style={styles.headerRightContainer}>
+            {/* Network Status Indicator - Moved to header */}
+            <View style={styles.headerNetworkStatus}>
+              <View style={[
+                styles.networkStatusBadge,
+                isBackendOnline ? styles.networkStatusOnline : styles.networkStatusOffline
+              ]}>
+                <View style={[
+                  styles.networkStatusDot,
+                  isBackendOnline && styles.networkStatusDotActive
+                ]} />
+                <Text style={[
+                  styles.networkStatusText,
+                  { color: isBackendOnline ? (isDark ? '#10B981' : '#059669') : (isDark ? '#EF4444' : '#DC2626') }
+                ]}>
+                  {isBackendOnline ? 'Online' : 'Offline'}
+                </Text>
+                {isSyncing && (
+                  <View style={styles.syncIndicator}>
+                    <ActivityIndicator size="small" color={isDark ? '#4285F4' : '#1A73E8'} />
+                  </View>
+                )}
+              </View>
+            </View>
+            
+            <TouchableOpacity 
             style={styles.profileButton}
             onPress={() => setShowProfileMenu(!showProfileMenu)}
           >
@@ -1213,6 +1296,7 @@ export default function ImprovedChatScreen({ navigation }) {
               </Text>
             </View>
           </TouchableOpacity>
+          </View>
         </View>
         
         {/* Profile Dropdown Menu */}
@@ -1399,8 +1483,12 @@ export default function ImprovedChatScreen({ navigation }) {
               
               {isLoading && (
                 <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="small" color="#4285F4" />
-                  <Text style={styles.loadingText}>Thinking...</Text>
+                  <View style={styles.loadingBubble}>
+                    <ActivityIndicator size="small" color="#4285F4" />
+                    <Text style={styles.loadingText}>
+                      {isBackendOnline ? 'Thinking...' : 'Searching offline knowledge...'}
+                    </Text>
+                  </View>
                 </View>
               )}
             </View>
@@ -1506,6 +1594,62 @@ const createStyles = (theme, isDark) => {
   contentContainerBlurred: {
     opacity: 0.1,
   },
+  // Network Status Indicator
+  networkStatusContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 4,
+    backgroundColor: surfaceColor,
+    borderBottomWidth: 1,
+    borderBottomColor: dividerColor,
+  },
+  networkStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    backgroundColor: isDark ? 'rgba(107, 114, 128, 0.3)' : '#F1F3F4',
+  },
+  networkStatusOnline: {
+    backgroundColor: isDark ? 'rgba(16, 185, 129, 0.2)' : '#E6F7F0',
+  },
+  networkStatusOffline: {
+    backgroundColor: isDark ? 'rgba(239, 68, 68, 0.2)' : '#FEE2E2',
+  },
+  networkStatusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#6B7280',
+    marginRight: 6,
+  },
+  networkStatusDotActive: {
+    backgroundColor: '#10B981',
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  networkStatusText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: textColor,
+  },
+  syncIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 6,
+    paddingLeft: 6,
+    borderLeftWidth: 1,
+    borderLeftColor: dividerColor,
+  },
+  syncText: {
+    fontSize: 11,
+    color: textSecondary,
+    marginLeft: 4,
+  },
   // Gemini Header Styles
   geminiHeader: {
     flexDirection: 'row',
@@ -1522,12 +1666,21 @@ const createStyles = (theme, isDark) => {
   geminiTitleContainer: {
     flex: 1,
     alignItems: 'center',
+    marginRight: 8,
   },
   geminiTitle: {
     fontSize: 24,
     fontWeight: '700',
     color: textColor,
     letterSpacing: 0.5,
+  },
+  headerRightContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerNetworkStatus: {
+    // Network status in header
   },
   profileButton: {
     padding: 4,
@@ -1948,9 +2101,10 @@ const createStyles = (theme, isDark) => {
     textAlign: 'right',
   },
   messageTimestamp: {
-    marginTop: 8,
-    fontSize: 11,
+    marginTop: 6,
+    fontSize: 10,
     color: textSecondary,
+    opacity: 0.7,
   },
   messageText: {
     fontSize: 15,
@@ -1972,12 +2126,25 @@ const createStyles = (theme, isDark) => {
   },
   loadingContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     padding: 12,
+    marginBottom: 8,
+  },
+  loadingBubble: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: isDark ? (theme.colors.surfaceVariant || theme.colors.surface) : '#E8F0FE',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 18,
+    borderTopLeftRadius: 4,
+    maxWidth: '75%',
   },
   loadingText: {
     marginLeft: 8,
     color: textSecondary,
+    fontSize: 14,
+    fontStyle: 'italic',
   },
   carousel: {
     maxHeight: 100,
@@ -2112,6 +2279,45 @@ const createStyles = (theme, isDark) => {
   kbMessageBlock: {
     borderLeftWidth: 3,
     borderLeftColor: '#4285F4',
+  },
+  offlineMessageBlock: {
+    borderLeftWidth: 3,
+    borderLeftColor: '#9AA0A6',
+    opacity: 0.9,
+  },
+  messageSourceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+    flexWrap: 'wrap',
+  },
+  sourceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: isDark ? 'rgba(66, 133, 244, 0.2)' : '#E8F0FE',
+    marginRight: 6,
+    marginBottom: 4,
+  },
+  offlineBadge: {
+    backgroundColor: isDark ? 'rgba(154, 160, 166, 0.2)' : '#F1F3F4',
+  },
+  aiBadge: {
+    backgroundColor: isDark ? 'rgba(156, 39, 176, 0.2)' : '#F3E5F5',
+  },
+  sourceBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#4285F4',
+    marginLeft: 4,
+  },
+  offlineBadgeText: {
+    color: '#9AA0A6',
+  },
+  aiBadgeText: {
+    color: '#9C27B0',
   },
   kbBadge: {
     flexDirection: 'row',

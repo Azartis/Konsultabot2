@@ -64,7 +64,8 @@
     "@react-native-community/cli-platform-android": "^20.0.2",
     "@react-native/babel-preset": "^0.82.1",
     "express": "^5.1.0",
-    "metro-react-native-babel-preset": "^0.77.0"
+    "metro-react-native-babel-preset": "^0.77.0",
+    "sharp": "^0.34.5"
   },
   "resolutions": {
     "@react-native-voice/voice": "3.2.4"
