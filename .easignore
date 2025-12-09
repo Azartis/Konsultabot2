@@ -1,0 +1,85 @@
+# EAS Build ignore file
+# Files and directories listed here will be excluded from the build upload
+
+# Documentation files (not needed for build)
+*.md
+!README.md
+
+# Batch scripts (not needed for build)
+*.bat
+*.ps1
+*.sh
+
+# Test files
+*.test.js
+*test*.js
+App.test.js
+SimpleApp.js
+
+# Debug/Log files
+*.log
+*.zip
+bugreport-*.zip
+
+# Development scripts
+check-*.js
+find-*.js
+get_*.js
+list_*.js
+sync-*.js
+test*.js
+
+# Git files
+.git/
+.gitignore
+.gitattributes
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Build artifacts (will be regenerated)
+android/app/build/
+android/.gradle/
+android/build/
+ios/build/
+ios/Pods/
+
+# Node modules (will be installed on EAS)
+# Note: node_modules is usually excluded by default, but listing it explicitly
+
+# Large assets that aren't needed
+# Uncomment if you have large video/image files
+# assets/videos/
+# assets/large-images/
+
+# Environment files (if any)
+.env.local
+.env.development
+.env.test
+
+# Expo cache
+.expo/
+.expo-shared/
+
+# Metro bundler cache
+.metro/
+
+# Other caches
+.cache/
+.temp/
+

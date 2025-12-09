@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Konsultabot Tech Holographic Orb Adaptive Icon">
+  <defs>
+    <!-- Outer glow gradient -->
+    <radialGradient id="glowGradientAdaptive" cx="50%" cy="50%">
+      <stop offset="0%" stop-color="#00FFF0" stop-opacity="0.8"/>
+      <stop offset="40%" stop-color="#4F8EFF" stop-opacity="0.5"/>
+      <stop offset="70%" stop-color="#8B5CF6" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#00FFF0" stop-opacity="0"/>
+    </radialGradient>
+    
+    <!-- Main orb gradient -->
+    <radialGradient id="orbGradientAdaptive" cx="30%" cy="30%">
+      <stop offset="0%" stop-color="#00FFF0"/>
+      <stop offset="25%" stop-color="#4F8EFF"/>
+      <stop offset="50%" stop-color="#8B5CF6"/>
+      <stop offset="75%" stop-color="#FF3B9A"/>
+      <stop offset="100%" stop-color="#1A1F3A"/>
+    </radialGradient>
+    
+    <!-- Tech highlight gradient -->
+    <radialGradient id="highlightGradientAdaptive" cx="30%" cy="30%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.9"/>
+      <stop offset="50%" stop-color="#00FFF0" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    
+    <!-- Circuit pattern gradient -->
+    <linearGradient id="circuitGradientAdaptive" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00FFF0" stop-opacity="0.6"/>
+      <stop offset="50%" stop-color="#4F8EFF" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#8B5CF6" stop-opacity="0.6"/>
+    </linearGradient>
+    
+    <!-- Enhanced glow filter -->
+    <filter id="glowAdaptive" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="12" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    
+    <!-- Tech pattern filter -->
+    <filter id="techGlowAdaptive">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Outer hexagonal grid pattern -->
+  <g opacity="0.15">
+    <polygon points="962.5600000000001,512 737.2800000000001,902.1964059291167 286.7200000000001,902.1964059291167 61.43999999999994,512 286.7199999999998,121.80359407088332 737.2799999999997,121.8035940708831" fill="none" stroke="#00FFF0" stroke-width="2"/>
+    <polygon points="1024,512 768,955.4050067376326 256.0000000000001,955.4050067376327 0,512.0000000000001 255.99999999999977,68.5949932623675 767.9999999999997,68.59499326236721" fill="none" stroke="#00FFF0" stroke-width="2"/>
+    <polygon points="1085.44,512 798.72,1008.6136075461485 225.2800000000001,1008.6136075461486 -61.440000000000055,512.0000000000001 225.27999999999975,15.386392453851556 798.7199999999996,15.386392453851215" fill="none" stroke="#00FFF0" stroke-width="2"/>
+  </g>
+  
+  <!-- Outer glow -->
+  <circle 
+    cx="512" 
+    cy="512" 
+    r="614.4" 
+    fill="url(#glowGradientAdaptive)" 
+    opacity="0.6"
+  />
+  
+  <!-- Circuit lines radiating from orb -->
+  <g filter="url(#techGlowAdaptive)">
+    <line x1="860.1600000000001" y1="512" x2="983.04" y2="512" stroke="#00FFF0" stroke-width="2" opacity="0.4" stroke-dasharray="4 4"/>
+    <line x1="813.5154045815902" y1="686.0799999999999" x2="919.9326061986219" y2="747.52" stroke="#00FFF0" stroke-width="2" opacity="0.4" stroke-dasharray="4 4"/>
+    <line x1="686.08" y1="813.5154045815902" x2="747.52" y2="919.9326061986219" stroke="#00FFF0" stroke-width="2" opacity="0.4" stroke-dasharray="4 4"/>
+    <line x1="512" y1="860.1600000000001" x2="512" y2="983.04" stroke="#00FFF0" stroke-width="2" opacity="0.4" stroke-dasharray="4 4"/>
+    <line x1="337.9200000000001" y1="813.5154045815902" x2="276.48000000000013" y2="919.9326061986219" stroke="#00FFF0" stroke-width="2" opacity="0.4" stroke-dasharray="4 4"/>
+    <line x1="210.4845954184098" y1="686.0799999999999" x2="104.06739380137805" y2="747.52" stroke="#00FFF0" stroke-width="2" opacity="0.4" stroke-dasharray="4 4"/>
+    <line x1="163.83999999999997" y1="512" x2="40.960000000000036" y2="512.0000000000001" stroke="#00FFF0" stroke-width="2" opacity="0.4" stroke-dasharray="4 4"/>
+    <line x1="210.4845954184098" y1="337.91999999999996" x2="104.0673938013781" y2="276.47999999999996" stroke="#00FFF0" stroke-width="2" opacity="0.4" stroke-dasharray="4 4"/>
+    <line x1="337.91999999999985" y1="210.48459541840987" x2="276.4799999999998" y2="104.0673938013781" stroke="#00FFF0" stroke-width="2" opacity="0.4" stroke-dasharray="4 4"/>
+    <line x1="511.99999999999994" y1="163.83999999999997" x2="511.9999999999999" y2="40.960000000000036" stroke="#00FFF0" stroke-width="2" opacity="0.4" stroke-dasharray="4 4"/>
+    <line x1="686.08" y1="210.4845954184098" x2="747.52" y2="104.0673938013781" stroke="#00FFF0" stroke-width="2" opacity="0.4" stroke-dasharray="4 4"/>
+    <line x1="813.51540458159" y1="337.91999999999985" x2="919.9326061986219" y2="276.4799999999998" stroke="#00FFF0" stroke-width="2" opacity="0.4" stroke-dasharray="4 4"/>
+  </g>
+  
+  <!-- Main orb -->
+  <circle 
+    cx="512" 
+    cy="512" 
+    r="409.6" 
+    fill="url(#orbGradientAdaptive)"
+    filter="url(#glowAdaptive)"
+  />
+  
+  <!-- Inner hexagonal pattern overlay -->
+  <g opacity="0.3">
+    <polygon points="757.76,512 634.88,724.8344032340636 389.12000000000006,724.8344032340636 266.24,512 389.1199999999999,299.1655967659364 634.8799999999999,299.16559676593624" fill="none" stroke="#FFFFFF" stroke-width="1.5"/>
+    <polygon points="675.84,512 593.9200000000001,653.8896021560424 430.08000000000004,653.8896021560424 348.15999999999997,512 430.0799999999999,370.11039784395757 593.9199999999998,370.1103978439575" fill="none" stroke="#FFFFFF" stroke-width="1.5"/>
+  </g>
+  
+  <!-- Inner highlight -->
+  <circle 
+    cx="358.4" 
+    cy="358.4" 
+    r="163.84000000000003" 
+    fill="url(#highlightGradientAdaptive)"
+  />
+  
+  <!-- Tech core (smaller inner orb) -->
+  <circle 
+    cx="384" 
+    cy="384" 
+    r="102.4" 
+    fill="#00FFF0"
+    opacity="0.6"
+    filter="url(#techGlowAdaptive)"
+  />
+  
+  <!-- Data stream lines -->
+  <g opacity="0.5" stroke="#00FFF0" stroke-width="1.5" fill="none">
+    <line x1="880.6400000000001" y1="512" x2="942.08" y2="512"/>
+    <line x1="696.32" y1="831.2516048510954" x2="727.0400000000001" y2="884.4602056596113"/>
+    <line x1="327.68000000000006" y1="831.2516048510955" x2="296.96000000000004" y2="884.4602056596115"/>
+    <line x1="143.35999999999996" y1="512" x2="81.91999999999996" y2="512"/>
+    <line x1="327.67999999999984" y1="192.74839514890454" x2="296.9599999999998" y2="139.53979434038865"/>
+    <line x1="696.32" y1="192.74839514890454" x2="727.0400000000001" y2="139.5397943403886"/>
+  </g>
+  
+  <!-- Reflection 1 -->
+  <circle 
+    cx="588.8" 
+    cy="614.4" 
+    r="102.4" 
+    fill="#FFFFFF" 
+    opacity="0.3"
+  />
+  
+  <!-- Reflection 2 -->
+  <circle 
+    cx="614.4" 
+    cy="358.4" 
+    r="61.44" 
+    fill="#FFFFFF" 
+    opacity="0.2"
+  />
+  
+  <!-- Tech nodes (connection points) -->
+  <circle cx="1003.52" cy="512" r="6" fill="#00FFF0" opacity="0.7"/>
+  <circle cx="859.5571250888119" cy="859.5571250888117" r="6" fill="#00FFF0" opacity="0.7"/>
+  <circle cx="512" cy="1003.52" r="6" fill="#00FFF0" opacity="0.7"/>
+  <circle cx="164.4428749111882" cy="859.5571250888119" r="6" fill="#00FFF0" opacity="0.7"/>
+  <circle cx="20.480000000000018" cy="512.0000000000001" r="6" fill="#00FFF0" opacity="0.7"/>
+  <circle cx="164.44287491118808" cy="164.4428749111882" r="6" fill="#00FFF0" opacity="0.7"/>
+  <circle cx="511.9999999999999" cy="20.480000000000018" r="6" fill="#00FFF0" opacity="0.7"/>
+  <circle cx="859.5571250888117" cy="164.44287491118808" r="6" fill="#00FFF0" opacity="0.7"/>
+  
+  <!-- Enhanced particles (12 tech particles) -->
+  <circle cx="819.2" cy="512" r="3" fill="#00FFF0" opacity="0.7"/>
+  <circle cx="778.0430040425796" cy="665.6" r="3" fill="#4F8EFF" opacity="0.7"/>
+  <circle cx="665.6" cy="778.0430040425796" r="3" fill="#8B5CF6" opacity="0.7"/>
+  <circle cx="512" cy="819.2" r="3" fill="#00FFF0" opacity="0.7"/>
+  <circle cx="358.40000000000003" cy="778.0430040425796" r="3" fill="#4F8EFF" opacity="0.7"/>
+  <circle cx="245.95699595742042" cy="665.6" r="3" fill="#8B5CF6" opacity="0.7"/>
+  <circle cx="204.79999999999995" cy="512" r="3" fill="#00FFF0" opacity="0.7"/>
+  <circle cx="245.95699595742042" cy="358.4" r="3" fill="#4F8EFF" opacity="0.7"/>
+  <circle cx="358.39999999999986" cy="245.95699595742047" r="3" fill="#8B5CF6" opacity="0.7"/>
+  <circle cx="511.99999999999994" cy="204.79999999999995" r="3" fill="#00FFF0" opacity="0.7"/>
+  <circle cx="665.6" cy="245.95699595742042" r="3" fill="#4F8EFF" opacity="0.7"/>
+  <circle cx="778.0430040425795" cy="358.39999999999986" r="3" fill="#8B5CF6" opacity="0.7"/>
+  
+  <!-- Outer tech ring -->
+  <circle 
+    cx="512" 
+    cy="512" 
+    r="471.03999999999996" 
+    fill="none"
+    stroke="url(#circuitGradientAdaptive)"
+    stroke-width="2"
+    opacity="0.4"
+    stroke-dasharray="8 4"
+  />
+</svg>
