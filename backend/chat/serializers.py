@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import KnowledgeBase, CampusInfo, Conversation, ChatSession
+from .models import KnowledgeBase, CampusInfo, Conversation, ChatSession, UserKnowledgeBase
 
 class KnowledgeBaseSerializer(serializers.ModelSerializer):
     class Meta:
@@ -42,3 +42,13 @@ class ChatSessionSerializer(serializers.ModelSerializer):
         fields = ['id', 'user', 'user_name', 'session_id', 'started_at', 
                  'ended_at', 'is_active', 'message_count']
         read_only_fields = ['id', 'user', 'started_at', 'ended_at']
+
+class UserKnowledgeBaseSerializer(serializers.ModelSerializer):
+    user_name = serializers.CharField(source='user.get_full_name', read_only=True)
+    
+    class Meta:
+        model = UserKnowledgeBase
+        fields = ['id', 'user', 'user_name', 'category', 'question', 'answer', 
+                 'language', 'keywords', 'confidence_score', 'usage_count', 
+                 'is_active', 'source', 'created_at', 'updated_at', 'last_used_at']
+        read_only_fields = ['id', 'user', 'created_at', 'updated_at', 'last_used_at', 'usage_count']

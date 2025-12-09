@@ -368,23 +368,47 @@ def chat_endpoint(request):
                 'feedback_saved': True,
             }, status=status.HTTP_200_OK)
         
-        # Get conversation context (track last 10 messages for adaptive flow)
-        context = session.get_recent_context(limit=10)
+        # Check user's personal knowledge base first (if authenticated)
+        user_kb_match = None
+        if user:
+            try:
+                from chat.user_knowledge_base import search_user_knowledge_base
+                user_kb_match = search_user_knowledge_base(user, query, language, min_confidence=0.6)
+            except Exception as e:
+                logger.error(f"Error checking user knowledge base: {e}")
         
-        # Detect mode upfront to satisfy routing rules
-        routed = detect_mode(query)
-        forced_mode = routed.mode
-        
-        # Process AI query with improved error handling
-        try:
-            ai_response = multilingual_ai_handler.handle_ai_query(
-                query=query,
-                user=request.user if request.user.is_authenticated else None,
-                language=language,
-                session=session,
-                context=context,
-                forced_mode=forced_mode
-            )
+        # If found in user KB, use it directly
+        if user_kb_match:
+            ai_response = {
+                'message': user_kb_match['answer'],
+                'intent': user_kb_match.get('category', 'general'),
+                'confidence': user_kb_match['confidence'],
+                'source': 'user_kb',
+                'processing_time': 0.1,
+                'question_count': question_count + 1,
+                'metadata': {
+                    'kb_entry_id': user_kb_match['id'],
+                    'kb_category': user_kb_match['category']
+                }
+            }
+        else:
+            # Get conversation context (track last 10 messages for adaptive flow)
+            context = session.get_recent_context(limit=10)
+            
+            # Detect mode upfront to satisfy routing rules
+            routed = detect_mode(query)
+            forced_mode = routed.mode
+            
+            # Process AI query with improved error handling
+            try:
+                ai_response = multilingual_ai_handler.handle_ai_query(
+                    query=query,
+                    user=request.user if request.user.is_authenticated else None,
+                    language=language,
+                    session=session,
+                    context=context,
+                    forced_mode=forced_mode
+                )
             ai_response['mode'] = routed.mode.value
             ai_response['routing_reason'] = routed.reason
             ai_response.setdefault('metadata', {}).update(routed.metadata)
@@ -437,6 +461,37 @@ def chat_endpoint(request):
         # Update user message with bot's response
         user_message.response = ai_response['message']
         user_message.save()
+        
+        # Save to user's personal knowledge base (if authenticated and not already from user KB)
+        if user and ai_response.get('source') != 'user_kb':
+            try:
+                from chat.user_knowledge_base import (
+                    save_to_user_knowledge_base,
+                    extract_keywords_from_query,
+                    categorize_query
+                )
+                
+                # Only save if response has good confidence and is meaningful
+                confidence = ai_response.get('confidence', 0)
+                if confidence >= 0.5 and len(ai_response['message']) > 20:
+                    category = categorize_query(query)
+                    keywords = extract_keywords_from_query(query)
+                    
+                    user_kb_entry = save_to_user_knowledge_base(
+                        user=user,
+                        question=query,
+                        answer=ai_response['message'],
+                        language=language,
+                        category=category,
+                        keywords=keywords,
+                        source='chat',
+                        confidence=confidence
+                    )
+                    
+                    if user_kb_entry:
+                        logger.info(f"Saved to user KB for {user.username}: {user_kb_entry.id}")
+            except Exception as e:
+                logger.error(f"Error saving to user knowledge base: {e}")
         
         # Update question count in session context
         question_count = ai_response.get('question_count', question_count + 1)
@@ -774,6 +829,108 @@ def speech_to_text_endpoint(request):
             'error': 'Speech processing failed',
             'code': 'STT_ERROR',
             'details': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def transcribe_audio_endpoint(request):
+    """
+    Transcribe audio file to text (simplified endpoint for mobile app)
+    
+    POST /api/v1/chat/transcribe/
+    Content-Type: multipart/form-data
+    
+    Form data:
+    - audio: Audio file (wav, mp3, m4a, etc.)
+    - language: Target language code (optional, default: 'en-US')
+    
+    Returns:
+    {
+        "transcript": "transcribed text",
+        "text": "transcribed text",  # Alternative field name
+        "confidence": 0.95,
+        "language": "en-US"
+    }
+    """
+    try:
+        # Check if audio file is provided
+        if 'audio' not in request.FILES:
+            return Response({
+                'error': 'Audio file is required',
+                'code': 'MISSING_AUDIO'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        audio_file = request.FILES['audio']
+        language = request.POST.get('language', 'en-US')
+        
+        # Validate file size (max 10MB)
+        if audio_file.size > 10 * 1024 * 1024:
+            return Response({
+                'error': 'Audio file too large (max 10MB)',
+                'code': 'FILE_TOO_LARGE'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get file format from extension or content type
+        file_extension = audio_file.name.split('.')[-1].lower() if '.' in audio_file.name else 'm4a'
+        
+        # Read audio data
+        audio_data = audio_file.read()
+        
+        # Process speech to text
+        if speech_processor is None:
+            return Response({
+                'error': 'Speech recognition not available',
+                'code': 'SPEECH_NOT_AVAILABLE'
+            }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        
+        # Convert language code format if needed (en-US -> english)
+        language_map = {
+            'en-US': 'english',
+            'en': 'english',
+            'tl-PH': 'tagalog',
+            'ceb-PH': 'bisaya',
+            'war-PH': 'waray',
+        }
+        language_key = language_map.get(language, 'english')
+        
+        # Transcribe audio
+        stt_result = speech_processor.speech_to_text(
+            audio_data=audio_data,
+            language=language_key,
+            audio_format=file_extension
+        )
+        
+        # Prepare response in format expected by mobile app
+        transcript = stt_result.get('text', '').strip()
+        
+        if not transcript and stt_result.get('error'):
+            return Response({
+                'error': stt_result['error'],
+                'code': 'TRANSCRIPTION_FAILED',
+                'transcript': '',
+                'text': ''
+            }, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+        
+        # Return both 'transcript' and 'text' for compatibility
+        response_data = {
+            'transcript': transcript,
+            'text': transcript,  # Alternative field name
+            'confidence': stt_result.get('confidence', 0.0),
+            'language': stt_result.get('language', language),
+            'method': stt_result.get('method', 'unknown')
+        }
+        
+        return Response(response_data, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        logger.error(f"Audio transcription error: {e}", exc_info=True)
+        return Response({
+            'error': 'Audio transcription failed',
+            'code': 'TRANSCRIPTION_ERROR',
+            'details': str(e),
+            'transcript': '',
+            'text': ''
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 

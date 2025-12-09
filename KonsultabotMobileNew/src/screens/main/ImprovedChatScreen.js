@@ -23,6 +23,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Audio } from 'expo-av';
 import * as Speech from 'expo-speech';
 import { VoiceHelper } from '../../utils/voiceHelper';
+import { ExpoVoiceHelper } from '../../utils/expoVoiceHelper';
 import { apiService } from '../../services/apiService';
 import { lumaTheme } from '../../theme/lumaTheme';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -921,8 +922,13 @@ export default function ImprovedChatScreen({ navigation }) {
       return;
     }
     
-    // Mobile - stop and discard speech recognition
+    // Mobile - stop and discard recording
     try {
+      // Cancel ExpoVoiceHelper if recording
+      if (ExpoVoiceHelper.isRecording) {
+        await ExpoVoiceHelper.cancel();
+      }
+      // Cancel VoiceHelper if available
       if (VoiceHelper.isAvailable()) {
         await VoiceHelper.stop();
         VoiceHelper.removeAllListeners();
@@ -933,7 +939,7 @@ export default function ImprovedChatScreen({ navigation }) {
       setVoiceTranscript('');
       console.log('Recording canceled');
     } catch (error) {
-      console.error('Error canceling speech recognition:', error);
+      console.error('Error canceling recording:', error);
       setIsRecording(false);
       setIsTranscribing(false);
       setIsVoiceInput(false);
@@ -959,12 +965,55 @@ export default function ImprovedChatScreen({ navigation }) {
       return;
     }
     
-    // Mobile: Stop speech recognition and get transcript
+    // Mobile: Stop recording and transcribe
     setIsRecording(false);
     setIsTranscribing(true);
     
     try {
-      if (!VoiceHelper.isAvailable()) {
+      let transcript = '';
+      
+      // Check if using ExpoVoiceHelper (expo-av recording)
+      if (ExpoVoiceHelper.isRecording) {
+        console.log('🛑 Stopping Expo audio recording...');
+        const audioUri = await ExpoVoiceHelper.stop();
+        
+        if (audioUri) {
+          console.log('📤 Sending audio for transcription:', audioUri);
+          try {
+            // Send audio to backend for transcription
+            const transcriptionResult = await apiService.transcribeAudio(audioUri, 'en-US');
+            transcript = transcriptionResult?.transcript || transcriptionResult?.text || '';
+            
+            if (transcript) {
+              console.log('✅ Transcription received:', transcript);
+              setInputText(transcript);
+              setIsVoiceInput(true);
+            } else {
+              throw new Error('No transcript returned from server');
+            }
+          } catch (transcribeError) {
+            console.error('❌ Transcription error:', transcribeError);
+            Alert.alert(
+              'Transcription Error',
+              'Could not transcribe audio. Please try typing your message instead.',
+              [{ text: 'OK' }]
+            );
+            setIsTranscribing(false);
+            setIsVoiceInput(false);
+            return;
+          }
+        } else {
+          throw new Error('No audio file recorded');
+        }
+      } 
+      // Try native VoiceHelper if available
+      else if (VoiceHelper.isAvailable()) {
+        await VoiceHelper.stop();
+        await new Promise(resolve => setTimeout(resolve, 300));
+        transcript = voiceTranscript || '';
+        VoiceHelper.removeAllListeners();
+        setVoiceTranscript('');
+      } else {
         setIsTranscribing(false);
         setIsVoiceInput(false);
         Alert.alert(
@@ -974,21 +1023,6 @@ export default function ImprovedChatScreen({ navigation }) {
         );
         return;
       }
-      
-      // Stop VoiceHelper
-      await VoiceHelper.stop();
-      
-      // Wait a moment for final processing
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      // Get transcript from state (set by listener)
-      let transcript = voiceTranscript || '';
-      
-      // Clear the transcript state for next recording
-      setVoiceTranscript('');
-      
-      // Remove listeners
-      VoiceHelper.removeAllListeners();
       
       // If no transcript, show message to user
       if (!transcript || !transcript.trim()) {

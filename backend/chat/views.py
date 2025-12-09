@@ -9,14 +9,20 @@ import uuid
 import logging
 import json
 
-from .models import KnowledgeBase, CampusInfo, Conversation, ChatSession
+from .models import KnowledgeBase, CampusInfo, Conversation, ChatSession, UserKnowledgeBase
 from .serializers import (
     KnowledgeBaseSerializer, 
     CampusInfoSerializer, 
     ConversationSerializer,
     ChatMessageSerializer,
     ChatResponseSerializer,
-    ChatSessionSerializer
+    ChatSessionSerializer,
+    UserKnowledgeBaseSerializer
+)
+from .user_knowledge_base import (
+    get_user_knowledge_base_entries,
+    save_to_user_knowledge_base,
+    search_user_knowledge_base
 )
 from .language_processor import LanguageProcessor
 from .technical_knowledge import get_technical_solution
@@ -746,7 +752,15 @@ def v1_chat_endpoint(request):
             'error': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
+import base64
+
+# Try to import speech processor
+try:
+    from .speech_processor import speech_processor
+except ImportError:
+    logger.warning("Speech processor not available")
+    speech_processor = None
 
 @csrf_exempt
 def chat_history_view(request):
@@ -754,3 +768,399 @@ def chat_history_view(request):
         # TODO: fetch real history for logged-in user
         return JsonResponse({'messages': []}, safe=False)
     return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@csrf_exempt
+def speech_to_text_view(request):
+    """
+    Convert uploaded audio to text
+    
+    POST /api/v1/chat/speech-to-text/
+    Content-Type: multipart/form-data
+    
+    Form data:
+    - audio: Audio file (wav, mp3, m4a, etc.)
+    - language: Target language (optional, default: 'english')
+    
+    Returns:
+    {
+        "text": "transcribed text",
+        "confidence": 0.95,
+        "language": "english",
+        "method": "google_speech_api"
+    }
+    """
+    try:
+        # Check if audio file is provided
+        if 'audio' not in request.FILES:
+            return Response({
+                'error': 'Audio file is required',
+                'code': 'MISSING_AUDIO'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        audio_file = request.FILES['audio']
+        language = request.POST.get('language', 'english')
+        
+        # Validate file size (max 10MB)
+        if audio_file.size > 10 * 1024 * 1024:
+            return Response({
+                'error': 'Audio file too large (max 10MB)',
+                'code': 'FILE_TOO_LARGE'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get file format from extension
+        file_extension = audio_file.name.split('.')[-1].lower() if '.' in audio_file.name else 'wav'
+        
+        # Read audio data
+        audio_data = audio_file.read()
+        
+        # Process speech to text
+        if speech_processor is None:
+            return Response({
+                'error': 'Speech recognition not available. Please install SpeechRecognition and pydub packages.',
+                'code': 'SPEECH_NOT_AVAILABLE'
+            }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        
+        stt_result = speech_processor.speech_to_text(
+            audio_data=audio_data,
+            language=language,
+            audio_format=file_extension
+        )
+        
+        # Prepare response
+        if stt_result.get('error'):
+            return Response({
+                'error': stt_result['error'],
+                'code': 'RECOGNITION_FAILED',
+                'text': '',
+                'confidence': 0.0
+            }, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+        
+        response_data = {
+            'text': stt_result.get('text', ''),
+            'confidence': stt_result.get('confidence', 0.0),
+            'language': stt_result.get('language', language),
+            'method': stt_result.get('method', 'unknown')
+        }
+        
+        return Response(response_data, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        logger.error(f"Speech-to-text error: {e}")
+        return Response({
+            'error': 'Speech processing failed',
+            'code': 'STT_ERROR',
+            'details': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@csrf_exempt
+def transcribe_audio_view(request):
+    """
+    Transcribe audio file to text (simplified endpoint for mobile app)
+    
+    POST /api/v1/chat/transcribe/
+    Content-Type: multipart/form-data
+    
+    Form data:
+    - audio: Audio file (wav, mp3, m4a, etc.)
+    - language: Target language code (optional, default: 'en-US')
+    
+    Returns:
+    {
+        "transcript": "transcribed text",
+        "text": "transcribed text",
+        "confidence": 0.95,
+        "language": "en-US"
+    }
+    """
+    try:
+        # Check if audio file is provided
+        if 'audio' not in request.FILES:
+            return Response({
+                'error': 'Audio file is required',
+                'code': 'MISSING_AUDIO'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        audio_file = request.FILES['audio']
+        language = request.POST.get('language', 'en-US')
+        
+        # Validate file size (max 10MB)
+        if audio_file.size > 10 * 1024 * 1024:
+            return Response({
+                'error': 'Audio file too large (max 10MB)',
+                'code': 'FILE_TOO_LARGE'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get file format from extension
+        file_extension = audio_file.name.split('.')[-1].lower() if '.' in audio_file.name else 'm4a'
+        
+        # Read audio data
+        audio_data = audio_file.read()
+        
+        # Process speech to text
+        if speech_processor is None:
+            return Response({
+                'error': 'Speech recognition not available',
+                'code': 'SPEECH_NOT_AVAILABLE'
+            }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        
+        # Convert language code format if needed (en-US -> english)
+        language_map = {
+            'en-US': 'english',
+            'en': 'english',
+            'tl-PH': 'tagalog',
+            'ceb-PH': 'bisaya',
+            'war-PH': 'waray',
+        }
+        language_key = language_map.get(language, 'english')
+        
+        # Transcribe audio
+        stt_result = speech_processor.speech_to_text(
+            audio_data=audio_data,
+            language=language_key,
+            audio_format=file_extension
+        )
+        
+        # Prepare response in format expected by mobile app
+        transcript = stt_result.get('text', '').strip()
+        
+        if not transcript and stt_result.get('error'):
+            return Response({
+                'error': stt_result['error'],
+                'code': 'TRANSCRIPTION_FAILED',
+                'transcript': '',
+                'text': ''
+            }, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+        
+        # Return both 'transcript' and 'text' for compatibility
+        response_data = {
+            'transcript': transcript,
+            'text': transcript,
+            'confidence': stt_result.get('confidence', 0.0),
+            'language': stt_result.get('language', language),
+            'method': stt_result.get('method', 'unknown')
+        }
+        
+        return Response(response_data, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        logger.error(f"Audio transcription error: {e}")
+        return Response({
+            'error': 'Audio transcription failed',
+            'code': 'TRANSCRIPTION_ERROR',
+            'details': str(e),
+            'transcript': '',
+            'text': ''
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def user_knowledge_base_list(request):
+    """
+    Get all user's personal knowledge base entries
+    
+    GET /api/v1/chat/user-kb/
+    """
+    try:
+        entries = get_user_knowledge_base_entries(request.user, limit=100)
+        return Response({
+            'status': 'success',
+            'count': len(entries),
+            'entries': entries
+        }, status=status.HTTP_200_OK)
+    except Exception as e:
+        logger.error(f"Error getting user knowledge base: {e}")
+        return Response({
+            'status': 'error',
+            'message': str(e),
+            'code': 'KB_FETCH_ERROR'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def user_knowledge_base_create(request):
+    """
+    Create a new entry in user's personal knowledge base
+    
+    POST /api/v1/chat/user-kb/
+    {
+        "question": "How do I connect to WiFi?",
+        "answer": "Go to settings and select EVSU WiFi",
+        "category": "technical",
+        "language": "english",
+        "keywords": "wifi, network, connect"
+    }
+    """
+    try:
+        question = request.data.get('question', '').strip()
+        answer = request.data.get('answer', '').strip()
+        
+        if not question or not answer:
+            return Response({
+                'status': 'error',
+                'message': 'Question and answer are required',
+                'code': 'MISSING_FIELDS'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        category = request.data.get('category', 'general')
+        language = request.data.get('language', 'english')
+        keywords = request.data.get('keywords', '')
+        confidence = float(request.data.get('confidence', 0.8))
+        
+        entry = save_to_user_knowledge_base(
+            user=request.user,
+            question=question,
+            answer=answer,
+            language=language,
+            category=category,
+            keywords=keywords,
+            source='manual',
+            confidence=confidence
+        )
+        
+        if entry:
+            serializer = UserKnowledgeBaseSerializer(entry)
+            return Response({
+                'status': 'success',
+                'message': 'Knowledge base entry created',
+                'entry': serializer.data
+            }, status=status.HTTP_201_CREATED)
+        else:
+            return Response({
+                'status': 'error',
+                'message': 'Failed to create entry',
+                'code': 'CREATE_FAILED'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+    except Exception as e:
+        logger.error(f"Error creating user knowledge base entry: {e}")
+        return Response({
+            'status': 'error',
+            'message': str(e),
+            'code': 'KB_CREATE_ERROR'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def user_knowledge_base_detail(request, entry_id):
+    """
+    Get, update, or delete a specific user knowledge base entry
+    
+    GET /api/v1/chat/user-kb/{id}/
+    PUT /api/v1/chat/user-kb/{id}/
+    DELETE /api/v1/chat/user-kb/{id}/
+    """
+    try:
+        entry = UserKnowledgeBase.objects.get(id=entry_id, user=request.user)
+        
+        if request.method == 'GET':
+            serializer = UserKnowledgeBaseSerializer(entry)
+            return Response({
+                'status': 'success',
+                'entry': serializer.data
+            }, status=status.HTTP_200_OK)
+        
+        elif request.method == 'PUT':
+            # Update entry
+            entry.question = request.data.get('question', entry.question)
+            entry.answer = request.data.get('answer', entry.answer)
+            entry.category = request.data.get('category', entry.category)
+            entry.language = request.data.get('language', entry.language)
+            entry.keywords = request.data.get('keywords', entry.keywords)
+            entry.is_active = request.data.get('is_active', entry.is_active)
+            
+            if 'confidence_score' in request.data:
+                entry.confidence_score = float(request.data['confidence_score'])
+            
+            entry.save()
+            
+            serializer = UserKnowledgeBaseSerializer(entry)
+            return Response({
+                'status': 'success',
+                'message': 'Entry updated',
+                'entry': serializer.data
+            }, status=status.HTTP_200_OK)
+        
+        elif request.method == 'DELETE':
+            entry.delete()
+            return Response({
+                'status': 'success',
+                'message': 'Entry deleted'
+            }, status=status.HTTP_200_OK)
+            
+    except UserKnowledgeBase.DoesNotExist:
+        return Response({
+            'status': 'error',
+            'message': 'Entry not found',
+            'code': 'NOT_FOUND'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        logger.error(f"Error in user knowledge base detail: {e}")
+        return Response({
+            'status': 'error',
+            'message': str(e),
+            'code': 'KB_DETAIL_ERROR'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def user_knowledge_base_sync(request):
+    """
+    Sync user knowledge base entries (for offline sync)
+    
+    POST /api/v1/chat/user-kb/sync/
+    {
+        "entries": [
+            {
+                "question": "...",
+                "answer": "...",
+                "category": "...",
+                ...
+            }
+        ]
+    }
+    """
+    try:
+        entries_data = request.data.get('entries', [])
+        synced_count = 0
+        errors = []
+        
+        for entry_data in entries_data:
+            try:
+                question = entry_data.get('question', '').strip()
+                answer = entry_data.get('answer', '').strip()
+                
+                if not question or not answer:
+                    continue
+                
+                save_to_user_knowledge_base(
+                    user=request.user,
+                    question=question,
+                    answer=answer,
+                    language=entry_data.get('language', 'english'),
+                    category=entry_data.get('category', 'general'),
+                    keywords=entry_data.get('keywords', ''),
+                    source=entry_data.get('source', 'sync'),
+                    confidence=float(entry_data.get('confidence_score', 0.8))
+                )
+                synced_count += 1
+            except Exception as e:
+                errors.append(str(e))
+        
+        return Response({
+            'status': 'success',
+            'synced_count': synced_count,
+            'total_count': len(entries_data),
+            'errors': errors if errors else None
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        logger.error(f"Error syncing user knowledge base: {e}")
+        return Response({
+            'status': 'error',
+            'message': str(e),
+            'code': 'KB_SYNC_ERROR'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

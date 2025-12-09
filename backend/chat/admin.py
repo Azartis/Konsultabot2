@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import KnowledgeBase, CampusInfo, Conversation, ChatSession
+from .models import KnowledgeBase, CampusInfo, Conversation, ChatSession, UserKnowledgeBase
 
 @admin.register(KnowledgeBase)
 class KnowledgeBaseAdmin(admin.ModelAdmin):
@@ -36,3 +36,23 @@ class ChatSessionAdmin(admin.ModelAdmin):
     search_fields = ('session_id', 'user__email', 'user__student_id')
     readonly_fields = ('started_at', 'ended_at')
     ordering = ('-started_at',)
+
+@admin.register(UserKnowledgeBase)
+class UserKnowledgeBaseAdmin(admin.ModelAdmin):
+    list_display = ('user', 'category', 'question_preview', 'language', 'confidence_score', 'usage_count', 'is_active', 'created_at')
+    list_filter = ('category', 'language', 'is_active', 'source', 'created_at')
+    search_fields = ('user__email', 'user__username', 'question', 'answer', 'keywords')
+    list_editable = ('is_active', 'confidence_score')
+    readonly_fields = ('created_at', 'updated_at', 'last_used_at')
+    ordering = ('-confidence_score', '-usage_count', '-last_used_at')
+    
+    def question_preview(self, obj):
+        return obj.question[:50] + "..." if len(obj.question) > 50 else obj.question
+    question_preview.short_description = 'Question'
+    
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        # Non-superusers can only see their own entries
+        return qs.filter(user=request.user)

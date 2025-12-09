@@ -1169,6 +1169,62 @@ class ApiService {
     return this.api.get('/chat/knowledge/', { params });
   }
 
+  // User Knowledge Base endpoints
+  async getUserKnowledgeBase() {
+    try {
+      await this.ensureBackendURL();
+      const response = await this.api.get('/v1/chat/user-kb/');
+      return response.data;
+    } catch (error) {
+      console.error('Get user KB error:', error);
+      throw error;
+    }
+  }
+
+  async createUserKnowledgeBaseEntry(entryData) {
+    try {
+      await this.ensureBackendURL();
+      const response = await this.api.post('/v1/chat/user-kb/create/', entryData);
+      return response.data;
+    } catch (error) {
+      console.error('Create user KB entry error:', error);
+      throw error;
+    }
+  }
+
+  async updateUserKnowledgeBaseEntry(entryId, entryData) {
+    try {
+      await this.ensureBackendURL();
+      const response = await this.api.put(`/v1/chat/user-kb/${entryId}/`, entryData);
+      return response.data;
+    } catch (error) {
+      console.error('Update user KB entry error:', error);
+      throw error;
+    }
+  }
+
+  async deleteUserKnowledgeBaseEntry(entryId) {
+    try {
+      await this.ensureBackendURL();
+      const response = await this.api.delete(`/v1/chat/user-kb/${entryId}/`);
+      return response.data;
+    } catch (error) {
+      console.error('Delete user KB entry error:', error);
+      throw error;
+    }
+  }
+
+  async syncUserKnowledgeBase(entries) {
+    try {
+      await this.ensureBackendURL();
+      const response = await this.api.post('/v1/chat/user-kb/sync/', { entries });
+      return response.data;
+    } catch (error) {
+      console.error('Sync user KB error:', error);
+      throw error;
+    }
+  }
+
   async getCampusInfo(language = 'english', category = null) {
     const params = { language };
     if (category) params.category = category;
