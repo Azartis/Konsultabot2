@@ -1,0 +1,219 @@
+# 🚀 Automated Ngrok Setup - Complete Guide
+
+This project now includes **fully automated scripts** that start Django backend, start Ngrok, grab the public HTTPS URL, and update the mobile app config automatically.
+
+## 📁 Files Added
+
+### Backend Scripts (in `/backend` folder)
+
+1. **`start_backend_and_ngrok.ps1`** - PowerShell script (Windows)
+2. **`start_backend_and_ngrok.bat`** - Batch script (Windows)
+3. **`start_backend_and_ngrok.sh`** - Shell script (macOS/Linux)
+4. **`sync_ngrok_url.js`** - Node.js script that syncs Ngrok URL to mobile app
+5. **`update-ngrok-url.ps1`** - Helper to update mobile config only
+6. **`.ngrok-last-url`** - Auto-generated file with current Ngrok URL
+
+### Mobile App Config (auto-generated)
+
+- **`KonsultabotMobileNew/app_config/api_base_url.js`** - Auto-generated API base URL
+
+---
+
+## 🎯 Quick Start (Windows)
+
+### Step 1: Place ngrok.exe
+
+Put `ngrok.exe` in the `/backend` folder, or install ngrok globally (in PATH).
+
+### Step 2: Run the Starter Script
+
+```powershell
+cd backend
+.\start_backend_and_ngrok.ps1
+```
+
+**That's it!** The script will:
+- ✅ Start Django backend on `0.0.0.0:8000`
+- ✅ Start Ngrok tunnel
+- ✅ Get the public HTTPS URL
+- ✅ Save it to `backend/.ngrok-last-url`
+- ✅ Update mobile app config automatically
+
+### Step 3: Rebuild APK
+
+After the script completes, rebuild your APK:
+
+```powershell
+cd ..\KonsultabotMobileNew
+eas build --platform android --profile preview
+```
+
+---
+
+## 🎯 Quick Start (macOS/Linux)
+
+```bash
+cd backend
+chmod +x start_backend_and_ngrok.sh
+./start_backend_and_ngrok.sh
+```
+
+---
+
+## 📋 How It Works
+
+1. **Starter Script** (`start_backend_and_ngrok.ps1`):
+   - Starts Django: `python manage.py runserver 0.0.0.0:8000`
+   - Starts Ngrok: `ngrok http 8000`
+   - Polls Ngrok API: `http://127.0.0.1:4040/api/tunnels`
+   - Extracts HTTPS URL
+   - Saves to `backend/.ngrok-last-url`
+
+2. **Sync Script** (`sync_ngrok_url.js`):
+   - Reads `backend/.ngrok-last-url`
+   - Writes `KonsultabotMobileNew/app_config/api_base_url.js`
+   - Mobile app imports this file at runtime
+
+3. **Mobile App** (`apiService.js`):
+   - **Priority 0**: Uses auto-generated `API_BASE_URL` from `app_config/api_base_url.js`
+   - **Priority 1**: Falls back to environment variables
+   - **Priority 2**: Falls back to cached URL
+   - **Priority 3**: Local network discovery
+
+---
+
+## 🔧 Manual Update (If Needed)
+
+If you only want to update the mobile config without restarting everything:
+
+```powershell
+cd backend
+.\update-ngrok-url.ps1
+```
+
+Or manually:
+
+```powershell
+cd backend
+node ..\backend\sync_ngrok_url.js
+```
+
+---
+
+## 📱 Mobile App Integration
+
+The mobile app automatically uses the auto-generated URL. The `apiService.js` has been updated to check for `app_config/api_base_url.js` first.
+
+### Example Usage in Mobile Code
+
+```javascript
+// The API service automatically uses the synced URL
+// But if you need it directly:
+import { API_BASE_URL } from '../app_config/api_base_url';
+console.log('Using API:', API_BASE_URL);
+```
+
+---
+
+## ⚠️ Important Notes
+
+### Ngrok URL Changes
+
+**Free Ngrok URLs expire when you restart Ngrok.** When this happens:
+
+1. Run the starter script again: `.\start_backend_and_ngrok.ps1`
+2. It will automatically update `app_config/api_base_url.js`
+3. **Rebuild your APK** to embed the new URL
+
+### Keep Scripts Running
+
+**Keep the PowerShell/terminal window open** while testing the APK. Django and Ngrok must stay running.
+
+### APK Rebuild Required
+
+After Ngrok URL changes, you **must rebuild the APK** because the URL is embedded at build time.
+
+---
+
+## 🆘 Troubleshooting
+
+### "manage.py not found"
+
+The script looks for `manage.py` in:
+1. Current directory (`backend/`)
+2. `django_konsultabot/` subdirectory
+
+If your structure is different, edit the script paths.
+
+### "ngrok.exe not found"
+
+- Place `ngrok.exe` in `/backend` folder, OR
+- Install ngrok globally: `choco install ngrok` (Windows) or download from ngrok.com
+
+### "Mobile config not updating"
+
+1. Check `backend/.ngrok-last-url` exists and has a URL
+2. Check Node.js is installed: `node --version`
+3. Run sync manually: `node backend/sync_ngrok_url.js`
+
+### "APK still can't connect"
+
+1. ✅ Verify Ngrok is running: `http://localhost:4040`
+2. ✅ Verify backend is running: `http://localhost:8000/api/health/`
+3. ✅ Check `app_config/api_base_url.js` has the correct URL
+4. ✅ **Rebuild APK** after URL changes
+5. ✅ Keep backend/Ngrok running while testing
+
+---
+
+## 📝 File Structure
+
+```
+Konsultabot2-main/
+├── backend/
+│   ├── start_backend_and_ngrok.ps1    ← Run this!
+│   ├── start_backend_and_ngrok.bat
+│   ├── start_backend_and_ngrok.sh
+│   ├── sync_ngrok_url.js              ← Auto-updates mobile config
+│   ├── update-ngrok-url.ps1
+│   ├── .ngrok-last-url                ← Auto-generated
+│   └── ngrok.exe                      ← Place here (or install globally)
+│
+└── KonsultabotMobileNew/
+    └── app_config/
+        └── api_base_url.js            ← Auto-generated by sync script
+```
+
+---
+
+## ✅ Checklist
+
+Before building APK:
+
+- [ ] Ngrok installed (in `/backend` or PATH)
+- [ ] Node.js installed (for sync script)
+- [ ] Run `start_backend_and_ngrok.ps1`
+- [ ] Verify `app_config/api_base_url.js` exists and has URL
+- [ ] Rebuild APK: `eas build --platform android`
+- [ ] Keep backend/Ngrok running while testing
+
+---
+
+## 🎉 Success!
+
+Once everything is set up:
+
+1. Run `.\start_backend_and_ngrok.ps1`
+2. Wait for "Mobile config updated" message
+3. Rebuild APK
+4. Install on phone (can be on different WiFi)
+5. Login should work! 🚀
+
+---
+
+## 📚 Additional Resources
+
+- See `NGROK_SETUP_COMPLETE.md` for detailed configuration
+- See `validate-setup.ps1` to verify everything is working
+- Ngrok dashboard: `http://localhost:4040`
+

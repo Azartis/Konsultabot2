@@ -1,0 +1,484 @@
+"""
+Django settings for KonsultaBot Advanced AI Platform
+"""
+
+import os
+import json
+from pathlib import Path
+from datetime import timedelta
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Build paths inside the project like this: BASE_DIR / 'subdir'.
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load environment variables from parent directory's .env
+env_path = BASE_DIR.parent / '.env'
+if env_path.exists():
+    load_dotenv(str(env_path))
+
+# Consolidated Gemini/Google API key (preferred env var: GEMINI_API_KEY)
+_GEMINI_API_KEY = os.getenv('GEMINI_API_KEY') or os.getenv('GOOGLE_API_KEY') or ''
+
+# KonsultaBot Settings (single, canonical definition)
+KONSULTABOT_SETTINGS = {
+    # AI / Gemini configuration
+    'GOOGLE_API_KEY': _GEMINI_API_KEY,  # Backwards-compatible key name
+    'GEMINI_API_KEY': _GEMINI_API_KEY,  # Explicit Gemini key alias
+    'AI_MODEL': os.getenv('KONSULTABOT_AI_MODEL', 'gemini-2.5-flash'),
+    'GEMINI_CONFIG': {
+        'HISTORY_ENABLED': True,
+        'MAX_OUTPUT_TOKENS': 2048,
+        'TEMPERATURE': 0.7,
+        'TOP_P': 0.8,
+        'TOP_K': 40,
+        'CANDIDATE_COUNT': 1,
+    },
+
+    # Conversation / platform behavior
+    'SESSION_TIMEOUT_MINUTES': int(os.getenv('KONSULTABOT_SESSION_TIMEOUT', '30')),
+    'MAX_CONVERSATION_HISTORY': int(os.getenv('KONSULTABOT_MAX_HISTORY', '10')),
+    'DEFAULT_LANGUAGE': 'english',
+    'SUPPORTED_LANGUAGES': ['english', 'bisaya', 'waray', 'tagalog'],
+
+    # Feature toggles
+    'OFFLINE_MODE': os.getenv('KONSULTABOT_OFFLINE_MODE', 'false').lower() == 'true',
+    'ENABLE_VOICE': os.getenv('KONSULTABOT_ENABLE_VOICE', 'true').lower() == 'true',
+    'ENABLE_ANALYTICS': os.getenv('KONSULTABOT_ENABLE_ANALYTICS', 'true').lower() == 'true',
+}
+
+# Default login user for mobile testing / offline mode
+DEFAULT_LOGIN_USER = {
+    'username': os.getenv('DEFAULT_LOGIN_USERNAME', 'ace@evsu.edu.ph').strip(),
+    'email': os.getenv('DEFAULT_LOGIN_EMAIL', 'ace@evsu.edu.ph').strip(),
+    'password': os.getenv('DEFAULT_LOGIN_PASSWORD', 'Calupas#1'),
+    'first_name': os.getenv('DEFAULT_LOGIN_FIRST_NAME', 'Ace'),
+    'last_name': os.getenv('DEFAULT_LOGIN_LAST_NAME', 'Ziegfred'),
+    'role': os.getenv('DEFAULT_LOGIN_ROLE', 'student'),
+    'department': os.getenv('DEFAULT_LOGIN_DEPARTMENT', 'College of ICT'),
+    'student_id': os.getenv('DEFAULT_LOGIN_STUDENT_ID', '2025-0001')
+}
+
+# SECURITY WARNING: keep the secret key used in production secret!
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-konsultabot-dev-key-change-in-production')
+
+# SECURITY WARNING: don't run with debug turned on in production!
+DEBUG = os.getenv('DEBUG', 'True').lower() == 'true'
+
+# Load Google API Key (for backward compatibility)
+GOOGLE_API_KEY = KONSULTABOT_SETTINGS['GOOGLE_API_KEY']
+
+# In development, allow all hosts. In production, this should be restricted.
+ALLOWED_HOSTS = [
+    '*',  # Allow all hosts in development
+    'localhost',
+    '127.0.0.1',
+    '0.0.0.0',
+    '10.0.2.2',  # Android emulator
+    '10.143.17.242',  # Current WiFi IP
+    '10.143.17.1',
+    '10.143.17.100',
+    '192.168.1.17',
+    '192.168.0.17',
+    '192.168.100.17',
+    '192.168.103.243',  # Current network IP
+    '192.168.110.57',  # Recent network IP
+    '10.0.0.17',
+    '172.20.10.2',  # Mobile hotspot
+    # Ngrok domains (will be added dynamically below)
+    '.ngrok-free.dev',
+    '.ngrok.io',
+    '.ngrok.app',
+]
+
+# Add Ngrok domains from environment (for global access)
+NGROK_URL = os.getenv('NGROK_URL', '')
+if NGROK_URL:
+    # Extract domain from Ngrok URL
+    ngrok_domain = NGROK_URL.replace('https://', '').replace('http://', '').split('/')[0]
+    if ngrok_domain and ngrok_domain not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(ngrok_domain)
+    # Add base domain patterns for subdomains
+    if '.ngrok-free.dev' in ngrok_domain:
+        if '.ngrok-free.dev' not in ALLOWED_HOSTS:
+            ALLOWED_HOSTS.append('.ngrok-free.dev')
+    if '.ngrok.io' in ngrok_domain:
+        if '.ngrok.io' not in ALLOWED_HOSTS:
+            ALLOWED_HOSTS.append('.ngrok.io')
+    if '.ngrok.app' in ngrok_domain:
+        if '.ngrok.app' not in ALLOWED_HOSTS:
+            ALLOWED_HOSTS.append('.ngrok.app')
+
+# Application definition
+INSTALLED_APPS = [
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    'django.contrib.staticfiles',
+    
+    # Third party apps
+    'rest_framework',
+    'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
+    'corsheaders',
+    
+    # KonsultaBot apps
+    'chatbot_core',
+    'knowledgebase',
+    'analytics',
+    'user_account',  # RBAC system
+    'admin_panel',  # Admin Panel system
+]
+
+# Simplified settings for development
+CORS_ALLOW_ALL_ORIGINS = True  # Allow all origins in development
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+    'cache-control',
+    'pragma',
+    'x-client-version',
+    'x-client-platform',
+]
+# CSRF Trusted Origins - Add Ngrok URLs dynamically
+CSRF_TRUSTED_ORIGINS = [
+    'http://127.0.0.1:8000',
+    'http://localhost:8000',
+    'http://0.0.0.0:8000',
+    'http://10.0.2.2:8000',  # Android emulator
+    'http://localhost:8081',  # Expo web dev server
+    'http://127.0.0.1:8081',  # Expo web dev server
+    # Ngrok wildcard patterns (Django doesn't support wildcards, but we'll add specific domains)
+    'https://*.ngrok-free.dev',
+    'https://*.ngrok.io',
+    'https://*.ngrok.app',
+]
+
+# Add specific Ngrok URL from environment (for global access)
+# Note: Django doesn't support wildcards in CSRF_TRUSTED_ORIGINS, so we add the specific domain
+if NGROK_URL:
+    # Add both http and https versions of the specific domain
+    ngrok_domain = NGROK_URL.replace('https://', '').replace('http://', '').split('/')[0]
+    if ngrok_domain:
+        # Add specific domain
+        if f'https://{ngrok_domain}' not in CSRF_TRUSTED_ORIGINS:
+            CSRF_TRUSTED_ORIGINS.append(f'https://{ngrok_domain}')
+        if f'http://{ngrok_domain}' not in CSRF_TRUSTED_ORIGINS:
+            CSRF_TRUSTED_ORIGINS.append(f'http://{ngrok_domain}')
+
+# Note: Django doesn't support wildcards in CSRF_TRUSTED_ORIGINS
+# We'll add specific ngrok domains dynamically when they're detected
+# For now, CORS_ALLOW_ALL_ORIGINS = True handles CORS, and we exempt CSRF for API views
+USE_X_FORWARDED_HOST = False
+SECURE_PROXY_SSL_HEADER = None
+
+# REST Framework settings
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticatedOrReadOnly',
+    ],
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
+    ],
+    'DEFAULT_PARSER_CLASSES': [
+        'rest_framework.parsers.JSONParser',
+    ],
+    'EXCEPTION_HANDLER': 'rest_framework.views.exception_handler',
+    'DEFAULT_THROTTLE_CLASSES': [],
+    'DEFAULT_THROTTLE_RATES': {
+        'chat': '100/hour',
+        'voice': '50/hour',
+    }
+}
+
+# JWT Settings
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'UPDATE_LAST_LOGIN': True,
+    'ALGORITHM': 'HS256',
+    'SIGNING_KEY': SECRET_KEY,
+    'VERIFYING_KEY': None,
+    'AUTH_HEADER_TYPES': ('Bearer',),
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',
+    'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
+    'TOKEN_TYPE_CLAIM': 'token_type',
+}
+
+MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.security.SecurityMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.common.CommonMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware',
+]
+
+ROOT_URLCONF = 'django_konsultabot.urls'
+
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [BASE_DIR / 'templates'],
+        'APP_DIRS': True,
+        'OPTIONS': {
+            'context_processors': [
+                'django.template.context_processors.debug',
+                'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
+                'django.contrib.messages.context_processors.messages',
+            ],
+        },
+    },
+]
+
+WSGI_APPLICATION = 'django_konsultabot.wsgi.application'
+
+# Database configuration with PostgreSQL support
+# Priority: DATABASE_URL > DB_* env vars > SQLite fallback
+try:
+    import dj_database_url
+    DATABASE_URL = os.getenv('DATABASE_URL', '')
+    
+    if DATABASE_URL:
+        try:
+            # Parse DATABASE_URL (PostgreSQL/MySQL)
+            DATABASES = {
+                'default': dj_database_url.parse(DATABASE_URL, conn_max_age=600)
+            }
+            print(f"✅ Using database from DATABASE_URL: {DATABASES['default'].get('ENGINE', 'unknown')}")
+        except Exception as e:
+            print(f"⚠️ DATABASE_URL parsing failed: {e}")
+            print("⚠️ Falling back to SQLite")
+            DATABASES = {
+                'default': {
+                    'ENGINE': 'django.db.backends.sqlite3',
+                    'NAME': BASE_DIR / 'konsultabot_advanced.db',
+                }
+            }
+    elif os.getenv('DB_ENGINE'):
+        # Use DB_* environment variables
+        DATABASES = {
+            'default': {
+                'ENGINE': os.getenv('DB_ENGINE', 'django.db.backends.sqlite3'),
+                'NAME': os.getenv('DB_NAME', BASE_DIR / 'konsultabot_advanced.db'),
+                'USER': os.getenv('DB_USER', ''),
+                'PASSWORD': os.getenv('DB_PASSWORD', ''),
+                'HOST': os.getenv('DB_HOST', 'localhost'),
+                'PORT': os.getenv('DB_PORT', ''),
+            }
+        }
+        # Remove empty values
+        DATABASES['default'] = {k: v for k, v in DATABASES['default'].items() if v}
+        print(f"✅ Using database from DB_* env vars: {DATABASES['default'].get('ENGINE', 'unknown')}")
+    else:
+        # Default to SQLite
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': BASE_DIR / 'konsultabot_advanced.db',
+            }
+        }
+        print("ℹ️ Using SQLite (no DATABASE_URL or DB_* env vars set)")
+except ImportError:
+    # dj-database-url not installed, use SQLite
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'konsultabot_advanced.db',
+        }
+    }
+    print("ℹ️ Using SQLite (dj-database-url not installed)")
+
+# Password validation
+AUTH_PASSWORD_VALIDATORS = [
+    {
+        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+    },
+]
+
+# Internationalization
+LANGUAGE_CODE = 'en-us'
+TIME_ZONE = 'Asia/Manila'
+USE_I18N = True
+USE_TZ = True
+
+# Static files (CSS, JavaScript, Images)
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_DIRS = [
+    BASE_DIR / 'static',
+]
+
+# Media files
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+# Default primary key field type
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Custom user model for RBAC
+AUTH_USER_MODEL = 'user_account.User'
+
+# REST Framework settings
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticatedOrReadOnly',
+    ],
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 20,
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle'
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '100/hour',
+        'user': '1000/hour'
+    }
+}
+
+# JWT Configuration
+from datetime import timedelta
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'UPDATE_LAST_LOGIN': True,
+    
+    'ALGORITHM': 'HS256',
+    'SIGNING_KEY': SECRET_KEY,
+    'VERIFYING_KEY': None,
+    'AUDIENCE': None,
+    'ISSUER': None,
+    'JWK_URL': None,
+    'LEEWAY': 0,
+    
+    'AUTH_HEADER_TYPES': ('Bearer',),
+    'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',
+    'USER_AUTHENTICATION_RULE': 'rest_framework_simplejwt.authentication.default_user_authentication_rule',
+    
+    'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
+    'TOKEN_TYPE_CLAIM': 'token_type',
+    'TOKEN_USER_CLASS': 'rest_framework_simplejwt.models.TokenUser',
+    
+    'JTI_CLAIM': 'jti',
+    
+    'SLIDING_TOKEN_REFRESH_EXP_CLAIM': 'refresh_exp',
+    'SLIDING_TOKEN_LIFETIME': timedelta(minutes=60),
+    'SLIDING_TOKEN_REFRESH_LIFETIME': timedelta(days=1),
+}
+
+# CORS settings for React Native
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:19006",  # Expo web
+    "http://127.0.0.1:19006",
+    "http://192.168.1.17:19006",
+    "http://localhost:8081",   # Expo web dev server
+    "http://127.0.0.1:8081",
+    "http://192.168.1.17:8081",
+    "exp://192.168.1.14:8081", # Expo Go app
+]
+
+# CORS is already set above, this is redundant but kept for compatibility
+# CORS_ALLOW_ALL_ORIGINS = True  # Already set above
+
+# Logging configuration
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'file': {
+            'level': 'INFO',
+            'class': 'logging.FileHandler',
+            'filename': BASE_DIR / 'konsultabot.log',
+            'formatter': 'verbose',
+        },
+        'console': {
+            'level': 'DEBUG',
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        },
+    },
+    'root': {
+        'handlers': ['console', 'file'],
+        'level': 'INFO',
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'konsultabot': {
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+    },
+}
+
+# Security settings for production
+if not DEBUG:
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_REDIRECT_EXEMPT = []
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True

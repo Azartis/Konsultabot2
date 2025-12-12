@@ -1,0 +1,32 @@
+{
+  "general_facts": [
+    {
+      "fact": "KonsultaBot is an IT troubleshooting assistant for EVSU Dulag Campus",
+      "source": "system",
+      "date": "2025-11-27"
+    }
+  ],
+  "common_questions": [
+    {
+      "question": "Who are you?",
+      "frequency": 1,
+      "last_asked": "2025-11-27"
+    },
+    {
+      "question": "What can you do?",
+      "frequency": 1,
+      "last_asked": "2025-11-27"
+    }
+  ],
+  "learned_fixes": [
+    {
+      "issue": "Laptop won't turn on",
+      "solution": "Check power connection, try hard reset (hold power 30 seconds), check charger LED",
+      "success_rate": 0.85,
+      "verified": true,
+      "date": "2025-11-27"
+    }
+  ],
+  "past_failures": []
+}
+

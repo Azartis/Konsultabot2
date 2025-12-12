@@ -1,0 +1,38 @@
+[
+  {
+    "id": "kb_1",
+    "title": "The wifi is down all of a sudden, I am using freew...",
+    "question_pattern": "The wifi is down all of a sudden, I am using freewifi",
+    "answer": "Please try restarting the device you are currently using (e.g., your phone, laptop, or tablet). Often, a simple restart can resolve sudden Wi-Fi connectivity issues.\n\nAfter restarting, are you able to see any Wi-Fi networks available in your device's settings?",
+    "tags": [
+      "wifi"
+    ],
+    "source": "gemini",
+    "created_at": "2025-12-02T05:06:52.335902+00:00",
+    "updated_at": "2025-12-02T05:06:52.335902+00:00"
+  },
+  {
+    "id": "kb_2",
+    "title": "Kay ano waray internet it DCIT?",
+    "question_pattern": "Kay ano waray internet it DCIT?",
+    "answer": "It sounds like you're having trouble with internet connectivity at DCIT. Let's try to get that resolved.\n\nFirst, please try these basic troubleshooting steps:\n1.  **Restart the main internet router/modem:** Unplug it from power for about 30 seconds, then plug it back in and wait for all the indicator lights to stabilize.\n2.  **Restart the device you are using:** Sometimes a simple restart can clear temporary network glitches.\n\nCould you please clarify what \"DCIT\" refers to? Is it a specific computer, a department, or an entire network experiencing the outage?",
+    "tags": [
+      "wifi"
+    ],
+    "source": "gemini",
+    "created_at": "2025-12-02T06:10:06.719538+00:00",
+    "updated_at": "2025-12-02T06:10:06.719538+00:00"
+  },
+  {
+    "id": "kb_3",
+    "title": "What if my laptop always want to update?",
+    "question_pattern": "What if my laptop always want to update?",
+    "answer": "It sounds like your laptop might be stuck in an update loop or has an issue with its update settings. Let's try to get that sorted out.\n\nFirst, try pausing updates temporarily. If you're on Windows, go to **Settings > Update & Security > Windows Update**, and you should see an option to \"Pause updates for 7 days\" or \"Advanced options\" where you can set a custom pause period.\n\nTo help me give you more specific steps, could you tell me what operating system your laptop is running (e.g., Windows 10, Windows 11, macOS, etc.)?",
+    "tags": [
+      "laptop"
+    ],
+    "source": "gemini",
+    "created_at": "2025-12-02T06:27:36.343603+00:00",
+    "updated_at": "2025-12-02T06:27:36.343603+00:00"
+  }
+]
