@@ -46,6 +46,7 @@ export const AuthProvider = ({ children }) => {
         await AsyncStorage.setItem('authToken', response.token);
         await AsyncStorage.setItem('userData', JSON.stringify(response.user || response));
         setUser(response.user || response);
+        apiService.setAuthToken(response.token);
         return { success: true, user: response.user || response };
       }
       return { success: false, error: 'Invalid response from server' };
@@ -68,11 +69,28 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const changePassword = async (oldPassword, newPassword) => {
+    try {
+      await apiService.changePassword(oldPassword, newPassword);
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error:
+          error.response?.data?.detail ||
+          error.response?.data?.error ||
+          error.message ||
+          'Change password failed',
+      };
+    }
+  };
+
   const value = {
     user,
     loading,
     login,
     logout,
+    changePassword,
     isAuthenticated: !!user,
   };
 

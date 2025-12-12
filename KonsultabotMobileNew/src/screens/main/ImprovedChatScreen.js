@@ -10,14 +10,13 @@ import {
   Text,
   TextInput,
   ActivityIndicator,
-  SafeAreaView,
   FlatList,
   Modal,
   Alert,
   StatusBar,
   Keyboard,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Audio } from 'expo-av';
@@ -871,7 +870,7 @@ export default function ImprovedChatScreen({ navigation = null }) {
           try {
             // Clean up any existing listeners first (silently fail if Voice is null)
             try {
-              VoiceHelper.removeAllListeners();
+            VoiceHelper.removeAllListeners();
             } catch (removeError) {
               // Ignore errors when removing listeners (expected in Expo Go when Voice is null)
             }
@@ -1010,7 +1009,7 @@ export default function ImprovedChatScreen({ navigation = null }) {
       // Cancel VoiceHelper if available
       if (VoiceHelper.isAvailable()) {
         try {
-          await VoiceHelper.stop();
+        await VoiceHelper.stop();
         } catch (stopError) {
           // Ignore stop errors if Voice is not available (expected in Expo Go)
           // Only log if it's not a null-related error
@@ -1019,7 +1018,7 @@ export default function ImprovedChatScreen({ navigation = null }) {
           }
         }
         try {
-          VoiceHelper.removeAllListeners();
+        VoiceHelper.removeAllListeners();
         } catch (removeError) {
           // Ignore removeAllListeners errors (expected when Voice is null in Expo Go)
           if (!removeError.message?.includes('null') && !removeError.message?.includes('Cannot set property')) {
@@ -1134,14 +1133,14 @@ export default function ImprovedChatScreen({ navigation = null }) {
       // Try native VoiceHelper if available
       else if (VoiceHelper.isAvailable()) {
         try {
-          await VoiceHelper.stop();
+        await VoiceHelper.stop();
         } catch (stopError) {
           // Ignore stop errors
         }
         await new Promise(resolve => setTimeout(resolve, 300));
         transcript = voiceTranscript || '';
         try {
-          VoiceHelper.removeAllListeners();
+        VoiceHelper.removeAllListeners();
         } catch (removeError) {
           // Silently ignore - expected when Voice is null
         }
@@ -1285,14 +1284,14 @@ export default function ImprovedChatScreen({ navigation = null }) {
                   <MaterialIcons name="stop" size={20} color="#FFFFFF" />
                   <Text style={styles.stopButtonText}>Stop</Text>
                 </TouchableOpacity>
-                <TouchableOpacity 
-                  style={styles.cancelButton}
-                  onPress={cancelRecording}
-                  activeOpacity={0.7}
-                >
-                  <MaterialIcons name="close" size={20} color="#EF4444" />
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.cancelButton}
+                onPress={cancelRecording}
+                activeOpacity={0.7}
+              >
+                <MaterialIcons name="close" size={20} color="#EF4444" />
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
               </View>
             )}
           </View>
@@ -1480,7 +1479,7 @@ export default function ImprovedChatScreen({ navigation = null }) {
                   setShowSideMenu(false);
                   if (navigation && typeof navigation.navigate === 'function') {
                     try {
-                      navigation.navigate('Settings');
+                  navigation.navigate('Settings');
                     } catch (navError) {
                       console.warn('⚠️ Navigation error:', navError.message);
                       // Fallback: just close the menu if navigation fails

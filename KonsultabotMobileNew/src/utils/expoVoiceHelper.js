@@ -6,6 +6,7 @@ import { apiService } from '../services/apiService';
 
 let recording = null;
 let isRecording = false;
+let micPermissionGranted = false; // Cache mic permission during session
 
 export const ExpoVoiceHelper = {
   /**
@@ -17,7 +18,8 @@ export const ExpoVoiceHelper = {
       const { status: currentStatus } = await Audio.getPermissionsAsync();
       
       // If already granted, return true
-      if (currentStatus === 'granted') {
+      if (currentStatus === 'granted' || micPermissionGranted) {
+        micPermissionGranted = true;
         console.log('✅ Microphone permission already granted');
         return true;
       }
@@ -28,6 +30,7 @@ export const ExpoVoiceHelper = {
       
       if (status === 'granted') {
         console.log('✅ Microphone permission granted');
+        micPermissionGranted = true;
         return true;
       } else {
         console.warn('⚠️ Microphone permission denied');

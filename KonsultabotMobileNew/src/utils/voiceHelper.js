@@ -6,6 +6,8 @@ import { Platform, PermissionsAndroid } from 'react-native';
 
 let Voice = null;
 let isVoiceAvailable = false;
+let nativeModuleLinked = false; // Track if native module is actually usable
+let micPermissionGranted = false; // Cache microphone permission for this session
 
 // Try to import Voice, but handle gracefully if not available
 try {
@@ -27,28 +29,33 @@ try {
         // Check if Voice has required methods
         if (typeof Voice.start === 'function' && typeof Voice.stop === 'function') {
           isVoiceAvailable = true;
+          nativeModuleLinked = true;
           console.log('✅ Voice module loaded successfully');
         } else {
           console.warn('⚠️ Voice module loaded but missing required methods');
           isVoiceAvailable = false;
+          nativeModuleLinked = false;
         }
       } else {
         console.warn('⚠️ Voice module is null, undefined, or not an object');
         isVoiceAvailable = false;
+        nativeModuleLinked = false;
       }
     } else {
       console.warn('⚠️ VoiceModule is null or undefined');
       isVoiceAvailable = false;
+      nativeModuleLinked = false;
     }
   }
 } catch (error) {
   console.log('❌ Voice module not available:', error.message);
   isVoiceAvailable = false;
+  nativeModuleLinked = false;
 }
 
 export const VoiceHelper = {
   isAvailable: () => {
-    const available = isVoiceAvailable && Voice !== null;
+    const available = isVoiceAvailable && nativeModuleLinked && Voice !== null;
     if (!available) {
       console.log('VoiceHelper not available - Voice:', Voice, 'isVoiceAvailable:', isVoiceAvailable);
     } else {
@@ -67,6 +74,10 @@ export const VoiceHelper = {
     }
     
     try {
+      // If we've already granted permission in this session, skip re-checking
+      if (micPermissionGranted) {
+        return true;
+      }
       // First check if permission is already granted
       const checkResult = await PermissionsAndroid.check(
         PermissionsAndroid.PERMISSIONS.RECORD_AUDIO
@@ -74,6 +85,7 @@ export const VoiceHelper = {
       
       if (checkResult === PermissionsAndroid.RESULTS.GRANTED) {
         console.log('✅ Microphone permission already granted');
+        micPermissionGranted = true;
         return true;
       }
       
@@ -92,6 +104,7 @@ export const VoiceHelper = {
       
       if (granted === PermissionsAndroid.RESULTS.GRANTED) {
         console.log('✅ Microphone permission granted');
+        micPermissionGranted = true;
         return true;
       } else {
         console.warn('⚠️ Microphone permission denied');
@@ -148,6 +161,10 @@ export const VoiceHelper = {
       } catch (startError) {
         // If error mentions null or startSpeech, native module isn't linked
         if (startError.message && (startError.message.includes('null') || startError.message.includes('startSpeech'))) {
+          // Mark module as not linked so future calls skip VoiceHelper entirely
+          nativeModuleLinked = false;
+          isVoiceAvailable = false;
+          Voice = null;
           throw new Error('Native module not linked. This requires a development build, not Expo Go. Run: npx expo prebuild --clean && npx expo run:android');
         }
         throw startError;
@@ -172,8 +189,12 @@ export const VoiceHelper = {
         return false;
       }
     } catch (error) {
-      // Don't log errors if Voice is null - this is expected in Expo Go
-      if (Voice !== null) {
+      // If stop fails due to null native module, mark as unavailable to prevent repeats
+      if (error?.message?.includes('null') || error?.message?.includes('stopSpeech')) {
+        nativeModuleLinked = false;
+        isVoiceAvailable = false;
+        Voice = null;
+      } else if (Voice !== null) {
         console.error('Voice stop error:', error);
       }
       return false;

@@ -51,7 +51,8 @@ export const ThemeProvider = ({ children }) => {
     }
   };
 
-  const setTheme = async (mode) => {
+  // Explicitly set theme mode: 'light' | 'dark' | 'system'
+  const setThemeModePersisted = async (mode) => {
     setThemeMode(mode);
     try {
       await AsyncStorage.setItem('themeMode', mode);
@@ -94,7 +95,7 @@ export const ThemeProvider = ({ children }) => {
     isDark,
     themeMode,
     toggleTheme,
-    setTheme,
+    setThemeMode: setThemeModePersisted,
   };
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
