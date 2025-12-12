@@ -44,6 +44,7 @@
     "expo-secure-store": "~15.0.7",
     "expo-sharing": "~14.0.7",
     "expo-speech": "~14.0.7",
+    "expo-sqlite": "~15.0.5",
     "expo-status-bar": "~3.0.8",
     "react": "19.1.0",
     "react-dom": "19.1.0",
@@ -63,7 +64,8 @@
     "@react-native-community/cli-platform-android": "^20.0.2",
     "@react-native/babel-preset": "^0.82.1",
     "express": "^5.1.0",
-    "metro-react-native-babel-preset": "^0.77.0"
+    "metro-react-native-babel-preset": "^0.77.0",
+    "sharp": "^0.34.5"
   },
   "resolutions": {
     "@react-native-voice/voice": "3.2.4"

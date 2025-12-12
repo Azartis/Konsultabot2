@@ -14,6 +14,7 @@ urlpatterns = [
     
     # Voice processing endpoints
     path('speech-to-text/', views.speech_to_text_endpoint, name='speech_to_text'),
+    path('transcribe/', views.transcribe_audio_endpoint, name='transcribe_audio'),
     path('text-to-speech/', views.text_to_speech_endpoint, name='text_to_speech'),
     
     # Translation endpoint

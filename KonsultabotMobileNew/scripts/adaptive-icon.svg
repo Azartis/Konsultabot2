@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="glowGradient" cx="50%" cy="50%">
+      <stop offset="0%" stop-color="#00FFF0" stop-opacity="0.6"/>
+      <stop offset="50%" stop-color="#4F8EFF" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#00FFF0" stop-opacity="0"/>
+    </radialGradient>
+    
+    <radialGradient id="orbGradient" cx="30%" cy="30%">
+      <stop offset="0%" stop-color="#00FFF0"/>
+      <stop offset="30%" stop-color="#4F8EFF"/>
+      <stop offset="60%" stop-color="#8B5CF6"/>
+      <stop offset="100%" stop-color="#FF3B9A"/>
+    </radialGradient>
+    
+    <radialGradient id="highlightGradient" cx="30%" cy="30%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="8" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Outer glow -->
+  <circle 
+    cx="512" 
+    cy="512" 
+    r="614.4" 
+    fill="url(#glowGradient)" 
+    opacity="0.5"
+  />
+  
+  <!-- Main orb -->
+  <circle 
+    cx="512" 
+    cy="512" 
+    r="409.6" 
+    fill="url(#orbGradient)"
+    filter="url(#glow)"
+  />
+  
+  <!-- Inner highlight -->
+  <circle 
+    cx="358.4" 
+    cy="358.4" 
+    r="163.84000000000003" 
+    fill="url(#highlightGradient)"
+  />
+  
+  <!-- Reflection 1 -->
+  <circle 
+    cx="588.8" 
+    cy="614.4" 
+    r="102.4" 
+    fill="#FFFFFF" 
+    opacity="0.3"
+  />
+  
+  <!-- Reflection 2 -->
+  <circle 
+    cx="614.4" 
+    cy="358.4" 
+    r="61.44" 
+    fill="#FFFFFF" 
+    opacity="0.2"
+  />
+  
+  <!-- Particles -->
+  <circle cx="798.72" cy="512" r="4" fill="#00FFF0" opacity="0.6"/>
+  <circle cx="714.7416563018069" cy="714.7416563018069" r="4" fill="#00FFF0" opacity="0.6"/>
+  <circle cx="512" cy="798.72" r="4" fill="#00FFF0" opacity="0.6"/>
+  <circle cx="309.25834369819313" cy="714.7416563018069" r="4" fill="#00FFF0" opacity="0.6"/>
+  <circle cx="225.28000000000003" cy="512" r="4" fill="#00FFF0" opacity="0.6"/>
+  <circle cx="309.2583436981931" cy="309.25834369819313" r="4" fill="#00FFF0" opacity="0.6"/>
+  <circle cx="511.99999999999994" cy="225.28000000000003" r="4" fill="#00FFF0" opacity="0.6"/>
+  <circle cx="714.7416563018069" cy="309.2583436981931" r="4" fill="#00FFF0" opacity="0.6"/>
+</svg>

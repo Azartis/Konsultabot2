@@ -128,7 +128,7 @@ export default function ProfileScreen({ navigation }) {
             description="Update your account password"
             left={(props) => <List.Icon {...props} icon="lock" color={theme.colors.accent} />}
             right={(props) => <List.Icon {...props} icon="chevron-right" color={theme.colors.placeholder} />}
-            onPress={() => {/* Navigate to change password */}}
+            onPress={() => navigation.navigate('Settings')}
             titleStyle={styles.listItemTitle}
             descriptionStyle={styles.listItemDescription}
           />
@@ -190,7 +190,7 @@ export default function ProfileScreen({ navigation }) {
             description="Get help and contact support"
             left={(props) => <List.Icon {...props} icon="help-circle" color={theme.colors.accent} />}
             right={(props) => <List.Icon {...props} icon="chevron-right" color={theme.colors.placeholder} />}
-            onPress={() => {/* Navigate to help */}}
+            onPress={() => navigation.navigate('Help')}
             titleStyle={styles.listItemTitle}
             descriptionStyle={styles.listItemDescription}
           />

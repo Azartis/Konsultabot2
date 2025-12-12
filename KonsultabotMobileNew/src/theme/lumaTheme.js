@@ -1,6 +1,14 @@
 // Luma-inspired theme with holographic design
+import { MD3DarkTheme, configureFonts } from 'react-native-paper';
+
+const fontConfig = {
+  fontFamily: 'System',
+};
+
 export const lumaTheme = {
+  ...MD3DarkTheme,
   colors: {
+    ...MD3DarkTheme.colors,
     // Primary colors
     primary: '#4F8EFF',
     primaryGradientStart: '#5B8DEE',
@@ -9,11 +17,15 @@ export const lumaTheme = {
     // Background colors
     background: '#000000',
     surface: '#1A1A1A',
+    surfaceVariant: '#1E1E1E',
     card: '#1E1E1E',
     darkCard: '#0F0F0F',
     
     // Text colors
     text: '#FFFFFF',
+    onSurface: '#FFFFFF',
+    onBackground: '#FFFFFF',
+    onSurfaceVariant: '#A0A0A0',
     textSecondary: '#A0A0A0',
     textMuted: '#6B6B6B',
     
@@ -44,13 +56,33 @@ export const lumaTheme = {
     
     // React Native Paper compatibility
     accent: '#4F8EFF',
+    secondary: '#8B5CF6',
+    tertiary: '#00FFF0',
     backdrop: 'rgba(0, 0, 0, 0.5)',
-    onSurface: '#FFFFFF',
     disabled: '#6B6B6B',
     placeholder: '#6B6B6B',
     notification: '#FF3B9A',
+    outline: '#2A2A2A',
+    outlineVariant: '#1E1E1E',
+    inverseSurface: '#FFFFFF',
+    inverseOnSurface: '#000000',
+    inversePrimary: '#0047FF',
+    shadow: '#000000',
+    scrim: '#000000',
+    
+    // Elevation levels (required by react-native-paper)
+    elevation: {
+      level0: '#000000',
+      level1: '#0F0F0F',
+      level2: '#1A1A1A',
+      level3: '#1E1E1E',
+      level4: '#2A2A2A',
+      level5: '#333333',
+    },
   },
   dark: true,
+  fonts: configureFonts({ config: fontConfig }),
+  roundness: 12,
   
   gradients: {
     primary: ['#5B8DEE', '#0047FF'],

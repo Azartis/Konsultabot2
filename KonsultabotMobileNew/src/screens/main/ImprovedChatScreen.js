@@ -23,20 +23,25 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Audio } from 'expo-av';
 import * as Speech from 'expo-speech';
 import { VoiceHelper } from '../../utils/voiceHelper';
+import { ExpoVoiceHelper } from '../../utils/expoVoiceHelper';
 import { apiService } from '../../services/apiService';
 import { lumaTheme } from '../../theme/lumaTheme';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
 import { useChatHistory } from '../../context/ChatHistoryContext';
+import { useTheme } from '../../context/ThemeContext';
 import SpeechWaves from '../../components/SpeechWaves';
 import { useNetworkStatus } from '../../utils/networkUtils';
 import HolographicOrb from '../../components/HolographicOrb';
 import GlitchText from '../../components/GlitchText';
+import { useOfflineChat } from '../../hooks/useOfflineChat';
+import { initializeKnowledgeBase, getOfflineAnswer } from '../../../utils/offlineKnowledgeBase';
 
 const { width, height } = Dimensions.get('window');
 
 export default function ImprovedChatScreen({ navigation }) {
   const { user, logout } = useAuth();
+  const { theme, isDark } = useTheme();
   const { 
     currentChatId, 
     getCurrentChat, 
@@ -50,6 +55,15 @@ export default function ImprovedChatScreen({ navigation }) {
   
   // Network status detection
   const { isOnline, isBackendOnline, checkConnectivity } = useNetworkStatus();
+  
+  // Offline chat storage - use currentChatId or create one
+  const chatId = currentChatId || `chat_${user?.id || 'guest'}_${Date.now()}`;
+  const { 
+    saveMessageOffline, 
+    loadOfflineMessages,
+    syncNow,
+    isSyncing 
+  } = useOfflineChat(chatId);
   
   // Get safe area insets for proper spacing on mobile devices
   const insets = useSafeAreaInsets();
@@ -79,6 +93,9 @@ export default function ImprovedChatScreen({ navigation }) {
   const carouselRef = useRef();
   const prevUserRef = useRef(user);
 
+  // Create theme-aware styles
+  const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
+
   const buildFullName = (profile) => {
     if (!profile) return null;
     const parts = [
@@ -101,7 +118,31 @@ export default function ImprovedChatScreen({ navigation }) {
     initializeChat();
     initializeSpeechRecognition();
     initializeWakeWordDetection();
-  }, []);
+    
+    // Initialize offline knowledge base
+    initializeKnowledgeBase().catch(err => {
+      console.error('Failed to initialize offline KB:', err);
+    });
+    
+    // Load offline messages if available
+    if (user?.id && chatId) {
+      loadOfflineMessages().then(offlineMessages => {
+        if (offlineMessages && offlineMessages.length > 0) {
+          // Merge with existing messages (avoid duplicates)
+          setMessages(prev => {
+            const existingIds = new Set(prev.map(m => m.id));
+            const newMessages = offlineMessages.filter(m => !existingIds.has(m.id));
+            return [...prev, ...newMessages].sort((a, b) => 
+              new Date(a.timestamp) - new Date(b.timestamp)
+            );
+          });
+        }
+      }).catch(err => {
+        console.error('Error loading offline messages:', err);
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentChatId, user?.id, chatId]);
 
   // Detect login: when user changes from null/undefined to a user object
   useEffect(() => {
@@ -388,8 +429,11 @@ export default function ImprovedChatScreen({ navigation }) {
     }
   };
 
-  const sendMessage = async (text = inputText, fromVoice = false) => {
-    if (!text.trim() || isLoading) return;
+  const sendMessage = async (text = null, fromVoice = false) => {
+    // Capture the current input text before clearing it
+    const messageText = text !== null ? text.trim() : inputText.trim();
+    
+    if (!messageText || isLoading) return;
     
     // Stop any ongoing speech before sending new message
     try {
@@ -399,15 +443,17 @@ export default function ImprovedChatScreen({ navigation }) {
       console.log('No speech to stop');
     }
 
+    // Clear input immediately after capturing text
+    setInputText('');
+
     const userMessage = {
       id: Date.now(),
-      text: text.trim(),
+      text: messageText,
       sender: 'user',
       timestamp: new Date(),
     };
 
     setMessages(prev => [...prev, userMessage]);
-    setInputText('');
     setIsLoading(true);
 
     try {
@@ -426,7 +472,7 @@ export default function ImprovedChatScreen({ navigation }) {
       // Step 2: Always use backend chatbot with KB integration
       console.log('🌐 Calling backend /api/v1/chat/ via apiService...');
       const backendResponse = await apiService.sendV1ChatMessage(
-        text.trim(), 
+        messageText, 
         'english', 
         null, // sessionId
         { is_satisfied: isSatisfied } // additionalData
@@ -468,16 +514,23 @@ export default function ImprovedChatScreen({ navigation }) {
         mode: data.mode || data.metadata?.mode || 'normal',
         kb_source: data.source === 'knowledge_base',
         question_count: data.question_count || questionCount + 1,
-        userQuery: text.trim(), // Store the user's query for feedback
+        userQuery: messageText, // Store the user's query for feedback
         satisfied: null, // Track satisfaction state per message
       };
 
       setMessages(prev => [...prev, botMessage]);
       
+      // Save to offline storage (always save, even if from backend)
+      if (user?.id) {
+        saveMessageOffline(messageText, answerText, 'english').catch(err => {
+          console.error('Error saving message offline:', err);
+        });
+      }
+      
       // Store last bot message for feedback tracking
       setLastBotMessage({
         ...botMessage,
-        userQuery: text.trim(),
+        userQuery: messageText,
       });
       
       // Speak the bot's response with text-to-speech when from voice input
@@ -514,13 +567,56 @@ export default function ImprovedChatScreen({ navigation }) {
       
     } catch (error) {
       console.error('❌ Error in sendMessage:', error);
-      // Show error as warning (not as chat message)
-      setWarningMessage({
-        type: 'error',
-        message: "I couldn't reach the online assistant. Please check your internet connection or make sure the backend server is running, then try again.",
-      });
-      // Auto-hide warning after 8 seconds
-      setTimeout(() => setWarningMessage(null), 8000);
+      console.log('📴 Falling back to offline mode...');
+      
+      // Fallback to offline knowledge base
+      try {
+        const offlineAnswer = await getOfflineAnswer(messageText, 'english');
+        const offlineBotMessage = {
+          id: Date.now() + 1,
+          text: offlineAnswer,
+          sender: 'bot',
+          timestamp: new Date(),
+          confidence: 0.8,
+          source: 'offline',
+          mode: 'offline',
+          kb_source: true,
+          question_count: questionCount + 1,
+          userQuery: text.trim(),
+          satisfied: null,
+        };
+
+        setMessages(prev => [...prev, offlineBotMessage]);
+        
+        // Save to offline storage
+        if (user?.id) {
+          saveMessageOffline(messageText, offlineAnswer, 'english').catch(err => {
+            console.error('Error saving offline message:', err);
+          });
+        }
+        
+        // Store last bot message for feedback tracking
+        setLastBotMessage({
+          ...offlineBotMessage,
+          userQuery: messageText,
+        });
+        
+        // Show info message (not error) since offline mode is working
+        setWarningMessage({
+          type: 'info',
+          message: "📴 Offline Mode: Using local knowledge base. Your message will sync when online.",
+        });
+        setTimeout(() => setWarningMessage(null), 5000);
+      } catch (offlineError) {
+        console.error('❌ Offline mode also failed:', offlineError);
+        // Show error as warning (not as chat message)
+        setWarningMessage({
+          type: 'error',
+          message: "I couldn't reach the online assistant and offline mode failed. Please check your connection and try again.",
+        });
+        // Auto-hide warning after 8 seconds
+        setTimeout(() => setWarningMessage(null), 8000);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -564,7 +660,10 @@ export default function ImprovedChatScreen({ navigation }) {
 
   const renderMessage = (item) => {
     const isUser = item.sender === 'user';
-    const isKB = item.kb_source === true;
+    const isKB = item.kb_source === true || item.source === 'user_kb' || item.source === 'knowledge_base';
+    const isOffline = item.source === 'offline';
+    const source = item.source || 'unknown';
+    
     return (
       <View key={item.id} style={[styles.messageRow, isUser ? styles.userRow : styles.botRow]}>
         {!isUser && (
@@ -577,14 +676,35 @@ export default function ImprovedChatScreen({ navigation }) {
             styles.messageBlock,
             isUser ? styles.userBlock : styles.botBlock,
             isKB && styles.kbMessageBlock,
+            isOffline && styles.offlineMessageBlock,
           ]}
         >
-          {isKB && (
-            <View style={styles.kbBadge}>
-              <MaterialIcons name="book" size={12} color="#4285F4" />
-              <Text style={styles.kbBadgeText}>Knowledge Base</Text>
+          {/* Source Badge */}
+          {!isUser && (
+            <View style={styles.messageSourceBadge}>
+              {isKB && (
+                <View style={styles.sourceBadge}>
+                  <MaterialIcons name="book" size={12} color="#4285F4" />
+                  <Text style={styles.sourceBadgeText}>
+                    {source === 'user_kb' ? 'Your Knowledge' : 'Knowledge Base'}
+                  </Text>
+                </View>
+              )}
+              {isOffline && (
+                <View style={[styles.sourceBadge, styles.offlineBadge]}>
+                  <MaterialIcons name="cloud-off" size={12} color="#9AA0A6" />
+                  <Text style={[styles.sourceBadgeText, styles.offlineBadgeText]}>Offline</Text>
+                </View>
+              )}
+              {!isKB && !isOffline && source === 'gemini' && (
+                <View style={[styles.sourceBadge, styles.aiBadge]}>
+                  <MaterialIcons name="auto-awesome" size={12} color="#9C27B0" />
+                  <Text style={[styles.sourceBadgeText, styles.aiBadgeText]}>AI Powered</Text>
+                </View>
+              )}
             </View>
           )}
+          
           <Text
             style={[
               styles.messageText,
@@ -593,6 +713,14 @@ export default function ImprovedChatScreen({ navigation }) {
           >
             {item.text}
           </Text>
+          
+          {/* Timestamp */}
+          {item.timestamp && (
+            <Text style={styles.messageTimestamp}>
+              {formatTimestamp(item.timestamp)}
+            </Text>
+          )}
+          
           {!isUser && (
             <View style={styles.satisfactionButtons}>
               <TouchableOpacity
@@ -691,110 +819,120 @@ export default function ImprovedChatScreen({ navigation }) {
         return;
       }
       
-      // Mobile: Use VoiceHelper (which wraps @react-native-voice/voice)
+      // Mobile: Try VoiceHelper first, fallback to ExpoVoiceHelper
       console.log('Starting mobile speech recognition...');
       
-      if (!VoiceHelper.isAvailable()) {
-        Alert.alert(
-          'Speech Recognition Not Available',
-          'Speech recognition requires a native module that is not available in Expo Go.\n\nPlease create a development build:\n\n1. Run: npx expo prebuild --clean\n2. Run: npx expo run:android\n\nOr use EAS Build to create a development build.',
-          [{ text: 'OK' }]
-        );
-        return;
-      }
-      
-      // Check if native module is actually available (if method exists)
-      if (typeof VoiceHelper.checkNativeModule === 'function') {
-        try {
-          const nativeAvailable = await VoiceHelper.checkNativeModule();
-          if (nativeAvailable === false) {
-            Alert.alert(
-              'Native Module Not Linked',
-              'The voice recognition native module is not properly linked.\n\nThis requires a development build, not Expo Go.\n\nSteps:\n1. npx expo prebuild --clean\n2. npx expo run:android',
-              [{ text: 'OK' }]
-            );
-            return;
+      // First, try VoiceHelper (native speech recognition)
+      if (VoiceHelper.isAvailable()) {
+        // Check if native module is actually available (if method exists)
+        let useVoiceHelper = true;
+        if (typeof VoiceHelper.checkNativeModule === 'function') {
+          try {
+            const nativeAvailable = await VoiceHelper.checkNativeModule();
+            if (nativeAvailable === false) {
+              console.log('⚠️ Native module not linked, falling back to ExpoVoiceHelper');
+              useVoiceHelper = false;
+            }
+          } catch (checkError) {
+            console.warn('Native module check failed, falling back to ExpoVoiceHelper:', checkError);
+            useVoiceHelper = false;
           }
-        } catch (checkError) {
-          console.warn('Native module check failed:', checkError);
-          // Continue anyway - might still work
+        }
+        
+        if (useVoiceHelper) {
+          try {
+            // Clean up any existing listeners first
+            VoiceHelper.removeAllListeners();
+            setVoiceTranscript('');
+            
+            // Set up event listeners BEFORE starting
+            // Set up partial results listener for real-time transcription
+            VoiceHelper.on('SpeechPartialResults', (event) => {
+              console.log('📝 SpeechPartialResults event:', event);
+              if (event && event.value && Array.isArray(event.value) && event.value.length > 0) {
+                const partialTranscript = event.value[0];
+                if (partialTranscript && typeof partialTranscript === 'string' && partialTranscript.trim()) {
+                  console.log('✅ Partial speech recognized:', partialTranscript);
+                  setVoiceTranscript(partialTranscript);
+                  setInputText(partialTranscript);
+                }
+              }
+            });
+            
+            // Set up final result listener
+            VoiceHelper.on('SpeechResults', (event) => {
+              console.log('✅ SpeechResults event:', event);
+              // @react-native-voice/voice provides event.value as array of strings
+              if (event && event.value && Array.isArray(event.value) && event.value.length > 0) {
+                const transcript = event.value[0];
+                if (transcript && typeof transcript === 'string' && transcript.trim()) {
+                  console.log('✅ Final speech recognized:', transcript);
+                  setVoiceTranscript(transcript);
+                  setInputText(transcript);
+                }
+              }
+            });
+            
+            VoiceHelper.on('SpeechError', (error) => {
+              console.error('❌ Speech recognition error:', error);
+              setIsRecording(false);
+              setIsTranscribing(false);
+              setIsVoiceInput(false);
+              setVoiceTranscript('');
+              const errorMsg = error?.error?.message || error?.message || error?.error || 'Unknown error';
+              Alert.alert(
+                'Speech Recognition Error',
+                `Could not recognize speech: ${errorMsg}`,
+                [{ text: 'OK' }]
+              );
+            });
+            
+            VoiceHelper.on('SpeechEnd', () => {
+              console.log('🛑 Speech recognition ended');
+              setIsRecording(false);
+            });
+            
+            VoiceHelper.on('SpeechStart', () => {
+              console.log('🎤 Speech recognition started');
+              setIsRecording(true);
+            });
+            
+            // Now start recognition
+            console.log('🚀 Starting voice recognition with VoiceHelper...');
+            const started = await VoiceHelper.start('en-US');
+            if (started) {
+              setIsRecording(true);
+              setIsVoiceInput(true);
+              console.log('✅ Mobile speech recognition started - speak now!');
+              return; // Success, exit early
+            } else {
+              throw new Error('Failed to start voice recognition - start() returned false');
+            }
+          } catch (error) {
+            console.error('Failed to start VoiceHelper, falling back to ExpoVoiceHelper:', error);
+            // Fall through to ExpoVoiceHelper
+          }
         }
       }
       
+      // Fallback: Use ExpoVoiceHelper (expo-av recording + backend transcription)
+      console.log('🎤 Using ExpoVoiceHelper as fallback...');
       try {
-        // Clean up any existing listeners first
-        VoiceHelper.removeAllListeners();
-        setVoiceTranscript('');
-        
-        // Set up event listeners BEFORE starting
-        // Set up partial results listener for real-time transcription
-        VoiceHelper.on('SpeechPartialResults', (event) => {
-          console.log('📝 SpeechPartialResults event:', event);
-          if (event && event.value && Array.isArray(event.value) && event.value.length > 0) {
-            const partialTranscript = event.value[0];
-            if (partialTranscript && typeof partialTranscript === 'string' && partialTranscript.trim()) {
-              console.log('✅ Partial speech recognized:', partialTranscript);
-              setVoiceTranscript(partialTranscript);
-              setInputText(partialTranscript);
-            }
-          }
-        });
-        
-        // Set up final result listener
-        VoiceHelper.on('SpeechResults', (event) => {
-          console.log('✅ SpeechResults event:', event);
-          // @react-native-voice/voice provides event.value as array of strings
-          if (event && event.value && Array.isArray(event.value) && event.value.length > 0) {
-            const transcript = event.value[0];
-            if (transcript && typeof transcript === 'string' && transcript.trim()) {
-              console.log('✅ Final speech recognized:', transcript);
-              setVoiceTranscript(transcript);
-              setInputText(transcript);
-            }
-          }
-        });
-        
-        VoiceHelper.on('SpeechError', (error) => {
-          console.error('❌ Speech recognition error:', error);
-          setIsRecording(false);
-          setIsTranscribing(false);
-          setIsVoiceInput(false);
-          setVoiceTranscript('');
-          const errorMsg = error?.error?.message || error?.message || error?.error || 'Unknown error';
-          Alert.alert(
-            'Speech Recognition Error',
-            `Could not recognize speech: ${errorMsg}`,
-            [{ text: 'OK' }]
-          );
-        });
-        
-        VoiceHelper.on('SpeechEnd', () => {
-          console.log('🛑 Speech recognition ended');
-          setIsRecording(false);
-        });
-        
-        VoiceHelper.on('SpeechStart', () => {
-          console.log('🎤 Speech recognition started');
-          setIsRecording(true);
-        });
-        
-        // Now start recognition
-        console.log('🚀 Starting voice recognition...');
-        const started = await VoiceHelper.start('en-US');
+        const started = await ExpoVoiceHelper.start();
         if (started) {
           setIsRecording(true);
           setIsVoiceInput(true);
-          console.log('✅ Mobile speech recognition started - speak now!');
+          console.log('✅ Audio recording started with ExpoVoiceHelper - speak now!');
         } else {
-          throw new Error('Failed to start voice recognition - start() returned false');
+          throw new Error('Failed to start audio recording');
         }
       } catch (error) {
-        console.error('Failed to start VoiceHelper:', error);
+        console.error('Failed to start ExpoVoiceHelper:', error);
         setIsRecording(false);
         setIsVoiceInput(false);
         Alert.alert(
-          'Speech Recognition Error',
-          `Could not start speech recognition: ${error.message || 'Unknown error'}`,
+          'Microphone Error',
+          `Could not access microphone: ${error.message || 'Please check microphone permissions in your device settings.'}`,
           [{ text: 'OK' }]
         );
       }
@@ -831,8 +969,13 @@ export default function ImprovedChatScreen({ navigation }) {
       return;
     }
     
-    // Mobile - stop and discard speech recognition
+    // Mobile - stop and discard recording
     try {
+      // Cancel ExpoVoiceHelper if recording
+      if (ExpoVoiceHelper.isRecording) {
+        await ExpoVoiceHelper.cancel();
+      }
+      // Cancel VoiceHelper if available
       if (VoiceHelper.isAvailable()) {
         await VoiceHelper.stop();
         VoiceHelper.removeAllListeners();
@@ -843,7 +986,7 @@ export default function ImprovedChatScreen({ navigation }) {
       setVoiceTranscript('');
       console.log('Recording canceled');
     } catch (error) {
-      console.error('Error canceling speech recognition:', error);
+      console.error('Error canceling recording:', error);
       setIsRecording(false);
       setIsTranscribing(false);
       setIsVoiceInput(false);
@@ -869,12 +1012,65 @@ export default function ImprovedChatScreen({ navigation }) {
       return;
     }
     
-    // Mobile: Stop speech recognition and get transcript
+    // Mobile: Stop recording and transcribe
     setIsRecording(false);
     setIsTranscribing(true);
     
     try {
-      if (!VoiceHelper.isAvailable()) {
+      let transcript = '';
+      
+      // Check if using ExpoVoiceHelper (expo-av recording)
+      if (ExpoVoiceHelper.isRecording) {
+        console.log('🛑 Stopping Expo audio recording...');
+        const audioUri = await ExpoVoiceHelper.stop();
+        
+        if (audioUri) {
+          console.log('📤 Sending audio for transcription:', audioUri);
+          try {
+            // Send audio to backend for transcription
+            const transcriptionResult = await apiService.transcribeAudio(audioUri, 'en-US');
+            transcript = transcriptionResult?.transcript || transcriptionResult?.text || '';
+            
+            if (transcript) {
+              console.log('✅ Transcription received:', transcript);
+              setInputText(transcript);
+              setIsVoiceInput(true);
+            } else {
+              throw new Error('No transcript returned from server');
+            }
+          } catch (transcribeError) {
+            console.error('❌ Transcription error:', transcribeError);
+            // Check if offline - provide helpful message
+            const isOffline = !navigator.onLine || (typeof NetInfo !== 'undefined' && !NetInfo.isConnected);
+            if (isOffline) {
+              Alert.alert(
+                'Offline Mode',
+                'Voice transcription requires internet connection. Please connect to the internet or type your message instead.',
+                [{ text: 'OK' }]
+              );
+            } else {
+              Alert.alert(
+                'Transcription Error',
+                'Could not transcribe audio. Please try typing your message instead.',
+                [{ text: 'OK' }]
+              );
+            }
+            setIsTranscribing(false);
+            setIsVoiceInput(false);
+            return;
+          }
+        } else {
+          throw new Error('No audio file recorded');
+        }
+      } 
+      // Try native VoiceHelper if available
+      else if (VoiceHelper.isAvailable()) {
+        await VoiceHelper.stop();
+        await new Promise(resolve => setTimeout(resolve, 300));
+        transcript = voiceTranscript || '';
+        VoiceHelper.removeAllListeners();
+        setVoiceTranscript('');
+      } else {
         setIsTranscribing(false);
         setIsVoiceInput(false);
         Alert.alert(
@@ -884,21 +1080,6 @@ export default function ImprovedChatScreen({ navigation }) {
         );
         return;
       }
-      
-      // Stop VoiceHelper
-      await VoiceHelper.stop();
-      
-      // Wait a moment for final processing
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      // Get transcript from state (set by listener)
-      let transcript = voiceTranscript || '';
-      
-      // Clear the transcript state for next recording
-      setVoiceTranscript('');
-      
-      // Remove listeners
-      VoiceHelper.removeAllListeners();
       
       // If no transcript, show message to user
       if (!transcript || !transcript.trim()) {
@@ -1005,8 +1186,8 @@ export default function ImprovedChatScreen({ navigation }) {
   return (
     <View style={[styles.container, Platform.OS === 'web' && { height: '100vh', maxHeight: '100vh' }]}>
       <StatusBar 
-        barStyle="dark-content" 
-        backgroundColor={Platform.OS === 'android' ? 'transparent' : '#FFFFFF'}
+        barStyle={isDark ? "light-content" : "dark-content"} 
+        backgroundColor={Platform.OS === 'android' ? 'transparent' : (isDark ? theme.colors.surface : '#FFFFFF')}
         translucent={Platform.OS === 'android'}
       />
       <SafeAreaView 
@@ -1079,7 +1260,33 @@ export default function ImprovedChatScreen({ navigation }) {
             <GlitchText style={styles.geminiTitle}>Konsultabot</GlitchText>
           </View>
           
-          <TouchableOpacity 
+          {/* Network Status Indicator and Profile - Right side */}
+          <View style={styles.headerRightContainer}>
+            {/* Network Status Indicator - Moved to header */}
+            <View style={styles.headerNetworkStatus}>
+              <View style={[
+                styles.networkStatusBadge,
+                isBackendOnline ? styles.networkStatusOnline : styles.networkStatusOffline
+              ]}>
+                <View style={[
+                  styles.networkStatusDot,
+                  isBackendOnline && styles.networkStatusDotActive
+                ]} />
+                <Text style={[
+                  styles.networkStatusText,
+                  { color: isBackendOnline ? (isDark ? '#10B981' : '#059669') : (isDark ? '#EF4444' : '#DC2626') }
+                ]}>
+                  {isBackendOnline ? 'Online' : 'Offline'}
+                </Text>
+                {isSyncing && (
+                  <View style={styles.syncIndicator}>
+                    <ActivityIndicator size="small" color={isDark ? '#4285F4' : '#1A73E8'} />
+                  </View>
+                )}
+              </View>
+            </View>
+            
+            <TouchableOpacity 
             style={styles.profileButton}
             onPress={() => setShowProfileMenu(!showProfileMenu)}
           >
@@ -1089,6 +1296,7 @@ export default function ImprovedChatScreen({ navigation }) {
               </Text>
             </View>
           </TouchableOpacity>
+          </View>
         </View>
         
         {/* Profile Dropdown Menu */}
@@ -1183,7 +1391,13 @@ export default function ImprovedChatScreen({ navigation }) {
               </View>
               
               {/* Settings & Help */}
-              <TouchableOpacity style={styles.sideMenuSettings}>
+              <TouchableOpacity 
+                style={styles.sideMenuSettings}
+                onPress={() => {
+                  setShowSideMenu(false);
+                  navigation.navigate('Settings');
+                }}
+              >
                 <MaterialIcons name="settings" size={20} color="#5F6368" />
                 <Text style={styles.sideMenuSettingsText}>Settings & help</Text>
               </TouchableOpacity>
@@ -1269,8 +1483,12 @@ export default function ImprovedChatScreen({ navigation }) {
               
               {isLoading && (
                 <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="small" color="#4285F4" />
-                  <Text style={styles.loadingText}>Thinking...</Text>
+                  <View style={styles.loadingBubble}>
+                    <ActivityIndicator size="small" color="#4285F4" />
+                    <Text style={styles.loadingText}>
+                      {isBackendOnline ? 'Thinking...' : 'Searching offline knowledge...'}
+                    </Text>
+                  </View>
                 </View>
               )}
             </View>
@@ -1340,10 +1558,19 @@ export default function ImprovedChatScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+// Create theme-aware styles
+const createStyles = (theme, isDark) => {
+  const bgColor = isDark ? theme.colors.background : '#F8F9FA';
+  const surfaceColor = isDark ? theme.colors.surface : '#FFFFFF';
+  const textColor = isDark ? theme.colors.text : '#202124';
+  const textSecondary = isDark ? (theme.colors.textSecondary || theme.colors.textMuted || '#A0A0A0') : '#5F6368';
+  const borderColor = isDark ? (theme.colors.border || theme.colors.outline || '#2A2A2A') : '#E8EAED';
+  const dividerColor = isDark ? (theme.colors.divider || theme.colors.border || '#1E1E1E') : '#E8EAED';
+  
+  return StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: bgColor,
     ...(Platform.OS === 'web' && {
       height: '100vh',
       maxHeight: '100vh',
@@ -1352,7 +1579,7 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: bgColor,
   },
   contentContainer: {
     flex: 1,
@@ -1367,6 +1594,62 @@ const styles = StyleSheet.create({
   contentContainerBlurred: {
     opacity: 0.1,
   },
+  // Network Status Indicator
+  networkStatusContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 4,
+    backgroundColor: surfaceColor,
+    borderBottomWidth: 1,
+    borderBottomColor: dividerColor,
+  },
+  networkStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    backgroundColor: isDark ? 'rgba(107, 114, 128, 0.3)' : '#F1F3F4',
+  },
+  networkStatusOnline: {
+    backgroundColor: isDark ? 'rgba(16, 185, 129, 0.2)' : '#E6F7F0',
+  },
+  networkStatusOffline: {
+    backgroundColor: isDark ? 'rgba(239, 68, 68, 0.2)' : '#FEE2E2',
+  },
+  networkStatusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#6B7280',
+    marginRight: 6,
+  },
+  networkStatusDotActive: {
+    backgroundColor: '#10B981',
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  networkStatusText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: textColor,
+  },
+  syncIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 6,
+    paddingLeft: 6,
+    borderLeftWidth: 1,
+    borderLeftColor: dividerColor,
+  },
+  syncText: {
+    fontSize: 11,
+    color: textSecondary,
+    marginLeft: 4,
+  },
   // Gemini Header Styles
   geminiHeader: {
     flexDirection: 'row',
@@ -1374,7 +1657,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: surfaceColor,
     borderBottomWidth: 0,
   },
   menuButton: {
@@ -1383,12 +1666,21 @@ const styles = StyleSheet.create({
   geminiTitleContainer: {
     flex: 1,
     alignItems: 'center',
+    marginRight: 8,
   },
   geminiTitle: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#202124',
+    color: textColor,
     letterSpacing: 0.5,
+  },
+  headerRightContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerNetworkStatus: {
+    // Network status in header
   },
   profileButton: {
     padding: 4,
@@ -1470,7 +1762,7 @@ const styles = StyleSheet.create({
   greetingText: {
     fontSize: 32,
     fontWeight: '400',
-    color: '#1A73E8',
+    color: isDark ? theme.colors.primary : '#1A73E8',
     letterSpacing: 0,
   },
   // Action Chips
@@ -1497,13 +1789,13 @@ const styles = StyleSheet.create({
   },
   actionChipText: {
     fontSize: 14,
-    color: '#202124',
+    color: textColor,
     fontWeight: '400',
   },
   // Main Content
   mainContent: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: bgColor,
     ...(Platform.OS === 'web' && {
       overflow: 'auto',
     }),
@@ -1520,7 +1812,7 @@ const styles = StyleSheet.create({
     zIndex: 10000,
   },
   recordingContainer: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: surfaceColor,
     borderRadius: 24,
     padding: 32,
     alignItems: 'center',
@@ -1533,7 +1825,7 @@ const styles = StyleSheet.create({
     }),
   },
   recordingText: {
-    color: '#202124',
+    color: textColor,
     fontSize: 16,
     fontWeight: '500',
     textAlign: 'center',
@@ -1566,7 +1858,7 @@ const styles = StyleSheet.create({
   sideMenuContainer: {
     width: width * 0.85,
     maxWidth: 360,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: surfaceColor,
     paddingTop: 16,
     paddingBottom: 20,
   },
@@ -1577,7 +1869,7 @@ const styles = StyleSheet.create({
   sideMenuSearch: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F1F3F4',
+    backgroundColor: isDark ? theme.colors.surfaceVariant || theme.colors.surface : '#F1F3F4',
     marginHorizontal: 16,
     marginBottom: 16,
     paddingHorizontal: 12,
@@ -1588,7 +1880,7 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 8,
     fontSize: 14,
-    color: '#202124',
+    color: textColor,
   },
   sideMenuNewChat: {
     flexDirection: 'row',
@@ -1601,7 +1893,7 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 16,
     fontSize: 14,
-    color: '#202124',
+    color: textColor,
     fontWeight: '400',
   },
   sideMenuNewChatIcon: {
@@ -1621,7 +1913,7 @@ const styles = StyleSheet.create({
   sideMenuSectionTitle: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#202124',
+    color: textColor,
   },
   sideMenuChatsList: {
     maxHeight: 300,
@@ -1631,17 +1923,17 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   sideMenuChatItemActive: {
-    backgroundColor: '#E8F0FE',
+    backgroundColor: isDark ? 'rgba(79, 142, 255, 0.2)' : '#E8F0FE',
   },
   sideMenuChatTitle: {
     fontSize: 14,
-    color: '#5F6368',
+    color: textSecondary,
   },
   sideMenuEmptyChats: {
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 14,
-    color: '#9AA0A6',
+    color: textSecondary,
     fontStyle: 'italic',
   },
   sideMenuSettings: {
@@ -1651,17 +1943,17 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     marginTop: 'auto',
     borderTopWidth: 1,
-    borderTopColor: '#E8EAED',
+    borderTopColor: dividerColor,
   },
   sideMenuSettingsText: {
     marginLeft: 16,
     fontSize: 14,
-    color: '#202124',
+    color: textColor,
   },
   sideMenuUpgrade: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F1F3F4',
+    backgroundColor: isDark ? theme.colors.surfaceVariant || theme.colors.surface : '#F1F3F4',
     marginHorizontal: 16,
     marginTop: 12,
     paddingHorizontal: 16,
@@ -1681,7 +1973,7 @@ const styles = StyleSheet.create({
   sideMenuUpgradeText: {
     flex: 1,
     fontSize: 14,
-    color: '#202124',
+    color: textColor,
     fontWeight: '500',
   },
   headerOrb: {
@@ -1697,7 +1989,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: width > 768 ? 22 : 18,
     fontWeight: 'bold',
-    color: lumaTheme.colors.text,
+    color: textColor,
     letterSpacing: 0.5,
   },
   statusBadge: {
@@ -1724,7 +2016,7 @@ const styles = StyleSheet.create({
   },
   headerSubtitle: {
     fontSize: width > 768 ? 12 : 11,
-    color: lumaTheme.colors.textSecondary,
+    color: textSecondary,
     marginTop: 4,
   },
   headerButton: {
@@ -1776,12 +2068,13 @@ const styles = StyleSheet.create({
     borderRadius: 18,
   },
   botBlock: {
-    backgroundColor: '#E8F0FE',
+    backgroundColor: isDark ? (theme.colors.surfaceVariant || theme.colors.surface) : '#E8F0FE',
     borderTopLeftRadius: 4,
   },
   userBlock: {
-    backgroundColor: '#F1F3F4',
+    backgroundColor: isDark ? theme.colors.primary : '#F1F3F4',
     borderTopRightRadius: 4,
+    opacity: isDark ? 0.3 : 1,
   },
   messageMenu: {
     padding: 8,
@@ -1797,28 +2090,29 @@ const styles = StyleSheet.create({
   senderLabel: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#5F6368',
+    color: textSecondary,
     marginBottom: 6,
   },
   botSenderLabel: {
-    color: '#5F6368',
+    color: textSecondary,
   },
   userSenderLabel: {
-    color: '#5F6368',
+    color: textSecondary,
     textAlign: 'right',
   },
   messageTimestamp: {
-    marginTop: 8,
-    fontSize: 11,
-    color: '#9AA0A6',
+    marginTop: 6,
+    fontSize: 10,
+    color: textSecondary,
+    opacity: 0.7,
   },
   messageText: {
     fontSize: 15,
     lineHeight: 22,
-    color: '#202124',
+    color: textColor,
   },
   userMessageText: {
-    color: '#202124',
+    color: isDark ? theme.colors.text : '#202124',
   },
   confidenceNote: {
     marginTop: 10,
@@ -1832,12 +2126,25 @@ const styles = StyleSheet.create({
   },
   loadingContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     padding: 12,
+    marginBottom: 8,
+  },
+  loadingBubble: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: isDark ? (theme.colors.surfaceVariant || theme.colors.surface) : '#E8F0FE',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 18,
+    borderTopLeftRadius: 4,
+    maxWidth: '75%',
   },
   loadingText: {
     marginLeft: 8,
-    color: lumaTheme.colors.textMuted,
+    color: textSecondary,
+    fontSize: 14,
+    fontStyle: 'italic',
   },
   carousel: {
     maxHeight: 100,
@@ -1847,9 +2154,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   suggestionCard: {
-    backgroundColor: 'rgba(30, 30, 40, 0.8)',
+    backgroundColor: isDark ? 'rgba(30, 30, 40, 0.8)' : 'rgba(255, 255, 255, 0.9)',
     borderWidth: 1.5,
-    borderColor: 'rgba(147, 51, 234, 0.4)',
+    borderColor: isDark ? 'rgba(147, 51, 234, 0.4)' : 'rgba(79, 142, 255, 0.3)',
     paddingHorizontal: 20,
     paddingVertical: 14,
     borderRadius: 20,
@@ -1857,10 +2164,10 @@ const styles = StyleSheet.create({
     width: width * 0.7,
     justifyContent: 'center',
     alignItems: 'center',
-    ...lumaTheme.shadows.medium,
+    ...(isDark ? lumaTheme.shadows.medium : {}),
   },
   suggestionText: {
-    color: lumaTheme.colors.text,
+    color: textColor,
     fontSize: 14,
     fontWeight: '500',
     textAlign: 'center',
@@ -1868,10 +2175,10 @@ const styles = StyleSheet.create({
   },
   // Gemini Input Styles
   geminiInputContainer: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: surfaceColor,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#E8EAED',
+    borderTopColor: dividerColor,
     position: 'absolute',
     bottom: 0,
     left: 0,
@@ -1887,7 +2194,7 @@ const styles = StyleSheet.create({
   geminiInputField: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    backgroundColor: '#F1F3F4',
+    backgroundColor: isDark ? (theme.colors.surfaceVariant || theme.colors.surface) : '#F1F3F4',
     marginHorizontal: 16,
     borderRadius: 24,
     paddingHorizontal: 4,
@@ -1895,7 +2202,7 @@ const styles = StyleSheet.create({
     minHeight: 56,
     maxHeight: 120,
     borderWidth: 1,
-    borderColor: '#E8EAED',
+    borderColor: borderColor,
     ...(Platform.OS === 'web' && {
       width: '100%',
       maxWidth: '100%',
@@ -1905,7 +2212,7 @@ const styles = StyleSheet.create({
   geminiTextInput: {
     flex: 1,
     fontSize: 16,
-    color: '#202124',
+    color: textColor,
     paddingVertical: 12,
     paddingHorizontal: 8,
     maxHeight: 120,
@@ -1928,7 +2235,7 @@ const styles = StyleSheet.create({
   },
   geminiDisclaimer: {
     fontSize: 11,
-    color: '#9AA0A6',
+    color: textSecondary,
     textAlign: 'center',
     marginTop: 8,
     paddingHorizontal: 16,
@@ -1973,6 +2280,45 @@ const styles = StyleSheet.create({
     borderLeftWidth: 3,
     borderLeftColor: '#4285F4',
   },
+  offlineMessageBlock: {
+    borderLeftWidth: 3,
+    borderLeftColor: '#9AA0A6',
+    opacity: 0.9,
+  },
+  messageSourceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+    flexWrap: 'wrap',
+  },
+  sourceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: isDark ? 'rgba(66, 133, 244, 0.2)' : '#E8F0FE',
+    marginRight: 6,
+    marginBottom: 4,
+  },
+  offlineBadge: {
+    backgroundColor: isDark ? 'rgba(154, 160, 166, 0.2)' : '#F1F3F4',
+  },
+  aiBadge: {
+    backgroundColor: isDark ? 'rgba(156, 39, 176, 0.2)' : '#F3E5F5',
+  },
+  sourceBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#4285F4',
+    marginLeft: 4,
+  },
+  offlineBadgeText: {
+    color: '#9AA0A6',
+  },
+  aiBadgeText: {
+    color: '#9C27B0',
+  },
   kbBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2013,7 +2359,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   historyContainer: {
-    backgroundColor: lumaTheme.colors.surface,
+    backgroundColor: surfaceColor,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: height * 0.7,
@@ -2025,12 +2371,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: lumaTheme.colors.border,
+    borderBottomColor: borderColor,
   },
   historyTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: lumaTheme.colors.text,
+    color: textColor,
   },
   historyList: {
     flex: 1,
@@ -2038,23 +2384,24 @@ const styles = StyleSheet.create({
   historyItem: {
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: lumaTheme.colors.border,
+    borderBottomColor: borderColor,
   },
   activeHistoryItem: {
-    backgroundColor: 'rgba(100, 100, 255, 0.1)',
+    backgroundColor: isDark ? 'rgba(79, 142, 255, 0.2)' : 'rgba(100, 100, 255, 0.1)',
   },
   historyItemTitle: {
     fontSize: 16,
-    color: lumaTheme.colors.text,
+    color: textColor,
     marginBottom: 4,
   },
   historyItemDate: {
     fontSize: 12,
-    color: lumaTheme.colors.textMuted,
+    color: textSecondary,
   },
   emptyHistory: {
     textAlign: 'center',
     padding: 40,
-    color: lumaTheme.colors.textMuted,
+    color: textSecondary,
   },
 });
+};

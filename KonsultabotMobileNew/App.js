@@ -6,12 +6,13 @@ import { ActivityIndicator, View, StyleSheet, Text, Button, LogBox } from 'react
 import { Provider as PaperProvider } from 'react-native-paper';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { ChatHistoryProvider } from './src/context/ChatHistoryContext';
+import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import MainNavigator from './src/navigation/MainNavigator';
 import LoginScreen from './src/screens/auth/LoginScreen';
 import RegisterScreen from './src/screens/auth/RegisterScreen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { lumaTheme } from './src/theme/lumaTheme';
 import WelcomeScreen from './src/screens/WelcomeScreen';
+import { initializeKnowledgeBase } from './utils/offlineKnowledgeBase';
 
 const Stack = createStackNavigator();
 
@@ -24,11 +25,12 @@ LogBox.ignoreLogs([
 // Error Boundary Component
 function NavigationWrapper() {
   const { user, isLoading } = useAuth();
+  const { theme } = useTheme();
 
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={lumaTheme.colors.primary} />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
   }
@@ -37,7 +39,7 @@ function NavigationWrapper() {
     <Stack.Navigator
       screenOptions={{
         headerShown: false,
-        cardStyle: { backgroundColor: lumaTheme.colors.background },
+        cardStyle: { backgroundColor: theme.colors.background },
       }}
     >
       {!user ? (
@@ -52,6 +54,27 @@ function NavigationWrapper() {
         <Stack.Screen name="Main" component={MainNavigator} />
       )}
     </Stack.Navigator>
+  );
+}
+
+// Component that uses theme from context
+function ThemeAwareApp() {
+  const { theme, isDark } = useTheme();
+
+  return (
+    <PaperProvider theme={theme}>
+      <AuthProvider>
+        <ChatHistoryProvider>
+          <NavigationContainer
+            onReady={() => console.log('✅ Navigation ready')}
+            onStateChange={() => {}}
+          >
+            <StatusBar style={isDark ? "light" : "dark"} />
+            <NavigationWrapper />
+          </NavigationContainer>
+        </ChatHistoryProvider>
+      </AuthProvider>
+    </PaperProvider>
   );
 }
 
@@ -133,11 +156,6 @@ export default function App() {
         try {
           console.log('🚀 App initializing...');
           
-          // Test critical imports
-          if (!lumaTheme) {
-            throw new Error('lumaTheme not found');
-          }
-          
           // Small delay to ensure everything is loaded
           await new Promise(resolve => setTimeout(resolve, 200));
           
@@ -188,19 +206,9 @@ export default function App() {
     return (
       <ErrorBoundary>
         <SafeAreaProvider>
-          <PaperProvider theme={lumaTheme}>
-            <AuthProvider>
-              <ChatHistoryProvider>
-                <NavigationContainer
-                  onReady={() => console.log('✅ Navigation ready')}
-                  onStateChange={() => {}}
-                >
-                  <StatusBar style="light" />
-                  <NavigationWrapper />
-                </NavigationContainer>
-              </ChatHistoryProvider>
-            </AuthProvider>
-          </PaperProvider>
+          <ThemeProvider>
+            <ThemeAwareApp />
+          </ThemeProvider>
         </SafeAreaProvider>
       </ErrorBoundary>
     );
@@ -219,14 +227,12 @@ export default function App() {
 const styles = StyleSheet.create({
   responsiveWrapper: {
     flex: 1,
-    backgroundColor: lumaTheme.colors.background,
     alignItems: 'center',
   },
   responsiveContainer: {
     flex: 1,
     width: '100%',
     maxWidth: 480,
-    backgroundColor: lumaTheme.colors.background,
   },
   container: {
     flex: 1,
@@ -236,7 +242,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: lumaTheme.colors.background,
   },
   loadingText: {
     marginTop: 10,
