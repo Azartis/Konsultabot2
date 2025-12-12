@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "KonsultabotMobileNew",
+    "slug": "KonsultabotMobileNew",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": false,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "apiUrl": "https://unmutated-nondeprecatively-bonnie.ngrok-free.dev"
+    },
+    "plugins": [
+      ["@react-native-voice/voice", {
+        "microphonePermission": "Allow Konsultabot to access your microphone",
+        "speechRecognitionPermission": "Allow Konsultabot to securely recognize user speech"
+      }]
+    ]
+  }
+}
